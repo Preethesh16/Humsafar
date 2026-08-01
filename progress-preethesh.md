@@ -139,4 +139,4 @@
 - Why: this prevents optional production access and partner-track work from distracting from the sandbox transaction that the core submission needs.
 - Blocked on: the user completing the Prava production-access form or sharing its non-secret questions for review.
 - Needs from Jeswin/Deepthi: nothing at this step.
-- Commit: pending (workflow decision will be pushed through `preethesh/integrations-backend` and merged to `main`)
+- Commit: `278b3bf` (workflow decision committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)

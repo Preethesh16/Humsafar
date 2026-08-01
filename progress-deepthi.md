@@ -206,3 +206,15 @@
 - Blocked on: Priority 0 items 1, 2 and 4 remain blocked on gate G2 and on Jeswin.
 - Needs from Preethesh: emit `sandbox` or `production` as the purchase `source` once real charges exist — `live` is ambiguous under the new vocabulary and my code will keep treating it as unproven. Also propagate the structured `errorCode` you identified (e.g. `THRESHOLD_EXCEEDED`); with it I can honestly show "declined as expected" as cap-enforcement evidence, and without it I will not claim it.
 - Commit: `b81156c` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-02 00:35 IST] — Merged provenance labelling into `main`; gate G2 has opened
+- Prompt: pull anything new from `main`, then merge my work into `main`.
+- Files changed: `progress-deepthi.md` only; the merge carried the provenance work.
+- Merged in first: `origin/main` `9f47a99` — Preethesh's **gate G2 backend primitives**: `approvalService`, the run-scoped approval routes, and the mandate resolver. Clean merge.
+- **My §6 taste-step proposal was accepted.** It is now 🟢 locked in `INTERFACES.md` as an additive, post-Prava-gate contract, with Preethesh requiring mandatory `runId` correlation rather than the single-active-run shortcut I had offered as the cheaper option. His reasoning is better than mine was: explicit `runId` means a delayed click can never mutate a later run. Photos are cut first if time runs short.
+- **Gate G2 has opened, which unblocks my Priority 0 items 1 and 2.** The new `INTERFACES.md` §7 protocol is `POST /api/approvals/requests`, `GET /api/approvals/:id?runId=`, `POST /api/approvals/:id/decision`, and `POST /api/approvals/:id/consume`. That is a four-call protocol with expiry and one-shot consumption, so the approval UI is now buildable rather than blocked — it is the next thing I pick up.
+- Merged out: `deepthi/frontend-demo` into `main` with `--no-ff`, carrying `provenance.js`, its 12 tests, the run-level mixed-mode receipt banner, and the exact `precaution.md` labels.
+- Validation before pushing `main`: clean tree, no conflicts, **59/59** JS tests, 80/80 Python, render smoke test at 24 assertions.
+- Blocked on: nothing in my lane any more. Priority 0 items 1 and 2 are now unblocked by G2; item 4 still waits on Jeswin's agent identity, and the taste step still waits on the G4 Prava evidence gate by design.
+- Needs from Preethesh: unchanged — emit `sandbox`/`production` as the purchase `source`, and propagate the structured `errorCode`, so the labels can reflect real evidence rather than staying pessimistic by default.
+- Commit: `60e7669` (merged to `main`)

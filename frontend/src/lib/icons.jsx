@@ -50,6 +50,14 @@ export const IconList = (p) => (
   <svg {...base} {...p}><path d="M8.5 6.5h11" /><path d="M8.5 12h11" /><path d="M8.5 17.5h11" /><path d="M4.5 6.5h.01" /><path d="M4.5 12h.01" /><path d="M4.5 17.5h.01" /></svg>
 );
 
+export const IconSearch = (p) => (
+  <svg {...base} {...p}><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+);
+
+export const IconArrow = (p) => (
+  <svg {...base} {...p}><path d="M4 12h15" /><path d="m13 6 6 6-6 6" /></svg>
+);
+
 export const IconRefresh = (p) => (
   <svg {...base} {...p}><path d="M20 12a8 8 0 1 1-2.3-5.6" /><path d="M20 4v5h-5" /></svg>
 );

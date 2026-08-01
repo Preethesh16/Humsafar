@@ -9,7 +9,7 @@ import { PurchaseCards } from "./components/PurchaseCards.jsx";
 import { PHASES, summarize } from "./state/sessionReducer.js";
 import { SOURCE, initialSource, useEventStream } from "./lib/useEventStream.js";
 import { money } from "./lib/agents.js";
-import { IconShield, IconSpark } from "./lib/icons.jsx";
+import { IconArrow, IconCheck, IconSearch, IconSpark } from "./lib/icons.jsx";
 
 /**
  * The four journey steps, and which phases mark each one reached. Derived
@@ -55,71 +55,80 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="brand-mark">
-            <IconShield />
-          </span>
+          <span className="brand-mark">H</span>
           Humsafar
         </div>
 
         <div className="status-row">
           <span className={`status ${isMock ? "sim" : connection === "open" ? "live" : "warn"}`}>
-            {isMock ? "simulated stream" : connection}
+            Prava · {isMock ? "simulated" : connection}
           </span>
-          <span className="status">{PHASE_LABEL[state.phase]}</span>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={!isMock}
-              onChange={(e) => setSource(e.target.checked ? SOURCE.LIVE : SOURCE.MOCK)}
-            />
-            Live backend
-          </label>
+          <span className={`status ${state.phase === PHASES.COMPLETE ? "live" : ""}`}>
+            Agents · {PHASE_LABEL[state.phase]}
+          </span>
         </div>
       </header>
 
       <section className="hero">
         <div>
-          <div className="eyebrow">Agentic commerce · Prava</div>
+          <div className="eyebrow">Agentic commerce, with a seatbelt</div>
           <h1>
-            One goal. One budget.<br />
+            One goal. One budget.
             <em>Zero overspend.</em>
           </h1>
-          <p className="hero-copy">
-            Four specialist agents negotiate over the same finite pot, then each one
-            buys its part on its <strong>own merchant-locked Prava card</strong>. No
-            agent can reach another's slice — and none of them can exceed it.
-          </p>
         </div>
 
-        <div className="command">
-          <div className="command-labels">
-            <span>Budget</span>
-            <span>Allocated</span>
-            <span>Spent</span>
-          </div>
-          <div className="command-figures">
-            <div className="figure">
-              <b>{summary.budget > 0 ? money(summary.budget) : "—"}</b>
-              <span>total pot</span>
-            </div>
-            <div className={`figure ${summary.overBudget ? "over" : ""}`}>
-              <b>{summary.allocated > 0 ? money(summary.allocated) : "—"}</b>
-              <span>{summary.overBudget ? "over the pot" : "across 4 agents"}</span>
-            </div>
-            <div className="figure">
-              <b>{summary.spent > 0 ? money(summary.spent) : "—"}</b>
-              <span>settled purchases</span>
-            </div>
-          </div>
-          <div className="command-note">
-            <span className="preset">
-              <i />
-              Plan my Goa trip under ₹30,000
-            </span>
-            <span>{state.audit.length} events</span>
-          </div>
-        </div>
+        <p className="hero-copy">
+          Humsafar gives specialist buying agents one finite pot. They{" "}
+          <strong>negotiate the trade-offs</strong>, then Prava locks every winner to
+          its merchant and amount.
+        </p>
       </section>
+
+      <div className="command">
+        <div className="command-labels">
+          <span>Outcome you want</span>
+          <span>Hard ceiling</span>
+          <span className="right">Event source</span>
+        </div>
+
+        <div className="command-row">
+          <div className="input-shell">
+            <IconSearch />
+            <span className="goal">Plan my Goa trip under ₹30,000</span>
+          </div>
+
+          <div className={`input-shell ${summary.overBudget ? "over" : ""}`}>
+            <span className="ceiling">
+              {summary.budget > 0 ? money(summary.budget) : <em>not set yet</em>}
+            </span>
+          </div>
+
+          <label className="mode-btn">
+            <input
+              type="checkbox"
+              checked={!isMock}
+              onChange={(e) => setSource(e.target.checked ? SOURCE.LIVE : SOURCE.MOCK)}
+            />
+            {isMock ? "Use live backend" : "Use simulated"}
+            <IconArrow />
+          </label>
+        </div>
+
+        <div className="command-note">
+          <span className="preset">
+            <i />
+            {isMock
+              ? "Judge-ready scenario · about 30 seconds"
+              : "Live stream from the orchestration backend"}
+          </span>
+          <span>
+            {summary.allocated > 0 ? `${money(summary.allocated)} allocated · ` : ""}
+            {summary.spent > 0 ? `${money(summary.spent)} spent · ` : ""}
+            {state.audit.length} events
+          </span>
+        </div>
+      </div>
 
       {isMock && (
         <div className="sim-notice" role="status">
@@ -138,23 +147,22 @@ export default function App() {
         </div>
       )}
 
-      <div style={{ marginTop: 26 }}>
-        <div className="journey">
-          {JOURNEY.map((step, index) => (
+      <div className="journey">
+        {JOURNEY.map((step, index) => {
+          const complete = index < activeStep;
+          return (
             <div
               key={step.title}
-              className={`journey-step ${
-                index === activeStep ? "active" : index < activeStep ? "complete" : ""
-              }`}
+              className={`journey-step ${index === activeStep ? "active" : complete ? "complete" : ""}`}
             >
-              <span className="journey-number">{index + 1}</span>
+              <span className="journey-number">{complete ? <IconCheck /> : index + 1}</span>
               <span className="journey-copy">
                 <b>{step.title}</b>
                 <span>{step.note}</span>
               </span>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       <main className="workspace">

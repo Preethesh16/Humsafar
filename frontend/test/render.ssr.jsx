@@ -11,6 +11,7 @@
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import App from "../src/App.jsx";
 import { AuditLog } from "../src/components/AuditLog.jsx";
 import { BudgetSplit } from "../src/components/BudgetSplit.jsx";
 import { DeliberationFeed } from "../src/components/DeliberationFeed.jsx";
@@ -82,11 +83,28 @@ for (const [needle, description] of expectations) {
   assert.ok(html.includes(needle), `rendered markup should contain ${description}: "${needle}"`);
 }
 
+// The app shell itself must render — it carries the hero, the journey stepper
+// and the simulated-stream notice, none of which the panel renders above cover.
+const shell = renderToStaticMarkup(<App />);
+for (const [needle, description] of [
+  ["One goal. One budget.", "hero headline"],
+  ["Zero overspend.", "hero headline accent"],
+  ["Agentic commerce, with a seatbelt", "eyebrow"],
+  ["Simulated stream", "mock notice heading"],
+  ["No real agents, no real Prava", "mock notice body"],
+  ["Negotiate", "journey step 1"],
+  ["Lock spend", "journey step 3"],
+  ["Truth layer", "footer disclosure"],
+]) {
+  assert.ok(shell.includes(needle), `app shell should contain ${description}: "${needle}"`);
+}
+
 // Nothing rendered may imply a live transaction while on the mocked stream.
 assert.ok(!html.includes("live transaction"), "mocked stream must never render a live-transaction tag");
 
 console.log(
   `render smoke test passed — ${MOCK_EVENTS.length} events folded, ` +
     `${state.messages.length} messages, ${state.purchases.length} purchases, ` +
-    `${html.length} chars of markup, ${expectations.length} assertions.`,
+    `${html.length} chars of panel markup + ${shell.length} of app shell, ` +
+    `${expectations.length + 8} content assertions.`,
 );

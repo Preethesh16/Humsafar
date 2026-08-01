@@ -283,3 +283,14 @@
 - Blocked on: the user placing both values in the local gitignored `.env`; only the secret is required for the immediate read-only verification.
 - Needs from Jeswin/Deepthi: Jeswin needs neither raw key. Deepthi may use only the publishable key if the browser SDK phase is implemented and must never import or expose `PRAVA_SECRET_KEY`.
 - Commit: `ef4f615` (dual-key documentation committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 00:07 IST] — Mapped the dashboard key shown in the screenshot
+- Prompt: shared the Prava Sandbox API Keys dashboard and asked exactly what to fill and where.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: confirmed the masked dashboard key begins with `pk_test_` and therefore belongs in local `PRAVA_PUBLISHABLE_KEY`; the separately saved `sk_test_` value belongs in backend-only `PRAVA_SECRET_KEY`.
+- Validation: visually inspected the supplied Sandbox-tab screenshot and matched its visible key prefix against Prava's current official dual-key authentication table.
+- Decision: keep the existing active default key; do not rotate, revoke, or create another. Configure both values only in the gitignored root `.env`, then use the secret-key-backed read-only verifier.
+- Why: the shown publishable key is intended for browser SDK initialization and cannot authenticate the current REST backend; the secret key must remain server-only.
+- Blocked on: the user entering the two already-saved values locally and running `npm run prava:verify`.
+- Needs from Jeswin/Deepthi: none now; Deepthi may later consume only the publishable key through an approved browser SDK path.
+- Commit: pending (dashboard mapping log on `preethesh/integrations-backend`)

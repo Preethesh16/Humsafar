@@ -111,3 +111,17 @@
 - Blocked on: nothing
 - Needs from Jeswin/Preethesh: nothing.
 - Commit: `fa86e0e` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 16:20 IST] — Audited the build against the spec; found and fixed a mislabelling bug
+- Prompt: asked whether all the features work as specified in the Markdown files.
+- Files changed: `frontend/src/components/FinalReceipt.jsx`, `frontend/src/lib/mockStream.js`, `frontend/src/styles.css`, `frontend/test/render.ssr.jsx`, `progress-deepthi.md`.
+- Audit performed: re-read Jeswin's new producer-behaviour notes in `INTERFACES.md` §2 and checked each one against the dashboard, then read the agent core's `events.py` and `orchestrator.py` directly instead of trusting the prose.
+- Checked and correct: repeated `split_update` at the same round (the reducer always takes the latest, never keys by round); over-budget early rounds render as overflow rather than being clamped; `final_receipt` is treated as the terminal signal; all four allocation keys always present. Currency units were the biggest risk — the agent core works in integer paise — but `to_rupees()` converts at the event boundary, so the wire carries rupees and the existing formatting is right.
+- **Bug found and fixed:** each `final_receipt.purchases` line carries its own `status` and `source`, and the receipt rendered neither. A fixture line and a *failed* line both displayed as completed purchases with an amount charged. On the mocked stream the banner masked it; on the live stream there is no banner, so this was a real mislabelling of a fixture as a completed order — the exact disqualifier risk in the handbook. Failed lines now read "not charged", fixture lines "simulated · fixture", live lines "live order", untagged lines "source unverified". The copied fan-out summary carries the same labels.
+- Decision: also filled `status`/`source` into the mocked receipt lines so the mock exercises the same labelling path as a real run. This touches `mockStream.js`, which I had otherwise kept frozen — the event shapes and stream flow are unchanged, only the fixture payload gained the two fields the real producer already sends. Flagging it explicitly because I had previously reported that file as untouched.
+- Known gap, not fixed: `summarize()` totals only the four locked categories, so an allocation key outside those four would be omitted from the allocated total. Jeswin's note says the current MVP goals never emit one; fixing it would mean changing reducer logic, so I am flagging rather than pre-emptively changing it.
+- Validation: 36/36 at the repo root, render assertions up to 24, clean build. The new test builds a receipt shaped exactly like the agent core's `_close()` output and asserts a fixture line cannot borrow the live-order label.
+- **Scope still outstanding (not started):** the optional Flutter passkey screen, and the demo video plus Devfolio submission writeup — pitch, Prava integration explanation, disclosure section and track evidence. These are items 4 and 5 of my brief in `build-prompts.md`.
+- Blocked on: nothing
+- Needs from Jeswin: nothing — the producer notes were accurate and caught a real bug on my side.
+- Commit: `4e578b4` (pushed to `deepthi/frontend-demo`)

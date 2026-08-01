@@ -37,7 +37,7 @@ _FIXTURES: dict[str, list[tuple[str, str, str, str, float]]] = {
         ("SpiceJet", "SG-482 BLR-GOI return, late arrival", "duffel-spicejet", "7400.00", 3.8),
         ("Akasa Air", "QP-1382 BLR-GOI return, morning out", "duffel-akasa", "8200.00", 4.3),
         ("Air India Express", "IX-1128 BLR-GOI return, direct", "duffel-air-india-express", "9800.00", 4.4),
-        ("Vistara", "UK-857 BLR-GOI return, flexible fare", "duffel-vistara", "11800.00", 4.6),
+        ("Air India", "BLR-GOI return, flexible fare", "duffel-air-india", "11800.00", 4.6),
     ],
     "stay": [
         ("Zostel Goa", "2 nights, private twin, Anjuna", "duffel-zostel", "5400.00", 4.0),

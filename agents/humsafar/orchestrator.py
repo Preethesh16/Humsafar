@@ -1,0 +1,446 @@
+"""The Orchestrator — goal in, executed plan out.
+
+Runs the whole flow from brainstorming.md §7:
+
+    goal + budget -> specialists -> negotiation -> one approval
+      -> a scoped card per agent -> purchases
+      -> recover any failed slice -> receipt
+
+Two demo beats are first-class here rather than bolted on, because both are
+recovery paths a real product needs anyway:
+
+  * `overspend_agent` makes one agent attempt a charge above its slice, so the
+    card network refuses it on screen.
+  * `fail_agent` makes one booking fail after its card was issued, so the
+    orchestrator re-negotiates *only that slice* instead of restarting.
+"""
+
+from dataclasses import dataclass, field
+from typing import Optional
+
+from .cards import ScopedCard, StubScopedCardClient
+from .checkout import Checkout, SimulatedCheckout
+from .discovery import DiscoveryProvider, FixtureDiscovery, categories_for_goal
+from .events import EventEmitter
+from .guardian import Guardian
+from .mediator import Mediator
+from .models import NegotiationResult, Purchase, Specialist
+from .money import format_inr, to_paise, to_rupees
+from .negotiation import NegotiationEngine, build_specialists
+
+# How far over its slice the overspend beat reaches. Comfortably past any cap,
+# so a refusal is unambiguous rather than a rounding argument.
+OVERSPEND_MULTIPLIER = 1.6
+
+
+@dataclass
+class RunConfig:
+    goal: str
+    budget_paise: int
+    overspend_agent: Optional[str] = None
+    fail_agent: Optional[str] = None
+    auto_approve: bool = True
+
+
+@dataclass
+class RunReport:
+    goal: str
+    budget_paise: int
+    negotiation: Optional[NegotiationResult]
+    purchases: list[Purchase] = field(default_factory=list)
+    blocked: list[dict] = field(default_factory=list)
+    renegotiated: list[str] = field(default_factory=list)
+    approved: bool = False
+
+    @property
+    def total_spent_paise(self) -> int:
+        return sum(p.amount_paise for p in self.purchases if p.status == "success")
+
+    @property
+    def within_budget(self) -> bool:
+        return self.total_spent_paise <= self.budget_paise
+
+
+class Orchestrator:
+    def __init__(
+        self,
+        emitter: EventEmitter,
+        card_client=None,
+        checkout: Optional[Checkout] = None,
+        provider: Optional[DiscoveryProvider] = None,
+        narrator=None,
+    ) -> None:
+        self.emitter = emitter
+        self.card_client = card_client or StubScopedCardClient()
+        self.checkout = checkout or SimulatedCheckout()
+        self.provider = provider or FixtureDiscovery()
+        self.narrator = narrator
+        self.mediator = Mediator()
+
+    def run(self, config: RunConfig) -> RunReport:
+        report = RunReport(goal=config.goal, budget_paise=config.budget_paise, negotiation=None)
+
+        specialists = self._assemble(config)
+        if not specialists:
+            self._say(
+                "orchestrator",
+                f"I could not find any purchasable options for {config.goal!r}. Nothing to negotiate.",
+            )
+            return report
+
+        report.negotiation = self._negotiate(specialists, config)
+        allocations = report.negotiation.allocations_paise
+
+        if not self._approve(allocations, config):
+            self._say("orchestrator", "Approval declined. No cards minted, no money moved.")
+            return report
+
+        report.approved = True
+        by_category = {s.category: s for s in specialists}
+
+        for specialist in specialists:
+            self._execute(specialist, allocations[specialist.category], config, report)
+
+        self._recover(by_category, allocations, report)
+
+        if config.overspend_agent in by_category:
+            self._attempt_overspend(
+                by_category[config.overspend_agent],
+                allocations[config.overspend_agent],
+                report,
+            )
+
+        self._close(report)
+        return report
+
+    # -- phases ---------------------------------------------------------
+
+    def _assemble(self, config: RunConfig) -> list[Specialist]:
+        categories = categories_for_goal(config.goal)
+        self._say(
+            "orchestrator",
+            f"Goal: {config.goal}. Budget: {format_inr(config.budget_paise)}. "
+            f"Bringing in {len(categories)} specialists: {', '.join(categories)}.",
+        )
+
+        specialists = build_specialists(categories, self.provider, config.goal)
+        for specialist in specialists:
+            sources = {o.source for o in specialist.options}
+            self._say(
+                specialist.category,
+                f"Found {len(specialist.options)} options "
+                f"({'/'.join(sorted(sources))} data). Cheapest viable is "
+                f"{format_inr(specialist.minimum_paise)}.",
+            )
+        return specialists
+
+    def _negotiate(self, specialists: list[Specialist], config: RunConfig) -> NegotiationResult:
+        engine = NegotiationEngine(
+            specialists=specialists,
+            budget_paise=config.budget_paise,
+            mediator=self.mediator,
+            on_message=self._say,
+            on_split=lambda allocations, rnd: self.emitter.split_update(
+                allocations, config.budget_paise, rnd
+            ),
+            narrator=self.narrator,
+        )
+        result = engine.run()
+        self._say(
+            "orchestrator",
+            f"Negotiation closed after {len(result.rounds)} round(s) ({result.exit_reason}). "
+            f"Allocated {format_inr(result.total_allocated_paise)} of "
+            f"{format_inr(config.budget_paise)}.",
+        )
+        return result
+
+    def _approve(self, allocations: dict[str, int], config: RunConfig) -> bool:
+        self.emitter.approval_requested(allocations)
+        self._say(
+            "orchestrator",
+            "Sending the split for approval. One passkey covers the whole plan — after this, "
+            "no agent can be prompted into spending outside its own slice.",
+        )
+        if not config.auto_approve:
+            return False
+        self.emitter.approval_given()
+        return True
+
+    def _execute(
+        self,
+        specialist: Specialist,
+        slice_paise: int,
+        config: RunConfig,
+        report: RunReport,
+    ) -> None:
+        option = specialist.cheapest_within(slice_paise)
+        if option is None:
+            self._say(
+                specialist.category,
+                f"My slice is {format_inr(slice_paise)} and the cheapest thing I found is "
+                f"{format_inr(specialist.minimum_paise)}. I can't buy anything with this.",
+            )
+            report.purchases.append(
+                Purchase(
+                    agent=specialist.category,
+                    merchant="none",
+                    description="no affordable option",
+                    amount_paise=0,
+                    status="failed",
+                    card_id="",
+                    source="fixture",
+                    detail=f"Slice {format_inr(slice_paise)} is below the category floor",
+                )
+            )
+            self.emitter.purchase_result(
+                specialist.category,
+                "failed",
+                0,
+                "none",
+                f"No option within the {format_inr(slice_paise)} slice",
+            )
+            return
+
+        guardian = Guardian({o.merchant for o in specialist.options})
+        verdict = guardian.check(specialist.category, option, slice_paise, config.goal)
+        if not verdict.allowed:
+            self._record_block(specialist.category, option.price_paise, slice_paise, verdict.reason, report)
+            return
+
+        # The card is capped at the agreed slice, not at this purchase — that is
+        # the property the whole product rests on. Even if this agent is later
+        # talked into a different purchase, the credential cannot exceed its
+        # slice or reach another agent's money.
+        card = self.card_client.mint(option.merchant, slice_paise)
+        if not card.issued:
+            self._say(
+                specialist.category,
+                f"No card, no purchase: {card.get('error', 'issuance failed')}",
+            )
+            self.emitter.purchase_result(
+                specialist.category,
+                "failed",
+                0,
+                option.merchant,
+                f"Card issuance failed: {card.get('error', 'unknown error')}",
+            )
+            report.purchases.append(
+                Purchase(
+                    agent=specialist.category,
+                    merchant=option.merchant,
+                    description=option.description,
+                    amount_paise=0,
+                    status="failed",
+                    card_id="",
+                    source="fixture",
+                    detail=str(card.get("error", "card issuance failed")),
+                )
+            )
+            return
+
+        self.emitter.card_issued(specialist.category, card["cardId"], slice_paise)
+        result = self.checkout.pay(option, card)
+        status = "success" if result.ok else "failed"
+        amount = option.price_paise if result.ok else 0
+
+        report.purchases.append(
+            Purchase(
+                agent=specialist.category,
+                merchant=option.merchant,
+                description=f"{option.vendor} — {option.description}",
+                amount_paise=amount,
+                status=status,
+                card_id=card["cardId"],
+                source=result.get("source", "fixture"),
+                detail=result.get("detail", ""),
+            )
+        )
+        self.emitter.purchase_result(
+            specialist.category, status, amount, option.merchant, result.get("detail", "")
+        )
+        self._say(
+            specialist.category,
+            f"{'Booked' if result.ok else 'Failed'} {option.vendor} at "
+            f"{format_inr(option.price_paise)} on a card capped at {format_inr(slice_paise)}.",
+        )
+
+    def _recover(
+        self,
+        by_category: dict[str, Specialist],
+        allocations: dict[str, int],
+        report: RunReport,
+    ) -> None:
+        """Re-negotiate only the slices that failed, never the whole plan."""
+        failures = [p for p in report.purchases if p.status == "failed" and p.agent in by_category]
+        if not failures:
+            return
+
+        for failure in failures:
+            specialist = by_category[failure.agent]
+            freed = allocations[failure.agent]
+            unspent = report.budget_paise - report.total_spent_paise
+            available = min(freed, unspent)
+
+            self.emitter.renegotiation_triggered(
+                failure.agent,
+                f"{failure.agent} booking failed after its card was issued; re-negotiating that "
+                f"slice only ({format_inr(available)} available)",
+            )
+            self._say(
+                "mediator",
+                f"{specialist.display_name} lost its booking. Only its slice goes back on the "
+                f"table — the other three purchases stand. Retrying inside "
+                f"{format_inr(available)}.",
+            )
+            report.renegotiated.append(failure.agent)
+
+            option = specialist.cheapest_within(available)
+            if option is None:
+                self._say(
+                    specialist.category,
+                    f"Nothing left in my category under {format_inr(available)}. Standing down.",
+                )
+                continue
+
+            card = self.card_client.mint(option.merchant, available)
+            if not card.issued:
+                self._say(
+                    specialist.category,
+                    f"Retry blocked at issuance: {card.get('error', 'unknown error')}",
+                )
+                continue
+
+            self.emitter.card_issued(specialist.category, card["cardId"], available)
+            result = self.checkout.pay(option, card)
+            if not result.ok:
+                self.emitter.purchase_result(
+                    specialist.category, "failed", 0, option.merchant, result.get("detail", "")
+                )
+                continue
+
+            failure.status = "success"
+            failure.merchant = option.merchant
+            failure.description = f"{option.vendor} — {option.description}"
+            failure.amount_paise = option.price_paise
+            failure.card_id = card["cardId"]
+            failure.source = result.get("source", "fixture")
+            failure.detail = f"Recovered after re-negotiation. {result.get('detail', '')}"
+
+            self.emitter.purchase_result(
+                specialist.category,
+                "success",
+                option.price_paise,
+                option.merchant,
+                failure.detail,
+            )
+            self._say(
+                specialist.category,
+                f"Recovered — {option.vendor} at {format_inr(option.price_paise)}, "
+                f"still inside the original slice.",
+            )
+
+    def _attempt_overspend(
+        self, specialist: Specialist, slice_paise: int, report: RunReport
+    ) -> None:
+        """The proof shot: try to charge past the slice and get refused.
+
+        Routed through a real mint call on purpose. The guardian could reject
+        this in software in a microsecond, but then the block would be our `if`
+        statement, not the card network — and the card network is what we claim
+        on stage. See guardian.py for the full reasoning.
+        """
+        attempted = int(slice_paise * OVERSPEND_MULTIPLIER)
+        # Aim at the merchant this agent actually holds a mandate for. Pointing
+        # the attempt at some other merchant would prove nothing: it would be
+        # refused for the wrong reason (no mandate) rather than for exceeding
+        # the agreed cap.
+        bought = next(
+            (p for p in report.purchases if p.agent == specialist.category and p.status == "success"),
+            None,
+        )
+        merchant = bought.merchant if bought else specialist.options[0].merchant
+
+        self._say(
+            specialist.category,
+            f"Trying a {format_inr(attempted)} upgrade — {format_inr(attempted - slice_paise)} "
+            f"past my agreed slice.",
+        )
+
+        card = self.card_client.mint(merchant, attempted)
+        if card.issued:
+            # Worth failing loudly: if this ever succeeds, the safety claim at
+            # the centre of the product is not true and must not be demoed.
+            self._say(
+                "orchestrator",
+                f"WARNING: an over-slice charge of {format_inr(attempted)} was authorised. The "
+                f"cap is not being enforced — do not present this as a blocked attempt.",
+            )
+            return
+
+        reason = Guardian.describe_card_block(
+            specialist.display_name, attempted, slice_paise, str(card.get("error", ""))
+        )
+        self._record_block(specialist.category, attempted, slice_paise, reason, report)
+
+    def _close(self, report: RunReport) -> None:
+        purchases = [
+            {
+                "agent": p.agent,
+                "merchant": p.merchant,
+                "description": p.description,
+                "amount": to_rupees(p.amount_paise),
+                "status": p.status,
+                "cardId": p.card_id,
+                "source": p.source,
+                "details": p.detail,
+            }
+            for p in report.purchases
+        ]
+        succeeded = sum(1 for p in report.purchases if p.status == "success")
+        self._say(
+            "orchestrator",
+            f"Done. {succeeded}/{len(report.purchases)} purchases completed, "
+            f"{format_inr(report.total_spent_paise)} spent of "
+            f"{format_inr(report.budget_paise)}. "
+            f"{format_inr(report.budget_paise - report.total_spent_paise)} never left the account.",
+        )
+        # Emitted last, deliberately: `final_receipt` is the dashboard's signal
+        # that the run is over, so nothing may follow it.
+        self.emitter.final_receipt(purchases, report.total_spent_paise, report.budget_paise)
+
+    # -- helpers --------------------------------------------------------
+
+    def _record_block(
+        self, agent: str, attempted_paise: int, cap_paise: int, reason: str, report: RunReport
+    ) -> None:
+        report.blocked.append(
+            {"agent": agent, "attempted": to_rupees(attempted_paise), "cap": to_rupees(cap_paise), "reason": reason}
+        )
+        self.emitter.blocked_attempt(agent, attempted_paise, cap_paise, reason)
+        self._say("orchestrator", reason)
+
+    def _say(self, agent: str, message: str) -> None:
+        self.emitter.agent_message(agent, message)
+
+
+def run_goal(
+    goal: str,
+    budget_rupees,
+    emitter: EventEmitter,
+    **kwargs,
+) -> RunReport:
+    """Convenience entry point used by the CLI and the tests."""
+    config = RunConfig(
+        goal=goal,
+        budget_paise=to_paise(budget_rupees),
+        overspend_agent=kwargs.pop("overspend_agent", None),
+        fail_agent=kwargs.pop("fail_agent", None),
+        auto_approve=kwargs.pop("auto_approve", True),
+    )
+    # The failure beat is a property of checkout, but it is configured on the
+    # run — wire it here so callers only have to name the agent.
+    if config.fail_agent and "checkout" not in kwargs:
+        kwargs["checkout"] = SimulatedCheckout(fail_categories=(config.fail_agent,))
+
+    orchestrator = Orchestrator(emitter, **kwargs)
+    return orchestrator.run(config)

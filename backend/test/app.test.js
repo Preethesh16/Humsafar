@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { createApp } from "../src/app.js";
 import { EventHub } from "../src/events/eventHub.js";
+import { ApprovalService } from "../src/services/approvalService.js";
 
 test("health, event ingestion, validation, auth, and scoped card routes work", async (t) => {
   const eventHub = new EventHub();
@@ -20,6 +21,14 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
           amountCap: input[2],
           status: "issued",
         };
+      },
+    },
+    approvalService: new ApprovalService({ createId: () => "approval_1" }),
+    mandateService: {
+      resolveMandate(merchant) {
+        return merchant === "Duffel"
+          ? { data: { mandateId: "mdt_123", merchant }, source: "sandbox" }
+          : undefined;
       },
     },
   });
@@ -77,4 +86,58 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
   });
   assert.equal(card.status, 201);
   assert.deepEqual(scopedCardInput, ["mdt_123", "Duffel", 500]);
+
+  const approvalRequest = await fetch(`${baseUrl}/api/approvals/requests`, {
+    method: "POST",
+    headers: {
+      authorization: "Bearer internal-test-token",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      runId: "run_1",
+      allocations: { flights: 100, stay: 200, food: 50, guide: 25 },
+    }),
+  });
+  assert.equal(approvalRequest.status, 201);
+  const approval = await approvalRequest.json();
+
+  const decision = await fetch(`${baseUrl}/api/approvals/approval_1/decision`, {
+    method: "POST",
+    headers: {
+      authorization: "Bearer internal-test-token",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      approvalRequestId: "attacker-controlled-id",
+      runId: "run_1",
+      digest: approval.digest,
+      decision: "approved",
+    }),
+  });
+  assert.equal(decision.status, 202);
+  assert.equal((await decision.json()).status, "approved");
+
+  const consume = await fetch(`${baseUrl}/api/approvals/approval_1/consume`, {
+    method: "POST",
+    headers: {
+      authorization: "Bearer internal-test-token",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      approvalRequestId: "attacker-controlled-id",
+      runId: "run_1",
+      digest: approval.digest,
+    }),
+  });
+  assert.equal(consume.status, 200);
+  assert.equal((await consume.json()).status, "consumed");
+
+  const mandate = await fetch(`${baseUrl}/api/prava/mandates/resolve?merchant=Duffel`, {
+    headers: { authorization: "Bearer internal-test-token" },
+  });
+  assert.equal(mandate.status, 200);
+  assert.deepEqual(await mandate.json(), {
+    data: { mandateId: "mdt_123", merchant: "Duffel" },
+    source: "sandbox",
+  });
 });

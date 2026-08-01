@@ -33,10 +33,27 @@ T = TypeVar("T", bound=BaseModel)
 
 # Cheap model for the repeated specialist turns, stronger one reserved for
 # arbitration and goal parsing — the split brainstorming.md §4 asked for.
-SPECIALIST_MODEL = os.environ.get("HUMSAFAR_SPECIALIST_MODEL", "gpt-4.1-mini")
-REASONING_MODEL = os.environ.get("HUMSAFAR_REASONING_MODEL", "gpt-4.1")
+#
+# Two measured constraints drove this choice, both worth keeping in mind if it
+# is ever changed:
+#
+# 1. **Do not use a reasoning model for dialogue.** gpt-5-nano spent 31.8s of
+#    extended thinking to produce one two-sentence negotiating line. Four of
+#    those per round is not a demo, it is a stall. gpt-4.1-nano returns the same
+#    job in ~2.2s.
+# 2. **Rate limits are per-model.** On a free/unverified tier gpt-4.1-mini
+#    allows only 50 requests per DAY, and this account exhausted it during
+#    development while other models still had quota. A demo must not depend on
+#    a bucket that ordinary iteration can drain.
+SPECIALIST_MODEL = os.environ.get("HUMSAFAR_SPECIALIST_MODEL", "gpt-4.1-nano")
+REASONING_MODEL = os.environ.get("HUMSAFAR_REASONING_MODEL", "gpt-5.6-sol")
 
 DEFAULT_TIMEOUT = float(os.environ.get("HUMSAFAR_AGENT_TIMEOUT", "12"))
+
+# Concurrency for one negotiation round. Free-tier RPM can be as low as 10, and
+# four specialists plus the intent and mediator calls already sit close to that
+# in a single minute, so a round is never allowed to burst wider than this.
+ROUND_CONCURRENCY = int(os.environ.get("HUMSAFAR_ROUND_CONCURRENCY", "4"))
 
 # Turned on before the SDK is imported anywhere else in the process. These are
 # the documented switches that keep model and tool payloads out of traces.
@@ -128,8 +145,10 @@ class AgentRuntime:
         self.reasoning_model = reasoning_model
         self.calls = 0
         self.failures = 0
+        self.rate_limited = False
         self._agents: dict[str, object] = {}
         self._reported = False
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
         key = api_key or os.environ.get("OPENAI_API_KEY")
         self.available = bool(enabled and key)
@@ -208,20 +227,135 @@ class AgentRuntime:
         try:
             from agents import Runner
 
-            async def _run():
-                return await asyncio.wait_for(Runner.run(agent, prompt), timeout=limit)
-
             self.calls += 1
-            result = asyncio.run(_run())
-            return result.final_output
+            return self._drive(self._attempt(agent, prompt, limit))
         except asyncio.TimeoutError:
             self._degrade(f"{agent_key} timed out after {limit}s")
             return None
         except Exception as exc:  # noqa: BLE001 - never let reasoning break a run
+            self._note_exception(exc)
             self._degrade(f"{agent_key} call failed: {type(exc).__name__}")
             return None
 
+    def ask_many(
+        self, requests: list[tuple[str, str]], timeout: Optional[float] = None
+    ) -> list[Optional[BaseModel]]:
+        """Run several agents concurrently. Same None-on-failure contract.
+
+        The specialists in one negotiation round argue independently, so running
+        them sequentially just adds their latencies together — about 10s a round
+        against a demo beat that is only supposed to last 45s. Concurrency here
+        is the difference between a negotiation that reads live and one the
+        audience waits through.
+
+        Results come back positionally, and one agent failing never affects the
+        others: a failed slot is `None` and falls back to deterministic text.
+        """
+        if not self.available or not requests:
+            return [None] * len(requests)
+
+        limit = timeout if timeout is not None else self.timeout
+
+        try:
+            from agents import Runner
+
+            gate = asyncio.Semaphore(max(1, ROUND_CONCURRENCY))
+
+            async def _one(agent_key: str, prompt: str):
+                agent = self._agents.get(agent_key)
+                if agent is None:
+                    return None
+                async with gate:
+                    try:
+                        return await self._attempt(agent, prompt, limit)
+                    except Exception as exc:  # noqa: BLE001 - per-slot isolation
+                        self._note_exception(exc)
+                        return None
+
+            async def _all():
+                return await asyncio.gather(*(_one(k, p) for k, p in requests))
+
+            self.calls += len(requests)
+            results = self._drive(_all())
+        except Exception as exc:  # noqa: BLE001
+            self._degrade(f"batch call failed: {type(exc).__name__}")
+            return [None] * len(requests)
+
+        missing = sum(1 for r in results if r is None)
+        if missing:
+            self._degrade(f"{missing}/{len(requests)} agent(s) fell back this round")
+        return list(results)
+
     # -- internals -------------------------------------------------------
+
+    def _drive(self, coro):
+        """Run a coroutine on this runtime's own, persistent event loop.
+
+        `asyncio.run` creates and destroys a loop per call, and the OpenAI
+        client's HTTP connection pool binds to the loop it was first used on.
+        After a couple of calls the pool is holding connections tied to loops
+        that no longer exist, and the next request dies with an
+        `APIConnectionError` that looks exactly like a network fault.
+
+        Observed as: intent and the specialist round succeeding, then the
+        mediator failing every single time. One loop for the runtime's lifetime
+        removes the whole class of problem.
+        """
+        if self._loop is None or self._loop.is_closed():
+            self._loop = asyncio.new_event_loop()
+        return self._loop.run_until_complete(coro)
+
+    def close(self) -> None:
+        """Release the runtime's event loop. Safe to call more than once."""
+        loop, self._loop = self._loop, None
+        if loop is not None and not loop.is_closed():
+            loop.close()
+
+    async def _attempt(self, agent, prompt: str, limit: float):
+        """One call, with a single retry for transient transport failures.
+
+        Connection errors to the API proved intermittent on this network —
+        roughly one call in six, hitting whichever agent happened to be next
+        rather than any particular one. A single bounded retry converts most of
+        those into a successful line instead of a silent fallback.
+
+        Deliberately narrow, per `precaution.md`: retry transport faults only.
+        A rate limit is never retried — it will not clear inside a run, and
+        retrying it just burns the remaining per-minute allowance.
+        """
+        from agents import Runner
+
+        for attempt in (1, 2):
+            try:
+                result = await asyncio.wait_for(Runner.run(agent, prompt), timeout=limit)
+                return result.final_output
+            except asyncio.TimeoutError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                if attempt == 2 or not self._is_transient(exc):
+                    raise
+                await asyncio.sleep(0.4)
+        return None
+
+    @staticmethod
+    def _is_transient(exc: BaseException) -> bool:
+        name = type(exc).__name__
+        if name == "RateLimitError" or "429" in str(exc)[:80]:
+            return False
+        return name in {"APIConnectionError", "APITimeoutError", "InternalServerError"}
+
+    def _note_exception(self, exc: BaseException) -> None:
+        """Stop calling out entirely once the account is rate-limited.
+
+        A 429 will not clear within a run, so continuing to call wastes the
+        remaining per-minute allowance and — worse during a live demo — adds
+        seconds of dead air per agent while every request fails in turn. One
+        rate-limit response switches the whole run to deterministic text.
+        """
+        if type(exc).__name__ == "RateLimitError" or "429" in str(exc)[:80]:
+            self.rate_limited = True
+            self.available = False
+            self._degrade("OpenAI rate limit reached; run continues deterministically")
 
     def _degrade(self, reason: str) -> None:
         self.failures += 1

@@ -17,6 +17,7 @@ The engine holds no opinions about transport or LLMs — it reports through
 callbacks — so the whole thing is testable offline in milliseconds.
 """
 
+import os
 from typing import Callable, Optional
 
 from .discovery import DiscoveryProvider
@@ -26,6 +27,17 @@ from .models import NegotiationResult, Option, RoundRecord, Specialist
 from .money import format_inr
 
 MAX_ROUNDS = 5
+
+# How many opening rounds get model-written dialogue. Round 1 is where the
+# agents state their case and the model earns its place; the later rounds are
+# concessions, and the deterministic concession line ("Fine — I'll give up the
+# Taj and take Anjuna Beach Resort, that's Rs 4,800 back on the table") is
+# already the most concrete text in the transcript.
+#
+# This is a quota decision as much as an editorial one. A full run cost 10 model
+# calls; at the 50-requests-per-day free-tier ceiling that is five runs before
+# the demo stops working. Narrating the opening round only brings it to six.
+NARRATED_ROUNDS = int(os.environ.get("HUMSAFAR_NARRATED_ROUNDS", "1"))
 
 # Fraction of the outstanding gap the agents collectively close in each round.
 # Ramps to 1.0 so the negotiation always converges by round 3 whenever the
@@ -172,8 +184,13 @@ class NegotiationEngine:
             over_budget_paise=max(0, total - self.budget_paise),
         )
 
+        # Fetch the whole round's dialogue at once. The specialists argue
+        # independently, so waiting for them one after another just adds their
+        # latencies together — see AgentRuntime.ask_many.
+        spoken = self._argue_round(record)
         for specialist in self.specialists:
-            self._say(specialist.category, self._argue(specialist, record), record)
+            text = spoken.get(specialist.category) or self._default_argument(specialist, record)
+            self._say(specialist.category, text, record)
 
         self.on_split(asks, number)
         return record
@@ -293,6 +310,21 @@ class NegotiationEngine:
         )
 
     # -- dialogue -------------------------------------------------------
+
+    def _argue_round(self, record: RoundRecord) -> dict[str, Optional[str]]:
+        """Model dialogue for every specialist this round, or empty on fallback."""
+        if self.narrator is None or record.number > NARRATED_ROUNDS:
+            return {}
+
+        batch = getattr(self.narrator, "argue_many", None)
+        if batch is not None:
+            return batch(self.specialists, record, self.budget_paise) or {}
+
+        # A narrator without the batch method (a test double, say) still works.
+        return {
+            s.category: self.narrator.argue(s, record, self.budget_paise)
+            for s in self.specialists
+        }
 
     def _argue(self, specialist: Specialist, record: RoundRecord) -> str:
         if self.narrator is not None:

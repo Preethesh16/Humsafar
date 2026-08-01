@@ -33,10 +33,16 @@ class FakeRuntime:
         self.available = available
         self.responses = responses or {}
         self.prompts = []
+        self.batches = 0
 
     def ask(self, agent_key, prompt, timeout=None):
         self.prompts.append((agent_key, prompt))
         return self.responses.get(agent_key)
+
+    def ask_many(self, requests, timeout=None):
+        """Mirrors AgentRuntime's batch contract: positional, None on miss."""
+        self.batches += 1
+        return [self.ask(key, prompt) for key, prompt in requests]
 
     def trace_run(self, run_id):
         class _N:
@@ -146,9 +152,16 @@ class ParseIntentTest(unittest.TestCase):
 
     def test_uses_a_valid_model_plan(self):
         runtime = FakeRuntime({"intent": plan(("food", 0.9), ("guide", 0.4))})
-        intent = parse_intent("A food tour of Goa", runtime)
+        intent = parse_intent("Plan my Goa trip", runtime)
 
         self.assertEqual(intent.source, "openai")
+        self.assertAlmostEqual(intent.weights["food"], 0.9)
+
+    def test_narrowing_survives_for_a_non_travel_goal(self):
+        """The restore net is only for journeys; elsewhere the model decides."""
+        runtime = FakeRuntime({"intent": plan(("food", 0.9), ("guide", 0.4))})
+        intent = parse_intent("Stock my kitchen and hire a cook", runtime)
+
         self.assertEqual(intent.categories, ["food", "guide"])
 
     def test_the_budget_is_never_sent_to_the_model(self):
@@ -229,6 +242,109 @@ class NarratorTest(unittest.TestCase):
         # The deterministic settlement line is still there.
         self.assertTrue(any("Locking it in" in m for m in messages))
         self.assertTrue(report.within_budget)
+
+
+class RoundBatchingTest(unittest.TestCase):
+    """A round's specialists are fetched concurrently, not one after another."""
+
+    def _record(self):
+        from humsafar.models import RoundRecord
+
+        return RoundRecord(
+            number=2,
+            asks_paise={"flights": to_paise("9800"), "food": to_paise("3200")},
+            total_asked_paise=to_paise("13000"),
+            over_budget_paise=0,
+        )
+
+    def _specialists(self):
+        from humsafar.discovery import FixtureDiscovery
+        from humsafar.negotiation import build_specialists
+
+        return build_specialists(["flights", "food"], FixtureDiscovery(), "Goa")
+
+    def test_one_batch_per_round_not_one_call_per_agent(self):
+        runtime = FakeRuntime(
+            {k: AgentArgument(message="Holding.") for k in ("flights", "food")}
+        )
+        narrator = Narrator(runtime=runtime)
+
+        spoken = narrator.argue_many(self._specialists(), self._record(), to_paise("30000"))
+
+        self.assertEqual(runtime.batches, 1)
+        self.assertEqual(set(spoken), {"flights", "food"})
+
+    def test_a_runtime_without_ask_many_still_works(self):
+        class SerialOnly:
+            available = True
+
+            def ask(self, key, prompt, timeout=None):
+                return AgentArgument(message="Serial line.")
+
+        spoken = Narrator(runtime=SerialOnly()).argue_many(
+            self._specialists(), self._record(), to_paise("30000")
+        )
+        self.assertEqual(set(spoken.values()), {"Serial line."})
+
+    def test_one_agent_failing_does_not_silence_the_others(self):
+        runtime = FakeRuntime({"food": AgentArgument(message="Only me.")})
+        spoken = Narrator(runtime=runtime).argue_many(
+            self._specialists(), self._record(), to_paise("30000")
+        )
+
+        self.assertEqual(spoken["food"], "Only me.")
+        self.assertIsNone(spoken["flights"])
+
+
+class ConcededPositionPromptTest(unittest.TestCase):
+    """An agent must argue from where it is, not where it started.
+
+    Regression test for a real bug seen in a live run: the Stay Agent conceded
+    to Anjuna Beach Resort at Rs 11,200 and then announced it was staying at
+    the Taj for Rs 16,000. Every figure was one it had been given, so
+    `mentions_only` passed it — but the claim was incoherent on screen.
+    """
+
+    def test_a_conceded_agent_is_told_not_to_claim_its_opening(self):
+        from humsafar.discovery import FixtureDiscovery
+        from humsafar.models import RoundRecord
+        from humsafar.negotiation import build_specialists
+
+        specialist = build_specialists(["stay"], FixtureDiscovery(), "Goa")[0]
+        specialist.ask_paise = to_paise("11200")  # conceded from a 16,000 opening
+
+        runtime = FakeRuntime({"stay": AgentArgument(message="ok")})
+        record = RoundRecord(
+            number=2,
+            asks_paise={"stay": specialist.ask_paise},
+            total_asked_paise=specialist.ask_paise,
+            over_budget_paise=0,
+        )
+        Narrator(runtime=runtime).argue_many([specialist], record, to_paise("30000"))
+
+        _, prompt = runtime.prompts[0]
+        self.assertIn("ALREADY conceded", prompt)
+        self.assertIn("Do not claim you are getting anything above your current ask", prompt)
+        self.assertIn("Anjuna Beach Resort", prompt)
+
+    def test_an_opening_round_agent_is_not_told_it_conceded(self):
+        from humsafar.discovery import FixtureDiscovery
+        from humsafar.models import RoundRecord
+        from humsafar.negotiation import build_specialists
+
+        specialist = build_specialists(["stay"], FixtureDiscovery(), "Goa")[0]
+        runtime = FakeRuntime({"stay": AgentArgument(message="ok")})
+        record = RoundRecord(
+            number=1,
+            asks_paise={"stay": specialist.ask_paise},
+            total_asked_paise=specialist.ask_paise,
+            over_budget_paise=0,
+        )
+        Narrator(runtime=runtime).argue_many([specialist], record, to_paise("30000"))
+
+        _, prompt = runtime.prompts[0]
+        self.assertNotIn("ALREADY conceded", prompt)
+        self.assertIn("your opening position", prompt)
 
 
 class DeterminismTest(unittest.TestCase):
@@ -354,3 +470,47 @@ class RuntimeDegradationTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DroppedCategoryTest(unittest.TestCase):
+    """Roster omissions from the model are not trusted; its priorities are.
+
+    Regression test for a live failure: the same goal returned four categories
+    once and two the next time, dropping flights and stay from a trip and
+    leaving most of the budget unspent.
+    """
+
+    def test_a_dropped_travel_category_is_restored(self):
+        runtime = FakeRuntime({"intent": plan(("food", 0.9), ("guide", 0.6))})
+        intent = parse_intent("Plan my Goa trip, I really care about eating well", runtime)
+
+        self.assertEqual(set(intent.categories), {"flights", "stay", "food", "guide"})
+
+    def test_restored_categories_are_neutral_and_stated_ones_are_kept(self):
+        runtime = FakeRuntime({"intent": plan(("food", 0.9))})
+        intent = parse_intent("Plan my Goa trip", runtime)
+
+        self.assertAlmostEqual(intent.weights["food"], 0.9)
+        self.assertAlmostEqual(intent.weights["flights"], NEUTRAL_WEIGHT)
+        self.assertEqual(intent.source, "openai")
+
+    def test_a_full_roster_is_left_alone(self):
+        rows = [(c, 0.4) for c in ("flights", "stay", "food", "guide")]
+        intent = parse_intent("Plan my Goa trip", FakeRuntime({"intent": plan(*rows)}))
+
+        self.assertEqual(len(intent.categories), 4)
+        self.assertTrue(all(abs(w - 0.4) < 1e-9 for w in intent.weights.values()))
+
+    def test_the_restored_roster_spends_the_budget(self):
+        runtime = FakeRuntime({"intent": plan(("food", 0.9), ("guide", 0.6))})
+        emitter = EventEmitter(enabled=False)
+
+        report = run_goal(
+            "Plan my Goa trip, I really care about eating well",
+            "30000",
+            emitter,
+            narrator=Narrator(runtime=runtime),
+        )
+
+        self.assertEqual(len(report.purchases), 4)
+        self.assertGreater(report.total_spent_paise, to_paise("20000"))

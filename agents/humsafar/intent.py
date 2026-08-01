@@ -24,7 +24,7 @@ multiplier alongside slack, and every rupee is still computed deterministically.
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .discovery import categories_for_goal
+from .discovery import categories_for_goal, is_travel_goal
 from .models import WIRE_CATEGORIES
 
 NEUTRAL_WEIGHT = 0.5
@@ -132,4 +132,44 @@ def parse_intent(goal: str, runtime=None) -> GoalIntent:
     validated = validate_plan(plan)
     if validated is None:
         return keyword_intent(goal)
-    return validated
+
+    return _restore_dropped(validated, goal)
+
+
+def _restore_dropped(intent: GoalIntent, goal: str) -> GoalIntent:
+    """Add back categories the keyword parser is confident the goal needs.
+
+    Roster selection turned out to be the unreliable half of goal parsing. On
+    "Plan my Goa trip, I really care about eating well" the same model returned
+    all four categories once and only two the next time — reading the emphasis
+    on food as permission to drop flights and stay. A trip with no flights and
+    nowhere to sleep is not a plan, and it silently left most of the budget
+    unspent.
+
+    So the model's *priorities* are trusted and its *omissions* are not: any
+    category the keyword parser would have selected is restored at neutral
+    weight. Goals the keyword parser has no opinion about are still entirely
+    the model's call, which is what keeps arbitrary goals working.
+    """
+    # Only when the goal is *confidently* a journey. `categories_for_goal`
+    # falls back to the full roster whenever it has no opinion, so keying off
+    # that instead would restore all four categories for every goal and destroy
+    # the narrowing this agent exists to do.
+    if not is_travel_goal(goal):
+        return intent
+
+    missing = [c for c in WIRE_CATEGORIES if c not in intent.weights]
+    if not missing:
+        return intent
+
+    categories = list(intent.categories) + missing
+    weights = dict(intent.weights)
+    for category in missing:
+        weights[category] = NEUTRAL_WEIGHT
+
+    return GoalIntent(
+        categories=categories,
+        weights=weights,
+        summary=intent.summary,
+        source=intent.source,
+    )

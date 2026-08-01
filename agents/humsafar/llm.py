@@ -96,26 +96,80 @@ class Narrator:
         if not self.available:
             return None
 
-        best = max(specialist.options, key=lambda o: (o.rating, -o.price_paise))
+        prompt = self._argue_prompt(specialist, record, budget_paise)
         allowed = self._allowed_figures(specialist, record, budget_paise)
+        return self._speak(specialist.category, prompt, allowed)
+
+    def argue_many(
+        self, specialists: list[Specialist], record: RoundRecord, budget_paise: int
+    ) -> dict[str, Optional[str]]:
+        """One round of dialogue, all specialists concurrently.
+
+        Returns `{category: text or None}`; a None means that agent falls back
+        to its deterministic line, independently of the others.
+        """
+        if not self.available or not specialists:
+            return {s.category: None for s in specialists}
+
+        requests = [
+            (s.category, self._argue_prompt(s, record, budget_paise)) for s in specialists
+        ]
+
+        batch = getattr(self.runtime, "ask_many", None)
+        if batch is not None:
+            outputs = batch(requests)
+        else:
+            # Any runtime that only implements ask() still works, just serially.
+            outputs = [self.runtime.ask(key, prompt) for key, prompt in requests]
+
+        spoken: dict[str, Optional[str]] = {}
+        for specialist, output in zip(specialists, outputs):
+            allowed = self._allowed_figures(specialist, record, budget_paise)
+            spoken[specialist.category] = self._accept(output, allowed)
+        return spoken
+
+    def _argue_prompt(
+        self, specialist: Specialist, record: RoundRecord, budget_paise: int
+    ) -> str:
+        # The option the agent can actually afford at its *current* ask, not the
+        # one it opened wanting. Without this the model argues from a position
+        # it already conceded — announcing it is staying at a hotel it gave up
+        # two lines earlier, which reads as incoherent on screen even though
+        # every figure it quotes was technically supplied.
+        holding = specialist.cheapest_within(specialist.ask_paise)
+        conceded = specialist.opening_ask_paise - specialist.ask_paise
+
+        position = (
+            f"Your current ask: {format_inr(specialist.ask_paise)}"
+            + (
+                f" — you have ALREADY conceded {format_inr(conceded)} from your opening "
+                f"{format_inr(specialist.opening_ask_paise)}. Do not claim you are getting "
+                f"anything above your current ask."
+                if conceded > 0
+                else " (your opening position)."
+            )
+        )
+        holding_line = (
+            f"What that currently buys you: {holding.vendor} — {holding.description} "
+            f"at {format_inr(holding.price_paise)}.\n"
+            if holding is not None
+            else ""
+        )
 
         others = "; ".join(
             f"{category} is asking {format_inr(amount)}"
             for category, amount in record.asks_paise.items()
             if category != specialist.category
         )
-        prompt = (
+        return (
             f"Shared budget: {format_inr(budget_paise)}. Negotiation round {record.number}.\n"
-            f"Your current ask: {format_inr(specialist.ask_paise)}.\n"
+            f"{position}\n"
+            f"{holding_line}"
             f"Your floor (cheapest real option you found): {format_inr(specialist.minimum_paise)}.\n"
-            f"Your preferred option: {best.vendor} — {best.description} "
-            f"at {format_inr(best.price_paise)}.\n"
             f"Other agents: {others or 'none'}.\n"
             f"The table is currently {format_inr(record.over_budget_paise)} over budget.\n"
-            "Argue for your share."
+            "Argue for your share from your CURRENT position."
         )
-
-        return self._speak(specialist.category, prompt, allowed)
 
     # -- mediator ---------------------------------------------------------
 
@@ -169,7 +223,10 @@ class Narrator:
         return allowed
 
     def _speak(self, agent_key: str, prompt: str, allowed: Iterable[int]) -> Optional[str]:
-        output = self.runtime.ask(agent_key, prompt)
+        return self._accept(self.runtime.ask(agent_key, prompt), allowed)
+
+    def _accept(self, output, allowed: Iterable[int]) -> Optional[str]:
+        """Validate one model output into usable dialogue, or None."""
         if output is None:
             return None
 

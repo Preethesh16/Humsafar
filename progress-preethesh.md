@@ -272,3 +272,14 @@
 - Blocked on: local `.env` creation by the credential owner.
 - Needs from Jeswin/Deepthi: none for this credential placement step.
 - Commit: `9a45dd9` (credential clarification committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 00:04 IST] — Distinguished Prava's secret and publishable API keys
+- Prompt: clarified that Prava issued both one secret key and one API key.
+- Files changed: `.env.example`, `precaution.md`, and `progress-preethesh.md`; no runtime implementation changed.
+- Changed: documented the dual-key setup: `sk_test_...` maps to backend-only `PRAVA_SECRET_KEY`, while `pk_test_...` maps to `PRAVA_PUBLISHABLE_KEY` for future browser SDK initialization. Added both placeholders without values and a warning against exposing the secret through Vite/client code.
+- Validation: checked the current official Prava Authentication & Environments documentation, which specifies Bearer authentication for secret keys and browser SDK initialization for publishable keys; confirmed the existing backend correctly uses the secret Bearer form.
+- Decision: configure the secret key now for REST verification; retain the publishable key locally but do not wire it into the frontend until a real Prava browser SDK/passkey step is implemented.
+- Why: using the publishable key on server calls would fail authentication, while exposing the secret key in browser code would compromise the merchant account.
+- Blocked on: the user placing both values in the local gitignored `.env`; only the secret is required for the immediate read-only verification.
+- Needs from Jeswin/Deepthi: Jeswin needs neither raw key. Deepthi may use only the publishable key if the browser SDK phase is implemented and must never import or expose `PRAVA_SECRET_KEY`.
+- Commit: pending (dual-key documentation on `preethesh/integrations-backend`)

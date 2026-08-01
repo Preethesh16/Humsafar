@@ -21,6 +21,10 @@ an unanswered Discord question into an implementation assumption.
 
 ## Non-negotiable rules
 
+- Keep the dual-key roles separate: `sk_test_...` is
+  `PRAVA_SECRET_KEY` for server-to-server Bearer authentication only;
+  `pk_test_...` is the publishable/browser SDK key. The current REST backend
+  needs the secret key; do not substitute the publishable key in its place.
 - Use Prava **SDK/API in sandbox**. Prava MCP and CLI are production-only and
   are not the Humsafar integration path.
 - Never commit, paste, print, record, or screenshot an API key, the team test

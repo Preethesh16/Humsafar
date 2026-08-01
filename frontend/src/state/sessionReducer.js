@@ -27,7 +27,19 @@ export function initialState() {
     round: 0,
     allocations: {},
     messages: [],
-    approval: { requested: false, requestedAllocations: null, given: false, givenAt: null },
+    approval: {
+      requested: false,
+      requestedAllocations: null,
+      given: false,
+      givenAt: null,
+      // §7 correlation. Without all three of runId/approvalRequestId/digest the
+      // UI must not offer an approve button — the backend fails closed on a
+      // mismatch, so a request we cannot correlate is one we cannot answer.
+      runId: null,
+      approvalRequestId: null,
+      digest: null,
+      expiresAt: null,
+    },
     cards: {},
     purchases: [],
     blockedAttempts: [],
@@ -91,6 +103,13 @@ export function reduce(state, envelope) {
           ...next.approval,
           requested: true,
           requestedAllocations: event.allocations ? { ...event.allocations } : null,
+          runId: event.runId ?? null,
+          approvalRequestId: event.approvalRequestId ?? null,
+          digest: event.digest ?? null,
+          expiresAt: event.expiresAt ?? null,
+          // A fresh request supersedes any earlier decision for this run.
+          given: false,
+          givenAt: null,
         },
       };
 
@@ -98,7 +117,14 @@ export function reduce(state, envelope) {
       return {
         ...next,
         phase: PHASES.PURCHASING,
-        approval: { ...next.approval, given: true, givenAt: event.timestamp ?? null },
+        approval: {
+          ...next.approval,
+          given: true,
+          givenAt: event.timestamp ?? null,
+          runId: event.runId ?? next.approval.runId,
+          approvalRequestId: event.approvalRequestId ?? next.approval.approvalRequestId,
+          digest: event.digest ?? next.approval.digest,
+        },
       };
 
     case "card_issued":

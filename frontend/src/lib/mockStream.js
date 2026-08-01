@@ -32,8 +32,15 @@ const SCRIPT = [
   [600, { type: "agent_message", agent: "mediator", message: "Round 2 sums to ₹31,000. Still ₹1,000 over. Flights is a hard cost, so the remainder comes from the flexible three.", timestamp: iso(16) }],
   [500, { type: "split_update", allocations: { flights: 11800, stay: 9200, food: 5000, guide: 4000 }, totalBudget: BUDGET, round: 3 }],
   [600, { type: "agent_message", agent: "mediator", message: "Round 3 sums to ₹30,000 and no stated minimum is violated. Convergence condition 1 met — negotiation closed in 3 of 5 rounds.", timestamp: iso(18) }],
-  [400, { type: "approval_requested", allocations: { flights: 11800, stay: 9200, food: 5000, guide: 4000 } }],
-  [1600, { type: "approval_given", timestamp: iso(21) }],
+  // Carries the §7 correlation fields so the mocked run exercises the same
+  // approval path as a real one. The panel refuses to send anything on the
+  // mocked stream — there is no backend to answer — and says so.
+  [400, { type: "approval_requested", runId: "run_mock_01", approvalRequestId: "apr_mock_01",
+    digest: "sha256:mock-digest-not-a-real-approval",
+    expiresAt: new Date(Date.UTC(2026, 7, 1, 9, 2, 0)).toISOString(),
+    allocations: { flights: 11800, stay: 9200, food: 5000, guide: 4000 } }],
+  [1600, { type: "approval_given", runId: "run_mock_01", approvalRequestId: "apr_mock_01",
+    digest: "sha256:mock-digest-not-a-real-approval", timestamp: iso(21) }],
   [400, { type: "agent_message", agent: "orchestrator", message: "Approved. Minting one merchant-scoped Prava credential per agent, each capped at its agreed slice.", timestamp: iso(22) }],
   [400, { type: "card_issued", agent: "flights", cardId: "instr_mock_flights_01", amountCap: 11800 }],
   [250, { type: "card_issued", agent: "stay", cardId: "instr_mock_stay_01", amountCap: 9200 }],

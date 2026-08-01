@@ -26,7 +26,23 @@ export default defineConfig({
       interval: 300,
     },
     proxy: {
-      "/api": { target: BACKEND, changeOrigin: true },
+      // INTERFACES.md §7: the approval routes use INTERNAL_API_TOKEN when it is
+      // configured, and that token must never ship in browser JavaScript. The
+      // dev server is the trusted boundary locally — it attaches the header
+      // here, server-side, so the bundle never contains it. A real deployment
+      // needs an equivalent proxy; do not "solve" this by putting the token in
+      // import.meta.env, which would publish it to every visitor.
+      "/api": {
+        target: BACKEND,
+        changeOrigin: true,
+        configure: (proxy) => {
+          const token = process.env.INTERNAL_API_TOKEN;
+          if (!token) return;
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("Authorization", `Bearer ${token}`);
+          });
+        },
+      },
       "/health": { target: BACKEND, changeOrigin: true },
     },
   },

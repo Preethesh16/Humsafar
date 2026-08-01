@@ -34,14 +34,29 @@ export async function verifyPravaAccess({
   validateSandboxConfig({ apiKey, baseUrl, customerId });
 
   const client = new PravaClient({ apiKey, baseUrl, fetchImpl });
-  const result = await client.listMandates({
-    customerId: customerId.trim(),
-    standingOnly: true,
-  });
+  let result;
+  try {
+    result = await client.listMandates({
+      customerId: customerId.trim(),
+      standingOnly: true,
+    });
+  } catch (error) {
+    if (error?.code === "CUSTOMER_NOT_FOUND") {
+      return {
+        environment: "sandbox",
+        authentication: "ok",
+        customer: "not_created",
+        mandateCount: 0,
+        responseId: error.responseId,
+      };
+    }
+    throw error;
+  }
 
   return {
     environment: "sandbox",
     authentication: "ok",
+    customer: "found",
     mandateCount: result.data.mandates.length,
   };
 }

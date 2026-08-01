@@ -30,7 +30,33 @@ test("sandbox access check validates authentication without creating a transacti
   assert.deepEqual(result, {
     environment: "sandbox",
     authentication: "ok",
+    customer: "found",
     mandateCount: 0,
+  });
+});
+
+test("sandbox access check treats CUSTOMER_NOT_FOUND as authenticated setup state", async () => {
+  const result = await verifyPravaAccess({
+    apiKey: "sk_test_not-a-real-secret",
+    baseUrl: "https://sandbox.api.prava.space",
+    customerId: "new-humsafar-user",
+    fetchImpl: async () => new Response(JSON.stringify({
+      error: { code: "CUSTOMER_NOT_FOUND", message: "No such customer for this merchant" },
+    }), {
+      status: 404,
+      headers: {
+        "content-type": "application/json",
+        "x-response-id": "resp_customer_missing",
+      },
+    }),
+  });
+
+  assert.deepEqual(result, {
+    environment: "sandbox",
+    authentication: "ok",
+    customer: "not_created",
+    mandateCount: 0,
+    responseId: "resp_customer_missing",
   });
 });
 

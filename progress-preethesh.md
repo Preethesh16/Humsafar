@@ -95,4 +95,4 @@
 - Why: flaky discovery should not kill the demo, while simulated payment success or unverified prize-track claims would violate the project rules.
 - Blocked on: real Prava, Duffel, and Senso calls require local credentials; external NANDA registration and production deployment require a public URL. Code paths and honest fixture behavior are complete.
 - Needs from Jeswin/Deepthi: pass discovery inputs through the documented routes and display the top-level `source`; never label fixture trust/discovery or failed payment issuance as live.
-- Commit: pending
+- Commit: `d211855` (pushed to `preethesh/integrations-backend`; merge to `main` follows this log finalization)

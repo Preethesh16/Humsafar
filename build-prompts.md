@@ -2,7 +2,7 @@
 
 One prompt per person below. Each one is self-contained — paste the whole block for your name into your Claude Code or Codex session at the start of every work session (not just once), so the AI re-grounds itself even in a fresh session.
 
-**Before pasting**: make sure `brainstorming.md`, `INTERFACES.md`, `precaution.md`, `progress-jeswin.md`, `progress-preethesh.md`, and `progress-deepthi.md` all exist at the repo root and are up to date, since the prompt tells the AI to read them.
+**Before pasting**: make sure `brainstorming.md`, `INTERFACES.md`, `precaution.md`, `execution-plan.md`, `progress-jeswin.md`, `progress-preethesh.md`, and `progress-deepthi.md` all exist at the repo root and are up to date, since the prompt tells the AI to read them.
 
 ---
 
@@ -20,11 +20,12 @@ Before writing a single line of code, read these files in full, in this order:
 1. /brainstorming.md — full project context, decisions, and rationale
 2. /INTERFACES.md — locked cross-team function, event, fixture, and adapter contracts
 3. /precaution.md — sandbox, credential, passkey, checkout, evidence, and demo safeguards
-4. /progress-jeswin.md — your own prior work (this may be your first session — if
+4. /execution-plan.md — current remaining work, dependency gates, and three-person ownership
+5. /progress-jeswin.md — your own prior work (this may be your first session — if
    it only has a "not started yet" entry, that's expected)
-5. /progress-preethesh.md — what the backend/integrations teammate has built,
+6. /progress-preethesh.md — what the backend/integrations teammate has built,
    what interfaces they've exposed or are about to expose, what they're blocked on
-6. /progress-deepthi.md — what the frontend teammate needs from you (event
+7. /progress-deepthi.md — what the frontend teammate needs from you (event
    shapes, data formats) and what they've already built against
 
 Your scope for this build: the orchestrator, the specialist buyer agents
@@ -63,7 +64,7 @@ explicitly in your progress log so the team can correct it fast if it's
 wrong, and design your code so that assumption is isolated behind a
 function, not scattered through the codebase.
 
-Now: read the four files, then tell me what phase you're starting with and
+Now: read every required file above, then tell me what phase you're starting with and
 why, then begin.
 ```
 
@@ -87,10 +88,11 @@ Before writing a single line of code, read these files in full, in this order:
 2. /INTERFACES.md — locked cross-team contracts; implement these exact shapes
    and document any proposed change before changing code
 3. /precaution.md — sandbox, credential, passkey, checkout, evidence, and demo safeguards
-4. /progress-preethesh.md — your own prior work
-5. /progress-jeswin.md — what the agent-core teammate needs from you (the
+4. /execution-plan.md — current remaining work, dependency gates, and three-person ownership
+5. /progress-preethesh.md — your own prior work
+6. /progress-jeswin.md — what the agent-core teammate needs from you (the
    exact `mintScopedCard` function signature they're calling)
-6. /progress-deepthi.md — what event data the frontend teammate needs
+7. /progress-deepthi.md — what event data the frontend teammate needs
    streamed to them
 
 Your scope for this build, in priority order:
@@ -135,7 +137,7 @@ deliberately, and merge through a reviewed pull request. Explicitly document
 any locked-interface proposal in INTERFACES.md before changing dependent code,
 and notify Jeswin and Deepthi.
 
-Now: read the four files, then tell me what you're starting with and why,
+Now: read every required file above, then tell me what you're starting with and why,
 then begin — starting with the mandate/multi-card sandbox question.
 ```
 
@@ -156,9 +158,10 @@ Before writing a single line of code, read these files in full, in this order:
    script) and Section 8 (team split)
 2. /INTERFACES.md — locked cross-team function, event, fixture, and adapter contracts
 3. /precaution.md — sandbox, credential, passkey, checkout, evidence, and demo safeguards
-4. /progress-deepthi.md — your own prior work
-5. /progress-jeswin.md — what agent/negotiation data will exist to display
-6. /progress-preethesh.md — what event schema the backend will stream to you,
+4. /execution-plan.md — current remaining work, dependency gates, and three-person ownership
+5. /progress-deepthi.md — your own prior work
+6. /progress-jeswin.md — what agent/negotiation data will exist to display
+7. /progress-preethesh.md — what event schema the backend will stream to you,
    and what's still pending
 
 Your scope for this build:
@@ -193,7 +196,7 @@ others' latest changes, then append a new dated entry to
 Jeswin or Preethesh, and the commit hash. Do this every time you make a
 meaningful change.
 
-Now: read the four files, then tell me what you're starting with and why,
+Now: read every required file above, then tell me what you're starting with and why,
 then begin — mocked event stream first if the real one isn't ready yet.
 ```
 

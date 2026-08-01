@@ -50,7 +50,7 @@
 | Project NANDA Adapter | $1,000 OpenAI credits | Reusable Prava adapter for NANDA Town, documented, PR submitted |
 | Senso Discovery & Trust | $7,500 Senso credits | Senso **materially** influences a merchant/discovery decision, not just logged |
 
-Given our scope and time, **priority order to actually chase**: (1) Prava Overall, (2) OpenAI, (3) Senso (cheap to wire, real prize), (4) NANDA (cheap to wire). Visa and Linq require deeper, different integrations (Linq needs iMessage as the core interface — skip unless there's spare time) — do not chase these unless the core product is already rock solid.
+Current reviewed target set (see `execution-plan.md`): **Prava Overall, Visa Intelligent Commerce, OpenAI, and Localhost**. Senso is conditional on real access arriving early enough to affect a merchant decision; NANDA is conditional on the core flow and deployment; Linq is cut. Four evidenced tracks beat six shallow claims.
 
 ### Prava integration choice
 Handbook recommends **SDK/API** for hackathon builds needing an embedded/native payment experience with full control — this is our pick (not MCP or CLI, which need production access and suit chat-native or terminal-only agents).
@@ -87,7 +87,7 @@ Handbook recommends **SDK/API** for hackathon builds needing an embedded/native 
 
 ## 2. AGENT ARCHITECTURE
 
-- **Orchestrator ("The Planner"):** parses goal+budget, decides which specialists are needed, kicks off negotiation, holds the master Prava mandate, mints per-agent scoped cards after allocation, produces the final plan + running audit.
+- **Orchestrator ("The Planner"):** parses goal+budget, decides which specialists are needed, kicks off negotiation, coordinates the merchant-specific Prava mandates, mints per-agent scoped cards after allocation, and produces the final plan + running audit. It does not hold one unsupported cross-merchant master mandate.
 - **Specialist Buyer Agents** (one per category — Flights, Stay, Food, Guide/Activities): discover real options, estimate what they need, argue for budget share, push back on others, then discover → decide → checkout on their own scoped card.
 - **Mediator ("The Arbiter"):** does not negotiate for itself; validates fairness, resolves conflicts, prevents any one agent grabbing the whole pot, structures the final allocation. This buyer-pushes/mediator-arbitrates loop was refined by borrowing the negotiation structure from a teammate's separate prior project ("Accord" — buyer/seller/mediator agents for B2B agreements; we adapted the buyer/mediator pattern, not the seller side, since we don't have a seller).
 - **(Optional) Guardian check:** lightweight intent/anomaly check before any card is minted — one internal check, not the headline feature (that category is already crowded — Fystack, ATXP, Fireblocks, Airwallex, Meridian all do spend-firewall products).
@@ -180,7 +180,7 @@ Status: 🟡 **proposed 2026-08-01, not built.** Full contract in `INTERFACES.md
 1. Type: "Plan my Goa trip under ₹30k." (5s)
 2. Specialists appear and argue over the split; mediator settles it. (45s) ← the wow moment
 3. User taps approve once (passkey). (10s)
-4. Each agent buys its part live on its own scoped card — real sandbox transactions. (45s)
+4. Each agent executes its part; every genuine Prava sandbox result and every fixture result is labeled independently. Do not claim all four are sandbox checkouts unless all four were observed. (45s)
 5. Proof shot #1: an agent's off-goal/over-slice attempt is blocked at the card level, on screen. (25s)
 6. Proof shot #2: one agent's booking is deliberately failed; orchestrator re-negotiates only that slice and recovers live. (25s)
 7. Final receipt + audit + confirmation fan-out. (20s)

@@ -4,7 +4,7 @@
 
 **Assigned Git branch:** `preethesh/integrations-backend`. Push work only to this branch and open a pull request into `main`; do not push feature work directly to `main` or to another teammate's branch.
 
-**Before every session:** read `/brainstorming.md`, `/INTERFACES.md`, `/progress-jeswin.md`, and `/progress-deepthi.md` in full, THEN this file, before writing or changing anything.
+**Before every session:** read `/brainstorming.md`, `/INTERFACES.md`, `/precaution.md`, `/execution-plan.md`, `/progress-jeswin.md`, and `/progress-deepthi.md` in full, THEN this file, before writing or changing anything.
 
 **Every prompt and every file change must be logged:** append a dated entry for every user prompt, including prompts that result in no file changes. Never delete old entries. For a file-changing phase, include the exact files changed, validation performed, technical decision and reason, blockers, teammate needs, and pushed commit hash. For a prompt with no file changes, write `Files changed: none` and `Commit: n/a`; never create an empty commit merely to satisfy the log.
 
@@ -216,4 +216,15 @@
 - Why: the repeated failures were operational rather than architectural—lost keys, stale/outdated request shapes, passkey friction, no reliable sandbox merchant, browser-harness confusion, test-card declines and unclear limits. A single runbook prevents the team from rediscovering them while preserving truthful payment evidence.
 - Blocked on: the four Prava questions listed in `precaution.md`, plus local sandbox-key verification before any transaction-bearing call. Git finalization was initially blocked because `.git` was mounted read-only; write access was restored in the following session and the preserved working-tree changes were finalized without loss.
 - Needs from Jeswin/Deepthi: both must read `precaution.md` before changing payment/approval/demo behavior; Jeswin must preserve structured causes and cross-process mandate resolution, and Deepthi must use the exact sandbox/fixture/mixed-mode labels.
-- Commit: pending (precaution runbook preserved across the read-only session; finalization follows)
+- Commit: `567e7af` (precaution runbook committed on `preethesh/integrations-backend` after Git write access was restored)
+
+### [2026-08-01 23:37 IST] — Planned the remaining build across all three owners
+- Prompt: asked me to pull first, read every Markdown file and the current plan, then brainstorm and create a three-person remaining-work plan including meaningful OpenAI Agents/API use.
+- Files changed: added `execution-plan.md`; updated `brainstorming.md`, `build-prompts.md`, and `progress-preethesh.md`.
+- Changed: synchronized the latest `origin/main`, including Deepthi's proposed taste-step contract, then wrote a dependency-gated plan for Preethesh, Jeswin, and Deepthi with acceptance criteria, merge order, timeboxes, cut order, OpenAI agent roles, Prava evidence boundaries, deployment, and submission ownership. Added the plan to every role's mandatory startup reading.
+- Validation: pulled the current personal branch, fetched every remote branch, fast-forwarded the four new `main` commits, read all current Markdown and the revised execution-plan context, inspected the current OpenAI narrator/agent CLI/discovery/payment seams, and consulted current official OpenAI Agents SDK, orchestration, tracing, configuration and latest-model guidance. Node tests passed 40/40, Python tests passed 80/80, the frontend render smoke test and production build passed, `git diff --check` passed, and the credential scan found only the repository's explicit fake test keys.
+- Decision: use one server-side OpenAI project credential for all logical agents, not one key per specialist. Distinct `Agent` definitions and structured outputs provide identity; deterministic code retains all money, approval, Prava and checkout authority. The OpenAI Agents SDK replaces the decorative Chat Completions-only narrator with intent parsing, grounded specialists, and mediator explanation while preserving zero-key fallback. Deepthi's taste step is conditionally accepted only after genuine Prava evidence, with `runId` correlation and photos cut first.
+- Why: this gives the OpenAI track a material product role without allowing model output to move money, keeps the three branches independently actionable behind explicit contract gates, and protects the core transaction from optional track/polish work.
+- Blocked on: local `.env` is still absent, so Prava and OpenAI credential smoke checks cannot run. The user must place keys locally without sharing them; Prava's four open operational questions remain listed in `precaution.md`.
+- Needs from Jeswin/Deepthi: both must review the shared contract additions in `execution-plan.md` before dependent code. Jeswin owns Agents SDK and deterministic orchestration integration; Deepthi owns interactive UX, provenance, deployment and submission assets.
+- Commit: pending (planning documentation on `preethesh/integrations-backend`)

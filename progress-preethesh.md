@@ -261,3 +261,14 @@
 - Blocked on: `.env` is absent, so the read-only Prava authentication check and all deliberate sandbox calls remain blocked on Preethesh placing the existing sandbox key locally. The taste-step backend remains intentionally deferred until genuine Prava evidence passes G4.
 - Needs from Jeswin/Deepthi: Jeswin must consume the new resolver/approval endpoints, pass the new correlated approval events, and redact `cardToken`, `dynamicCvv`, expiry, and transaction identifiers in `ScopedCard.safe()` before any live-card run. Deepthi must use the approval request ID/digest/run ID, keep `INTERNAL_API_TOKEN` out of browser bundles, and render payment provenance separately from outcome. Both must pull the contract commit before dependent work.
 - Commit: `9d9d5f5` (G0/G2 implementation committed on `preethesh/integrations-backend`)
+
+### [2026-08-01 23:58 IST] — Clarified the existing Prava sandbox credentials
+- Prompt: said the Prava sandbox secret/API keys already exist and asked what happened to the sandbox integration.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: clarified that the sandbox implementation remains active and no credential or transaction was removed; the repository deliberately does not contain the user's key.
+- Validation: confirmed the current branch is `preethesh/integrations-backend` and the gitignored local `.env` file is absent, so no authenticated Prava request could have run from this workspace.
+- Decision: the user will place the existing `sk_test_...` sandbox secret locally as `PRAVA_SECRET_KEY`; it must not be pasted into chat or committed. Then `npm run prava:verify` performs the read-only authentication check before transaction-bearing calls.
+- Why: possession of a dashboard key and availability of that key to the local process are different states. Keeping the key outside Git/chat preserves it while allowing the existing sandbox client to authenticate once configured.
+- Blocked on: local `.env` creation by the credential owner.
+- Needs from Jeswin/Deepthi: none for this credential placement step.
+- Commit: pending (credential clarification log on `preethesh/integrations-backend`)

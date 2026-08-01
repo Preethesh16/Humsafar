@@ -151,3 +151,14 @@
 - Blocked on: the user creating the key and storing it locally without sharing or committing it.
 - Needs from Jeswin/Deepthi: nothing at this step.
 - Commit: `6b79a56` (dashboard guidance committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 22:26 IST] — Confirmed sandbox-only submission path
+- Prompt: decided not to pursue the production-access form because it requires a production-ready project and confirmed that the integration will be completed in sandbox.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: removed production approval from the active plan and made Prava Sandbox the sole payment environment for the hackathon build and evidence.
+- Validation: confirmed the dashboard is currently on the Sandbox key flow and the official Prava documentation designates sandbox for development/testing while production requires additional verification.
+- Decision: create and use the sandbox key, approved sandbox mandates, sandbox credentials, and a clearly labelled sandbox checkout. Do not request or use production access during this build.
+- Why: production access adds verification and real-world merchant/compliance risk without being required to demonstrate the integration. Sandbox gives the team the fastest safe path to genuine Prava API evidence.
+- Blocked on: the user creating the sandbox key and storing it locally without sharing or committing it.
+- Needs from Jeswin/Deepthi: describe successful Prava results as sandbox transactions, never production or real-money transactions.
+- Commit: pending (sandbox-only decision will be pushed through `preethesh/integrations-backend` and merged to `main`)

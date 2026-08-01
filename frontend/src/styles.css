@@ -354,6 +354,49 @@ h1 em {
 .runmode--ok { border-color: #a9d6bc; background: #edf9f2; }
 .runmode--ok b { color: var(--forest-2); }
 
+/* -------------------------------- approval -------------------------------- */
+.approval {
+  padding: 18px 20px; border: 1px solid #a9c6d8; border-radius: var(--radius);
+  background: linear-gradient(135deg, #eef4fa, rgba(255, 253, 248, 0.96));
+  box-shadow: var(--shadow-small); animation: outcome-in 0.45s ease;
+}
+.approval--approved { border-color: #9ec9ae; background: linear-gradient(135deg, #e9f7ef, rgba(255, 253, 248, 0.96)); }
+.approval--declined, .approval--expired, .approval--uncorrelated { border-color: #e6afa3; background: #fff6f2; }
+
+.approval__head { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; }
+.approval__icon { flex: 0 0 auto; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 11px; color: var(--blue); background: var(--blue-soft); }
+.approval--approved .approval__icon { color: var(--forest); background: var(--mint); }
+.approval--declined .approval__icon, .approval--expired .approval__icon, .approval--uncorrelated .approval__icon { color: var(--coral-ink); background: var(--coral-soft); }
+.approval__icon svg { width: 19px; height: 19px; }
+.approval__kicker { color: var(--muted); font: 760 9.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+.approval__head h3 { margin: 2px 0 0; font-size: 15px; letter-spacing: -0.02em; }
+.approval__timer { margin-left: auto; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--paper); font: 750 10px/1 var(--mono); font-variant-numeric: tabular-nums; }
+
+.approval__lines { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.approval__lines li { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+.approval__lines i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.approval__lines span { flex: 1; color: var(--muted); }
+.approval__lines b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.approval__total { padding-top: 7px; border-top: 1px solid var(--line); }
+.approval__total span { color: var(--ink); font-weight: 700; }
+.approval__total i { background: transparent !important; }
+
+.approval__ref { margin: 0 0 12px; color: var(--muted-2); font-size: 10px; word-break: break-all; }
+.approval__ref code { font-family: var(--mono); }
+
+.approval__actions { display: grid; grid-template-columns: 1fr auto; gap: 9px; }
+.approval__actions .run-btn { margin-top: 0; height: 44px; }
+.decline-btn {
+  height: 44px; padding: 0 18px; border-radius: 14px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--paper); color: var(--muted);
+  font-weight: 700; transition: border-color 0.18s ease, color 0.18s ease;
+}
+.decline-btn:hover { border-color: #e6afa3; color: var(--coral-ink); }
+
+.approval__note { margin: 10px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.approval__note--danger { color: var(--coral-ink); }
+.approval__note--ok { color: var(--forest-2); }
+
 /* --------------------------------- proof ---------------------------------- */
 .proof { padding: 18px 20px; border: 1px solid #e6afa3; border-radius: var(--radius); background: #fff6f2; box-shadow: var(--shadow-small); animation: outcome-in 0.45s ease; }
 .proof-top { display: flex; align-items: center; gap: 11px; margin-bottom: 9px; }

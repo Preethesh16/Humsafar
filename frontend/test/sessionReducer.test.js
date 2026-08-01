@@ -72,6 +72,49 @@ test("approval flow moves idle -> awaiting approval -> purchasing", () => {
   assert.equal(given.approval.givenAt, "2026-08-01T09:00:21.000Z");
 });
 
+test("approval_requested captures the §7 correlation fields", () => {
+  const state = fold([
+    {
+      type: "approval_requested",
+      runId: "run_9",
+      approvalRequestId: "apr_9",
+      digest: "sha256:deadbeef",
+      expiresAt: "2026-08-02T09:02:00.000Z",
+      allocations: { flights: 11800, stay: 9200, food: 5000, guide: 4000 },
+    },
+  ]);
+
+  assert.equal(state.approval.runId, "run_9");
+  assert.equal(state.approval.approvalRequestId, "apr_9");
+  assert.equal(state.approval.digest, "sha256:deadbeef");
+  assert.equal(state.approval.expiresAt, "2026-08-02T09:02:00.000Z");
+});
+
+test("a second approval_requested supersedes an earlier decision", () => {
+  const allocations = { flights: 1, stay: 1, food: 1, guide: 1 };
+  const state = fold([
+    { type: "approval_requested", runId: "r", approvalRequestId: "apr_1", digest: "d1", allocations },
+    { type: "approval_given", runId: "r", approvalRequestId: "apr_1", digest: "d1", timestamp: "2026-08-02T09:00:00.000Z" },
+    { type: "approval_requested", runId: "r", approvalRequestId: "apr_2", digest: "d2", allocations },
+  ]);
+
+  // The plan changed, so the old approval must not carry over to the new one.
+  assert.equal(state.approval.given, false);
+  assert.equal(state.approval.givenAt, null);
+  assert.equal(state.approval.approvalRequestId, "apr_2");
+  assert.equal(state.approval.digest, "d2");
+});
+
+test("correlation fields are absent rather than guessed when the event omits them", () => {
+  const state = fold([
+    { type: "approval_requested", allocations: { flights: 1, stay: 1, food: 1, guide: 1 } },
+  ]);
+
+  assert.equal(state.approval.runId, null);
+  assert.equal(state.approval.approvalRequestId, null);
+  assert.equal(state.approval.digest, null);
+});
+
 test("a re-issued card for the same agent replaces the previous credential", () => {
   const state = fold([
     { type: "card_issued", agent: "guide", cardId: "instr_a", amountCap: 4000 },

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { ApprovalPanel } from "./components/ApprovalPanel.jsx";
 import { AuditLog } from "./components/AuditLog.jsx";
 import { BudgetSplit } from "./components/BudgetSplit.jsx";
 import { DeliberationFeed } from "./components/DeliberationFeed.jsx";
@@ -169,6 +170,7 @@ export default function App() {
         <DeliberationFeed messages={state.messages} round={state.round} />
 
         <div className="rail">
+          <ApprovalPanel approval={state.approval} isMock={isMock} />
           <BudgetSplit allocations={state.allocations} summary={summary} round={state.round} />
           <PurchaseCards
             cards={state.cards}

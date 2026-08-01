@@ -129,3 +129,14 @@
 - Blocked on: the workspace still lacks `PRAVA_SECRET_KEY` and approved merchant-specific sandbox mandates. The contents of the user's email were not provided, so any form-specific deadline or condition in that email must be followed directly.
 - Needs from Jeswin/Deepthi: no new code dependency; preserve clear sandbox/production/fixture labels in the demo and submission.
 - Commit: `cea9f3c` (access decision committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 18:02 IST] — Locked the step-by-step execution order
+- Prompt: confirmed that the remaining work should be completed sequentially, finishing the current access step before starting the next one.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: recorded the agreed order: submit the Prava production-access form without waiting on approval, obtain and verify sandbox access, complete one genuine sandbox transaction and cap-rejection proof, then implement interactive UX/deployment, and finish the video and submission package last.
+- Validation: confirmed the working tree was clean and both `main` and `preethesh/integrations-backend` were synchronized before this log entry.
+- Decision: keep exactly one active milestone at a time and verify its evidence before moving forward.
+- Why: this prevents optional production access and partner-track work from distracting from the sandbox transaction that the core submission needs.
+- Blocked on: the user completing the Prava production-access form or sharing its non-secret questions for review.
+- Needs from Jeswin/Deepthi: nothing at this step.
+- Commit: pending (workflow decision will be pushed through `preethesh/integrations-backend` and merged to `main`)

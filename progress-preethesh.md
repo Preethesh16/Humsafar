@@ -140,3 +140,14 @@
 - Blocked on: the user completing the Prava production-access form or sharing its non-secret questions for review.
 - Needs from Jeswin/Deepthi: nothing at this step.
 - Commit: `278b3bf` (workflow decision committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 22:25 IST] — Guided sandbox API-key creation
+- Prompt: shared the Prava dashboard's Create API Key screen and asked whether this is the correct step and what to enter for Merchant URL.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: confirmed this is the sandbox-key step, not the production-access form, and documented the safe field values.
+- Validation: inspected the supplied dashboard screenshot, checked the public repository URL, and rechecked Prava's official sandbox/API-key guidance.
+- Decision: keep Environment set to `Sandbox`, keep Application name `Humsafar`, and use the existing public project URL `https://github.com/Preethesh16/Humsafar` as the honest Merchant URL until a deployed Humsafar HTTPS URL exists. Do not use `localhost`, an invented domain, or a destination travel vendor's URL.
+- Why: the field identifies the Humsafar application/merchant account. The public repository is an owned, reachable HTTPS project URL and is safer than permanently associating the key with a domain the team does not control.
+- Blocked on: the user creating the key and storing it locally without sharing or committing it.
+- Needs from Jeswin/Deepthi: nothing at this step.
+- Commit: pending (dashboard guidance will be pushed through `preethesh/integrations-backend` and merged to `main`)

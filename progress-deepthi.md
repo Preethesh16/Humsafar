@@ -86,4 +86,4 @@
 - Validation: `npm test` at the repo root passes **36/36** (Preethesh's merge added 7). `npm run test:render` passes with 15 assertions (up from 12) over the full 32-event script. Clean production build. Restarted the backend on the merged code and re-ran the end-to-end check: `/health` ok, his new `/.well-known/agentfacts.json` returns 200, and a POSTed `agent_message` came back through the Vite proxy SSE stream correctly framed.
 - Blocked on: nothing
 - Needs from Jeswin/Preethesh: nothing new.
-- Commit: `4e21e33` (pushed to `deepthi/frontend-demo`)
+- Commit: `9de1257` (pushed to `deepthi/frontend-demo`), after merge commit `bff608b` brought in `main` at `95657ea`.

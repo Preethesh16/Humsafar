@@ -100,3 +100,14 @@
 - Blocked on: nothing
 - Needs from Jeswin/Preethesh: nothing new.
 - Commit: `539a4d9` (pushed to `deepthi/frontend-demo`), after merge commit `0b22b27` brought in `main` at `16c7677`.
+
+### [2026-08-01 15:58 IST] — Fixed the stale dev server that hid every UI change
+- Prompt: asked why the dark theme was still showing.
+- Files changed: `frontend/vite.config.js`, `frontend/README.md`, `progress-deepthi.md`.
+- Problem found: the re-themed code was correct and committed, but the browser was being served the old dark build. Two Vite processes were running. The original one still held port 5173 and was answering with `--bg: #0b0f17`; the newer one had logged `Port 5173 is in use, trying another one...` and quietly moved to 5174. On top of that, the first process had never picked up any of my edits at all, because **inotify does not fire on `/mnt/d` under WSL2** — it was serving cached transforms from when it started.
+- Decision: fixed both halves rather than just restarting. Added `server.watch.usePolling` (interval 300ms) so file changes are actually detected on this Windows-drive/WSL setup, and `server.strictPort: true` so a second dev server now refuses to start instead of silently relocating. The silent port fallback is what turned a stale process into a confusing "my changes did nothing" symptom, and it would have recurred every session.
+- Validation: killed all four stale PIDs, restarted one dev server, confirmed exactly one Vite process running, and confirmed `http://127.0.0.1:5173/src/styles.css` now serves `--canvas: #f3efe5`, `--paper: #fffdf8`, `--forest: #1d3b2d`, `--coral: #e56b52` instead of the old dark tokens. Backend health and the `/health` proxy both still return ok.
+- Note for the team: this trap is not frontend-specific. Anyone running a watching dev process against this repo from WSL will hit it, so it is documented in `frontend/README.md`.
+- Blocked on: nothing
+- Needs from Jeswin/Preethesh: nothing.
+- Commit: `PENDING2` (pushed to `deepthi/frontend-demo`)

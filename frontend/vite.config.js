@@ -12,6 +12,19 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    // Fail loudly if 5173 is taken. Vite's default is to silently move to the
+    // next free port, which means a stale server keeps answering on 5173 while
+    // the new one serves the current code somewhere else — you end up staring
+    // at an old build wondering why your edits did nothing.
+    strictPort: true,
+    watch: {
+      // This repo lives on a Windows drive (/mnt/d) reached through WSL2, where
+      // inotify does not fire for edits made on the Linux side. Without polling
+      // the dev server never notices a file change and serves cached transforms
+      // forever. Costs a little CPU; the alternative is silent staleness.
+      usePolling: true,
+      interval: 300,
+    },
     proxy: {
       "/api": { target: BACKEND, changeOrigin: true },
       "/health": { target: BACKEND, changeOrigin: true },

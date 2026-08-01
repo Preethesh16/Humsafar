@@ -19,6 +19,19 @@ backend running. Flip the "Live backend" toggle in the header, or open
 
 Point the dev proxy somewhere else with `HUMSAFAR_BACKEND_URL=http://host:port`.
 
+### If your edits don't show up
+
+This repo lives on a Windows drive (`/mnt/d`) reached through WSL2, where inotify
+does not fire for edits made on the Linux side. `vite.config.js` therefore sets
+`server.watch.usePolling`, without which the dev server never notices a change
+and serves cached transforms indefinitely.
+
+It also sets `strictPort: true`. Vite's default is to silently move to the next
+free port when 5173 is taken — which leaves a stale server still answering on
+5173 while the new one runs elsewhere, so you sit there looking at an old build.
+With `strictPort` the second server refuses to start instead. If you see that
+error, kill the old one (`pkill -f "node.*vite"`) rather than opening 5174.
+
 ## Tests
 
 ```bash

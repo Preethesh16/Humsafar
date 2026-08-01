@@ -2,7 +2,7 @@
 
 One prompt per person below. Each one is self-contained — paste the whole block for your name into your Claude Code or Codex session at the start of every work session (not just once), so the AI re-grounds itself even in a fresh session.
 
-**Before pasting**: make sure `brainstorming.md`, `progress-jeswin.md`, `progress-preethesh.md`, and `progress-deepthi.md` all exist at the repo root and are up to date, since the prompt tells the AI to read them.
+**Before pasting**: make sure `brainstorming.md`, `INTERFACES.md`, `precaution.md`, `progress-jeswin.md`, `progress-preethesh.md`, and `progress-deepthi.md` all exist at the repo root and are up to date, since the prompt tells the AI to read them.
 
 ---
 
@@ -19,11 +19,12 @@ top of them and you iterate in small, testable increments.
 Before writing a single line of code, read these files in full, in this order:
 1. /brainstorming.md — full project context, decisions, and rationale
 2. /INTERFACES.md — locked cross-team function, event, fixture, and adapter contracts
-3. /progress-jeswin.md — your own prior work (this may be your first session — if
+3. /precaution.md — sandbox, credential, passkey, checkout, evidence, and demo safeguards
+4. /progress-jeswin.md — your own prior work (this may be your first session — if
    it only has a "not started yet" entry, that's expected)
-4. /progress-preethesh.md — what the backend/integrations teammate has built,
+5. /progress-preethesh.md — what the backend/integrations teammate has built,
    what interfaces they've exposed or are about to expose, what they're blocked on
-5. /progress-deepthi.md — what the frontend teammate needs from you (event
+6. /progress-deepthi.md — what the frontend teammate needs from you (event
    shapes, data formats) and what they've already built against
 
 Your scope for this build: the orchestrator, the specialist buyer agents
@@ -85,10 +86,11 @@ Before writing a single line of code, read these files in full, in this order:
    resolve first)
 2. /INTERFACES.md — locked cross-team contracts; implement these exact shapes
    and document any proposed change before changing code
-3. /progress-preethesh.md — your own prior work
-4. /progress-jeswin.md — what the agent-core teammate needs from you (the
+3. /precaution.md — sandbox, credential, passkey, checkout, evidence, and demo safeguards
+4. /progress-preethesh.md — your own prior work
+5. /progress-jeswin.md — what the agent-core teammate needs from you (the
    exact `mintScopedCard` function signature they're calling)
-5. /progress-deepthi.md — what event data the frontend teammate needs
+6. /progress-deepthi.md — what event data the frontend teammate needs
    streamed to them
 
 Your scope for this build, in priority order:
@@ -153,9 +155,10 @@ Before writing a single line of code, read these files in full, in this order:
 1. /brainstorming.md — full project context, especially Section 7 (the demo
    script) and Section 8 (team split)
 2. /INTERFACES.md — locked cross-team function, event, fixture, and adapter contracts
-3. /progress-deepthi.md — your own prior work
-4. /progress-jeswin.md — what agent/negotiation data will exist to display
-5. /progress-preethesh.md — what event schema the backend will stream to you,
+3. /precaution.md — sandbox, credential, passkey, checkout, evidence, and demo safeguards
+4. /progress-deepthi.md — your own prior work
+5. /progress-jeswin.md — what agent/negotiation data will exist to display
+6. /progress-preethesh.md — what event schema the backend will stream to you,
    and what's still pending
 
 Your scope for this build:

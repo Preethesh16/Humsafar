@@ -238,4 +238,4 @@
 - Why: clear ownership prevents duplicate implementations and lets the three personal branches progress independently after the contract gate.
 - Blocked on: none for this clarification.
 - Needs from Jeswin/Deepthi: follow the acceptance criteria and dependency gates in `execution-plan.md`.
-- Commit: pending (clarification log on `preethesh/integrations-backend`)
+- Commit: `5b8e500` (clarification committed on `preethesh/integrations-backend`)

@@ -37,6 +37,12 @@ Locked backend endpoints:
 - `GET /api/events` — SSE stream for Deepthi. Events use `id:` plus one JSON `data:` line; reconnects may send `Last-Event-ID` and receive buffered events after that id.
 - `POST /api/events` — server-to-server ingestion for Jeswin's agent layer. Body is exactly one event object from the shapes below; accepted events return `202`, invalid events return `400`.
 - `POST /api/scoped-cards` — server-to-server card issuance. Body: `{ mandateId: string, merchant: string, amountCap: number }`; response is the exact `mintScopedCard` result from Section 1 (`201` for `issued`, `422` for `failed`).
+- `POST /api/discovery/:category` — discovery for `flights`, `stay`, `food`, or `guide`; always returns the Section 4 `{ data, source }` envelope.
+- `POST /api/trust/check` — pre-purchase trust decision. Body: `{ merchant: string, rating?: number }`; response is `{ data: { merchant, score, decision, reason }, source }`. Fixture trust is labeled and does not qualify as live Senso evidence.
+- `POST /api/prava/mandate-sessions` — create one merchant-specific mandate approval session.
+- `POST /api/prava/mandates/sync` — refresh the active mandate-to-merchant registry for a customer after approval.
+- `POST /api/prava/mandates/:mandateId/charges/:transactionId/report` — report checkout success/failure to Prava.
+- `GET /.well-known/agentfacts.json` and `POST /a2a/ping` — NANDA/AgentFacts discovery and basic A2A availability.
 
 The two POST routes accept `Authorization: Bearer <INTERNAL_API_TOKEN>` when that environment variable is configured. A non-loopback deployment must configure it. Never put Prava credentials in these request bodies.
 
@@ -103,7 +109,7 @@ Every external call (Prava, Duffel, Senso, NANDA) returns:
 }
 ```
 
-Deepthi's dashboard can optionally surface `source` in the UI (a small "live" / "simulated" tag per purchase) — good for the demo's honesty story, not required.
+Deepthi's dashboard should surface `source` in the UI (a small "live" / "fixture" tag per result). A fixture may support discovery/demo resilience, but it must never be presented as evidence that a payment completed.
 
 ---
 

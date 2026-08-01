@@ -84,4 +84,4 @@
 - Blocked on: nothing. Live Prava issuance still needs `PRAVA_SECRET_KEY` and approved mandate IDs (Preethesh's blocker); the demo runs fully on stub cards.
 - Needs from Preethesh: (a) a decision on the fixture-contention finding above; (b) a `Checkout` implementation for Duffel — `agents/humsafar/checkout.py` is the seam, swapping `SimulatedCheckout` changes nothing else; (c) mandate IDs registered for the merchants we actually buy from, or the real card-level proof shot cannot run live.
 - Needs from Deepthi: `python3 -m humsafar --demo --trust` with the backend up now gives a complete realistic stream, including trust annotations in `purchase_result.details`. The §2 rendering notes from my previous entry still apply — especially that `split_update` can repeat for a round.
-- Commit: `c1b0a48` (pushed to `jeswin/agent-core`; pull request into `main` follows this log entry)
+- Commit: `9b2dbd7` (pushed to `jeswin/agent-core`; pull request into `main` follows this log entry)

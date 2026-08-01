@@ -51,4 +51,4 @@
 - Why: remove transport ambiguity, protect cross-team interfaces, and make the requested accountability workflow explicit.
 - Blocked on: nothing
 - Needs from Jeswin/Deepthi: read `INTERFACES.md` before boundary work and flag proposed contract changes before implementation.
-- Commit: pending (will be pushed to `preethesh/integrations-backend` and merged into `main`)
+- Commit: `a906ab0` (pushed to `preethesh/integrations-backend`; fast-forward merged and pushed to `main`)

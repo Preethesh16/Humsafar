@@ -184,3 +184,14 @@
 - Blocked on: the user must place the sandbox key in a local `.env` file; no key value is available to or needed by source control.
 - Needs from Jeswin/Deepthi: nothing for this verification step. Continue labeling any eventual Prava result as `sandbox`, not production.
 - Commit: `1d35790` (implementation committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 22:51 IST] — Ranked eligible tracks and audited the maximum-coverage plan
+- Prompt: provided the official Builder Handbook again plus Jeswin's assistant's maximum-track win plan, and asked which problem statements and tools best fit Humsafar before continuing sandbox setup.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: recorded the recommended target set: Prava Overall, Visa Intelligent Commerce, OpenAI, and Localhost as deliberate targets; Senso only if real API access arrives quickly; NANDA only after the core transaction and deployment; skip Linq because messaging is not Humsafar's core interface.
+- Validation: read the full 383-line handbook and 101-line proposed plan; compared every track's qualification language with the repository's implemented Prava, agent, trust, NANDA, checkout, event, and frontend paths.
+- Decision: preserve the plan's core-first sequencing, earlier-deadline assumption, meaningful OpenAI proposal, and Linq skip, but do not execute it literally. Visa eligibility through Prava does not make the track automatic; sandbox must be labeled sandbox; an over-cap charge remains tied to the selected merchant mandate; no `APPROVED` report may be sent without a genuine merchant/test-checkout outcome; a local trust heuristic does not qualify as Senso; and the unrelated card values suggested in the plan must not be used in place of the team's officially issued test card.
+- Why: four strong, evidenced track submissions are more credible than six shallow claims. The handbook explicitly penalizes mocked transactions, decorative partner integrations, and misleading results.
+- Blocked on: the core track gate remains the local sandbox-key verification followed by one honest end-to-end sandbox checkout. Senso and NANDA additionally require external access/evidence.
+- Needs from Jeswin/Deepthi: Jeswin should keep payment enforcement deterministic and OpenAI reasoning grounded; Deepthi should prepare distinct sandbox/fixture labels and track-specific evidence only for integrations actually demonstrated.
+- Commit: pending (documentation on `preethesh/integrations-backend`)

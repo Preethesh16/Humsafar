@@ -173,3 +173,14 @@
 - Blocked on: sandbox key creation and a decision from Prava support on whether their documented manual sandbox report is intended as the processor simulation for hackathon evidence, plus an honest checkout target if the submission claims an order rather than only a completed Prava sandbox lifecycle.
 - Needs from Jeswin/Deepthi: Jeswin should revise Phase 3 around a real or explicitly simulated processor boundary and a `sandbox` source label; Deepthi must render sandbox separately from production/live. No implementation should begin from the attached plan unchanged.
 - Commit: `c49aa3e` (plan review committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 22:45 IST] — Added a zero-transaction Prava sandbox access check
+- Prompt: shared the official team sandbox card and access notice, confirmed that a sandbox API key now exists, and asked what to do next.
+- Files changed: `package.json`, `.env.example`, `backend/scripts/verifyPravaAccess.js`, `backend/test/verifyPravaAccess.test.js`, and `progress-preethesh.md`.
+- Changed: added `npm run prava:verify`, a read-only authenticated mandate-list check that loads the local gitignored `.env`, reports only sandbox/authentication status and mandate count, and never prints credentials or mandate contents. Added `npm run start:sandbox` so the backend can load the same local environment explicitly without changing the zero-config fixture start path.
+- Validation: compared the supplied handbook with the existing Prava client and confirmed that sandbox—not production—is the active path; tests cover the authenticated request, production URL/key refusal, missing customer ID, and absence of transaction creation. Full validation and credential scans follow before commit.
+- Decision: verify the key with a read-only request before creating a mandate session or using the unique team card. Enforce the official sandbox origin and `sk_test_` key prefix in the operator command so a mistaken production key cannot be used through this workflow.
+- Why: the team card is limited to 30 sandbox transactions per day; authentication/configuration errors should be found without consuming that allowance. The API key and card values remain local and must never be pasted into chat or committed.
+- Blocked on: the user must place the sandbox key in a local `.env` file; no key value is available to or needed by source control.
+- Needs from Jeswin/Deepthi: nothing for this verification step. Continue labeling any eventual Prava result as `sandbox`, not production.
+- Commit: pending (implementation on `preethesh/integrations-backend`)

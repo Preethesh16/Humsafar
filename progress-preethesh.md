@@ -205,4 +205,4 @@
 - Why: without these corrections the plan can leak ephemeral credentials, misclassify a structured decline, reuse stale approval, fail to resolve a mandate in the Python process, or overstate how much of the demo completed through Prava.
 - Blocked on: sandbox key verification remains the first safe action; merchant/test-checkout selection and failed-charge mandate lifecycle need Prava confirmation before the proof run.
 - Needs from Jeswin/Deepthi: Jeswin must correlate approval and mandate resolution and preserve structured decline causes; Deepthi must present per-purchase sandbox/fixture evidence and never imply all four purchases are genuine from a single Prava checkout.
-- Commit: pending (documentation on `preethesh/integrations-backend`)
+- Commit: `c46f4d9` (review committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)

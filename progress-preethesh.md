@@ -63,3 +63,14 @@
 - Blocked on: live sandbox verification requires a local `PRAVA_SECRET_KEY` and active merchant-specific mandate ID; neither is present in the workspace.
 - Needs from Jeswin/Deepthi: Jeswin should treat `mandateId` as merchant-specific; Deepthi must not label fixture or failed card issuance as a completed live payment.
 - Commit: `60b34a4` (pushed to `preethesh/integrations-backend`; merge to `main` follows this log finalization)
+
+### [2026-08-01 13:26 IST] — Added Express API and replayable SSE stream
+- Prompt: continued implementation under the same request after completing the Prava adapter phase.
+- Files changed: `.env.example`, `package.json`, `package-lock.json`, `INTERFACES.md`, `backend/src/app.js`, `backend/src/server.js`, `backend/src/events/eventSchema.js`, `backend/src/events/eventHub.js`, `backend/test/app.test.js`, `backend/test/eventSchema.test.js`, `backend/test/eventHub.test.js`, and `progress-preethesh.md`.
+- Changed: added Express 5.2.1, health and scoped-card routes, authenticated internal event ingestion, locked event validation, SSE event IDs and bounded replay, safe loopback defaults, and non-loopback token enforcement.
+- Validation: `npm test` passed 14/14 tests; started the real server; verified `/health`; posted an `agent_message`; connected to `/api/events` and received the retry directive plus the replayed JSON event; stopped the server cleanly.
+- Decision: keep the dashboard stream unauthenticated for browser `EventSource` compatibility, protect state-changing POST routes when `INTERNAL_API_TOKEN` is configured, and refuse non-loopback startup without that token.
+- Why: this gives Jeswin and Deepthi a small, debuggable contract boundary while avoiding an unauthenticated mutation API on a network deployment.
+- Blocked on: live Prava issuance remains blocked on a local secret key and active merchant-specific mandate IDs.
+- Needs from Jeswin/Deepthi: Jeswin should POST the locked event objects to `/api/events`; Deepthi should consume `GET /api/events` and may use `Last-Event-ID` reconnect replay.
+- Commit: pending

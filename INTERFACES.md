@@ -32,6 +32,14 @@ mintScopedCard(mandateId: string, merchant: string, amountCap: number)
 
 Transport: **SSE (Server-Sent Events)**. Decision: this stream is one-directional (server → dashboard); there's no need for the dashboard to push messages back over the same channel. SSE runs over plain HTTP, needs no special client library, reconnects automatically in the browser by default, and is far easier to debug mid-hackathon with `curl` than a WebSocket handshake. If a genuine two-way need shows up later (e.g. the dashboard sending a live user command back), add a separate plain POST endpoint for that rather than switching the whole stream to WebSocket.
 
+Locked backend endpoints:
+
+- `GET /api/events` — SSE stream for Deepthi. Events use `id:` plus one JSON `data:` line; reconnects may send `Last-Event-ID` and receive buffered events after that id.
+- `POST /api/events` — server-to-server ingestion for Jeswin's agent layer. Body is exactly one event object from the shapes below; accepted events return `202`, invalid events return `400`.
+- `POST /api/scoped-cards` — server-to-server card issuance. Body: `{ mandateId: string, merchant: string, amountCap: number }`; response is the exact `mintScopedCard` result from Section 1 (`201` for `issued`, `422` for `failed`).
+
+The two POST routes accept `Authorization: Bearer <INTERNAL_API_TOKEN>` when that environment variable is configured. A non-loopback deployment must configure it. Never put Prava credentials in these request bodies.
+
 Every event is a JSON object with a `type` field:
 
 ```

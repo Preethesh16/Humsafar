@@ -175,6 +175,26 @@ assert.equal(
   "no panel before an approval is requested",
 );
 
+// Accessibility guards. These are cheap to assert and expensive to notice by
+// eye, and the plan's acceptance criteria list an accessibility check.
+const a11y = [
+  [liveReceipt, 'role="dialog"', "the receipt is announced as a dialog"],
+  [liveReceipt, 'aria-modal="true"', "the receipt traps assistive focus"],
+  [liveReceipt, 'aria-label="Close receipt"', "the icon-only close button is labelled"],
+  [pendingHtml, 'aria-live="polite"', "the approval countdown is announced as it changes"],
+];
+for (const [html, needle, description] of a11y) {
+  assert.ok(html.includes(needle), `a11y: ${description} — expected ${needle}`);
+}
+
+// Decorative SVGs must never be announced; every icon in the app is decorative
+// because its meaning is always carried by adjacent text.
+for (const [name, html] of [["receipt", liveReceipt], ["approval", pendingHtml]]) {
+  const svgs = (html.match(/<svg/g) ?? []).length;
+  const hidden = (html.match(/aria-hidden="true"/g) ?? []).length;
+  assert.ok(hidden >= svgs, `a11y: every ${name} icon must be aria-hidden (${svgs} svg, ${hidden} hidden)`);
+}
+
 // The app shell itself must render — it carries the hero, the journey stepper
 // and the simulated-stream notice, none of which the panel renders above cover.
 const shell = renderToStaticMarkup(<App />);

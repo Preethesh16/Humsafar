@@ -73,4 +73,4 @@
 - Why: this gives Jeswin and Deepthi a small, debuggable contract boundary while avoiding an unauthenticated mutation API on a network deployment.
 - Blocked on: live Prava issuance remains blocked on a local secret key and active merchant-specific mandate IDs.
 - Needs from Jeswin/Deepthi: Jeswin should POST the locked event objects to `/api/events`; Deepthi should consume `GET /api/events` and may use `Last-Event-ID` reconnect replay.
-- Commit: pending
+- Commit: `09abcf4` (pushed to `preethesh/integrations-backend`; merge to `main` follows this log finalization)

@@ -15,7 +15,13 @@ test("mintScopedCard maps a live mandate charge to the locked contract", async (
           source: "live",
           data: {
             instructionId: "ins_1",
-            credentials: { token: "virtual-card-token" },
+            transactionId: "txn_1",
+            credentials: {
+              token: "virtual-card-token",
+              dynamicCvv: "123",
+              expiryMonth: "12",
+              expiryYear: "2030",
+            },
           },
         };
       },
@@ -35,9 +41,14 @@ test("mintScopedCard maps a live mandate charge to the locked contract", async (
   assert.deepEqual(result, {
     cardId: "ins_1",
     cardToken: "virtual-card-token",
+    transactionId: "txn_1",
+    dynamicCvv: "123",
+    expiryMonth: "12",
+    expiryYear: "2030",
     merchant: "Duffel",
     amountCap: 1250.5,
     status: "issued",
+    source: "sandbox",
   });
 });
 
@@ -110,9 +121,41 @@ test("mintScopedCard returns a failed contract without leaking credentials on AP
   assert.deepEqual(result, {
     cardId: "",
     cardToken: "",
+    transactionId: null,
+    dynamicCvv: "",
+    expiryMonth: "",
+    expiryYear: "",
     merchant: "Duffel",
     amountCap: 500,
     status: "failed",
+    source: "sandbox",
+    errorCode: "MANDATE_NOT_ACTIVE",
     error: "Mandate is not active",
   });
+});
+
+test("mintScopedCard preserves THRESHOLD_EXCEEDED as structured safe metadata", async () => {
+  const logEntries = [];
+  const service = new ScopedCardService({
+    pravaClient: {
+      async chargeMandate() {
+        const error = new Error("Charge exceeds mandate cap");
+        error.code = "THRESHOLD_EXCEEDED";
+        error.responseId = "resp_safe_1";
+        throw error;
+      },
+    },
+    mandateMerchants: new Map([["mdt_123", "Duffel"]]),
+    logger: { info() {}, error(entry) { logEntries.push(entry); } },
+  });
+
+  const result = await service.mintScopedCard("mdt_123", "Duffel", 501);
+
+  assert.equal(result.errorCode, "THRESHOLD_EXCEEDED");
+  assert.equal(result.cardToken, "");
+  assert.deepEqual(logEntries, [{
+    integration: "prava",
+    code: "THRESHOLD_EXCEEDED",
+    responseId: "resp_safe_1",
+  }]);
 });

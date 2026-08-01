@@ -42,6 +42,27 @@ export class MandateService {
     return result;
   }
 
+  resolveMandate(merchant) {
+    if (typeof merchant !== "string" || merchant.trim() === "") {
+      throw new TypeError("merchant must be a non-empty string");
+    }
+
+    const normalized = normalizeMerchant(merchant);
+    const matches = [...this.mandateMerchants.entries()].filter(
+      ([, registeredMerchant]) => normalizeMerchant(registeredMerchant) === normalized,
+    );
+    if (matches.length === 0) return undefined;
+    if (matches.length > 1) {
+      throw new Error("Multiple active mandates are registered for this merchant");
+    }
+
+    const [mandateId, registeredMerchant] = matches[0];
+    return {
+      data: { mandateId, merchant: registeredMerchant },
+      source: "sandbox",
+    };
+  }
+
   async reportCharge(input) {
     return this.pravaClient.reportMandateCharge({
       ...input,
@@ -52,6 +73,10 @@ export class MandateService {
       amountPaid: undefined,
     });
   }
+}
+
+function normalizeMerchant(value) {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en");
 }
 
 function money(value) {

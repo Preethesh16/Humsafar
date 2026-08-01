@@ -50,9 +50,14 @@ export class ScopedCardService {
       return {
         cardId: result.data.instructionId,
         cardToken: result.data.credentials.token,
+        transactionId: result.data.transactionId ?? null,
+        dynamicCvv: result.data.credentials.dynamicCvv,
+        expiryMonth: result.data.credentials.expiryMonth,
+        expiryYear: result.data.credentials.expiryYear,
         merchant,
         amountCap,
         status: "issued",
+        source: "sandbox",
       };
     } catch (error) {
       this.logger.error?.({
@@ -65,6 +70,7 @@ export class ScopedCardService {
         merchant,
         amountCap,
         error instanceof Error ? error.message : "Prava charge failed",
+        error?.code ?? "PRAVA_CHARGE_FAILED",
       );
     }
   }
@@ -93,13 +99,19 @@ function normalizeMerchant(merchant) {
   return merchant.trim().replace(/\s+/g, " ").toLocaleLowerCase("en");
 }
 
-function failedCard(merchant, amountCap, error) {
+function failedCard(merchant, amountCap, error, errorCode = "SCOPED_CARD_REJECTED") {
   return {
     cardId: "",
     cardToken: "",
+    transactionId: null,
+    dynamicCvv: "",
+    expiryMonth: "",
+    expiryYear: "",
     merchant: typeof merchant === "string" ? merchant : "",
     amountCap: Number.isFinite(amountCap) ? amountCap : 0,
     status: "failed",
+    source: "sandbox",
+    errorCode,
     error,
   };
 }

@@ -31,3 +31,25 @@ test("MandateService syncs only active listed mandates into the registry", async
   await service.syncCustomerMandates("user_1");
   assert.deepEqual([...registry], [["mdt_1", "Duffel"]]);
 });
+
+test("MandateService resolves a merchant without sharing environment state", () => {
+  const service = new MandateService({
+    pravaClient: {},
+    mandateMerchants: new Map([["mdt_1", "Duffel Travel"]]),
+  });
+
+  assert.deepEqual(service.resolveMandate("  duffel   travel "), {
+    data: { mandateId: "mdt_1", merchant: "Duffel Travel" },
+    source: "sandbox",
+  });
+  assert.equal(service.resolveMandate("Unknown"), undefined);
+});
+
+test("MandateService refuses an ambiguous merchant resolution", () => {
+  const service = new MandateService({
+    pravaClient: {},
+    mandateMerchants: new Map([["mdt_1", "Duffel"], ["mdt_2", "duffel"]]),
+  });
+
+  assert.throws(() => service.resolveMandate("Duffel"), /Multiple active mandates/);
+});

@@ -13,17 +13,24 @@ mintScopedCard(mandateId: string, merchant: string, amountCap: number)
   -> Promise<{
        cardId: string,
        cardToken: string,      // what the specialist agent uses to check out
+       transactionId: string | null,
+       dynamicCvv: string,
+       expiryMonth: string,
+       expiryYear: string,
        merchant: string,       // echoed back, locked
        amountCap: number,      // echoed back, locked
        status: "issued" | "failed",
+       source: "sandbox",
+       errorCode?: string,
        error?: string
      }>
 ```
 
 - Jeswin's orchestrator calls this once per specialist agent, after the mediator finalizes the split.
 - Preethesh owns what happens inside it. The official Prava REST model allows repeated credential minting against an active mandate, but a `listed` mandate remains locked to the single merchant approved during setup. For the current API, Jeswin must therefore pass the mandate belonging to that specialist's merchant; the backend fails closed if the supplied merchant does not match the mandate registry. **The function signature above does not change.**
-- `cardId` maps to Prava's `instructionId`, the stable identifier for the minted credential instruction. `cardToken` maps to `credentials.token`. Neither raw token nor dynamic CVV may be logged.
-- The public function returns the exact object above. The lower-level Prava client uses the `{ data, source }` integration envelope from Section 4 internally; do not add `source` to this locked return shape without coordinating a contract change.
+- `cardId` maps to Prava's `instructionId`. `cardToken`, `dynamicCvv`, and expiry are transient checkout credentials. `transactionId` is `null` when Prava does not return one; never substitute `instructionId`, because the report endpoint distinguishes them.
+- Every credential field must be removed by Jeswin's `ScopedCard.safe()` before logging, events, receipts, exceptions, or traces. A failed result returns empty credential strings, `transactionId: null`, and a structured `errorCode` such as `THRESHOLD_EXCEEDED`, `MANDATE_NOT_ACTIVE`, or `SCOPED_CARD_REJECTED`.
+- `source: "sandbox"` describes the payment environment. It does not mean checkout succeeded: `status: "issued"` means only that Prava issued credentials awaiting a merchant/processor result.
 - If Preethesh's real implementation isn't ready yet, Jeswin should build against a stub that returns a fake `cardToken` and `status: "issued"` after a short delay, so his negotiation/orchestration logic isn't blocked.
 
 ---
@@ -41,7 +48,9 @@ Locked backend endpoints:
 - `POST /api/trust/check` — pre-purchase trust decision. Body: `{ merchant: string, rating?: number }`; response is `{ data: { merchant, score, decision, reason }, source }`. Fixture trust is labeled and does not qualify as live Senso evidence.
 - `POST /api/prava/mandate-sessions` — create one merchant-specific mandate approval session.
 - `POST /api/prava/mandates/sync` — refresh the active mandate-to-merchant registry for a customer after approval.
+- `GET /api/prava/mandates/resolve?merchant=<name>` — internal merchant-to-mandate lookup. Returns `{ data: { mandateId, merchant }, source: "sandbox" }`, `404 MANDATE_NOT_FOUND`, or fails closed on ambiguity. Python uses this source of truth instead of copying backend state into environment variables.
 - `POST /api/prava/mandates/:mandateId/charges/:transactionId/report` — report checkout success/failure to Prava.
+- `POST /api/approvals/requests`, `GET /api/approvals/:approvalRequestId`, `POST /api/approvals/:approvalRequestId/decision`, and `POST /api/approvals/:approvalRequestId/consume` — the run-scoped approval protocol locked in Section 7.
 - `GET /.well-known/agentfacts.json` and `POST /a2a/ping` — NANDA/AgentFacts discovery and basic A2A availability.
 
 **How the agent layer consumes discovery and trust (Jeswin, 2026-08-01) — read if you change either route's response:**
@@ -65,15 +74,17 @@ Every event is a JSON object with a `type` field:
   totalBudget: number, round: number }
 
 // User approval requested / given
-{ type: "approval_requested", allocations: {...} }
-{ type: "approval_given", timestamp: string }
+{ type: "approval_requested", runId: string, approvalRequestId: string,
+  digest: string, allocations: {...}, expiresAt: string }
+{ type: "approval_given", runId: string, approvalRequestId: string,
+  digest: string, timestamp: string }
 
 // A scoped card was minted for an agent
 { type: "card_issued", agent: string, cardId: string, amountCap: number }
 
 // A purchase completed or failed
 { type: "purchase_result", agent: string, status: "success" | "failed", amount: number,
-  merchant: string, details: string }
+  merchant: string, details: string, source: "fixture" | "sandbox" | "production" }
 
 // Proof-shot events (for the two demo beats)
 { type: "blocked_attempt", agent: string, attemptedAmount: number, cap: number, reason: string }
@@ -83,13 +94,18 @@ Every event is a JSON object with a `type` field:
 { type: "final_receipt", purchases: [...], totalSpent: number, budget: number }
 ```
 
+Migration note: the backend event validator temporarily accepts the earlier
+uncorrelated approval event shape so the already-merged demo does not stop
+running while Jeswin updates his producer. New code must emit the correlated
+shape above; legacy acceptance is removed after his branch lands.
+
 **Producer-behaviour notes from the agent layer (Jeswin, 2026-08-01) — no shape changes, but Deepthi's rendering depends on them:**
 
 - `split_update` **can be emitted more than once with the same `round` number.** After the agents converge, the mediator makes a final pass that spends leftover budget on upgrades, and that revised split is emitted against the same round. **Render the most recent `split_update`, don't key state by `round` alone.**
 - `split_update.allocations` during rounds shows what the agents are *asking for*, which is deliberately allowed to exceed `totalBudget` in early rounds — that overflow is the negotiation beat and is worth showing visually. Only the final split is guaranteed to fit.
 - `final_receipt` is always the **last** event of a run and is safe to use as the "run finished" signal. Nothing is emitted after it.
 - Every category the goal did not use is sent as `0` rather than omitted, so all four keys are always present. Goals needing a category outside the locked four would arrive as an *extra* key alongside them; the current MVP goals never do this.
-- Each entry in `final_receipt.purchases` carries `source: "live" | "fixture"` and a `details` string. Anything with `source: "fixture"` must be labelled as simulated in the UI — it is not a completed live order.
+- Each entry in `final_receipt.purchases` carries `source: "fixture" | "sandbox" | "production"` and a `details` string. `sandbox` says where the attempt happened, not whether it succeeded; status/details carry the observed outcome. Anything with `source: "fixture"` must be labelled as simulated — it is not a completed order.
 
 - Deepthi builds her dashboard against a **mocked stream** matching this exact shape first — don't wait for Preethesh's real backend.
 - If Preethesh needs to add a field mid-build, he edits this file, adds the field, and flags it in his progress.md — he does not silently ship a differently-shaped event.
@@ -153,7 +169,7 @@ This does not change any function signature or event shape — it is a new termi
 
 ## 6. Human choice step — "the agent picks the budget, the user picks the taste"
 
-Status: 🟡 **PROPOSED, not locked.** Raised by Deepthi 2026-08-01. Jeswin and Preethesh must both agree before anyone implements. Nothing below changes an existing shape — it is all additive, so the current flow keeps working untouched if this is deferred or dropped.
+Status: 🟢 **LOCKED AS AN ADDITIVE, POST-PRAVA-GATE CONTRACT.** Accepted by Preethesh 2026-08-01 with mandatory `runId` correlation. Implementation remains deferred until genuine Prava evidence exists; the current flow keeps working if the feature is cut.
 
 ### Why
 
@@ -173,6 +189,7 @@ One per category, after the split is final.
 
 ```
 { type: "choice_requested",
+  runId: string,
   agent: "flights" | "stay" | "food" | "guide",
   slice: number,              // the agreed budget for this category, rupees
   options: [ {
@@ -194,7 +211,7 @@ One per category, after the split is final.
 ### 6.2 `choice_made` — emitted after the user decides, for the audit trail
 
 ```
-{ type: "choice_made", agent: string, optionId: string, vendor: string,
+{ type: "choice_made", runId: string, agent: string, optionId: string, vendor: string,
   price: number, chosenBy: "user" | "agent-timeout" }
 ```
 
@@ -202,9 +219,9 @@ One per category, after the split is final.
 
 ### 6.3 `POST /api/choices` — Preethesh implements, Deepthi calls
 
-Body: `{ agent: string, optionId: string }`. Returns `202` on accept, `400` for an unknown `optionId`, `409` if that category's choice is already settled.
+Body: `{ runId: string, agent: string, optionId: string }`. Returns `202` on accept, `400` for an unknown `runId`/`optionId`, `409` if that category's choice is already settled.
 
-Client-to-server needs its own POST because the SSE stream stays one-directional (§2). **Open question for Preethesh:** the backend must know which run a choice belongs to. Either add a `runId` to every event, or have the backend track a single active run. Single-active-run is enough for the demo and much cheaper — Preethesh's call.
+Client-to-server needs its own POST because the SSE stream stays one-directional (§2). Preethesh's decision is explicit `runId` correlation rather than global single-active-run state, so a delayed click can never mutate a later run.
 
 ### 6.4 Ranking rule — this is a correctness constraint, not a preference
 
@@ -240,6 +257,70 @@ If no choice arrives within `timeoutSeconds`, the agent picks the top-ranked opt
 ### 6.9 Sequencing
 
 This is **additive and lower priority than a genuine Prava sandbox transaction.** Judging criterion 4 requires Prava to be meaningful and central, and every card is still a stub today. A richer picker on top of simulated payments scores worse than a plain UI on a real one. Build this only once the sandbox charge and its cap-rejection proof exist, and treat §6.1 plus the Deepthi column as the minimum viable slice — the photo preview is polish, the choice itself is the feature.
+
+---
+
+## 7. Run-scoped, expiring, one-shot approval — LOCKED
+
+Approval is server state, not a global boolean and not an SSE event alone. The
+backend computes the digest; callers never invent it.
+
+### 7.1 Create the request
+
+`POST /api/approvals/requests` body:
+
+```
+{ runId: string,
+  allocations: { flights: number, stay: number, food: number, guide: number },
+  choices?: { [agent: string]: string },
+  ttlSeconds?: number }  // integer 1..600; default 120
+```
+
+Returns `201`:
+
+```
+{ approvalRequestId: string, runId: string, digest: string,
+  status: "pending", createdAt: string, expiresAt: string,
+  decidedAt: null, consumedAt: null }
+```
+
+The SHA-256 `digest` covers a canonical representation of exactly `runId`,
+`allocations`, and `choices`. Changing a price, allocation, option, or run
+requires a new approval request.
+
+### 7.2 Read and decide
+
+- `GET /api/approvals/:approvalRequestId?runId=<runId>` returns the same public
+  record. A pending record becomes `expired` at `expiresAt`.
+- `POST /api/approvals/:approvalRequestId/decision` body is
+  `{ runId, digest, decision: "approved" | "declined" }`; returns `202`.
+- A mismatched run returns `404 APPROVAL_NOT_FOUND`. A changed digest, repeated
+  decision, or non-pending request returns `409` with a structured code.
+
+### 7.3 Consume before minting
+
+`POST /api/approvals/:approvalRequestId/consume` body is `{ runId, digest }`.
+Only `approved` can become `consumed`; it returns `200`. Consume immediately
+before the first credential mint. A second consume, expired request, decline,
+or digest mismatch fails closed with `409`, so stale approval cannot authorize
+a later plan.
+
+All four approval routes use `INTERNAL_API_TOKEN` when configured. Never ship
+that token in browser JavaScript; deployment must proxy the user action through
+the same trusted application/session boundary. Approval records contain no
+Prava credentials, card data, or raw external responses.
+
+## 8. Provenance vocabulary — LOCKED
+
+- Discovery: `source: "live" | "fixture"` describes whether an adapter called
+  the external inventory API. Pair it with
+  `environment: "test" | "production" | null` so Duffel test inventory is not
+  presented as real market inventory.
+- Payment/purchase: `source: "fixture" | "sandbox" | "production"` describes
+  the payment environment. It never replaces `status` or `details`.
+- A run containing both fixture and sandbox purchase lines is `mixed-mode`.
+  The receipt keeps provenance per line and must not promote the entire run to
+  the strongest source observed on one line.
 
 ---
 

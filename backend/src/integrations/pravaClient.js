@@ -130,7 +130,10 @@ function validateChargeResponse(payload, responseId) {
     payload?.status !== "awaiting_result" ||
     payload?.fetchStatus !== "SUCCESS" ||
     typeof payload?.instructionId !== "string" ||
-    typeof credentials?.token !== "string"
+    typeof credentials?.token !== "string" ||
+    typeof credentials?.dynamicCvv !== "string" ||
+    typeof credentials?.expiryMonth !== "string" ||
+    typeof credentials?.expiryYear !== "string"
   ) {
     throw new PravaApiError(
       payload?.errorMessage ?? "Prava did not return usable card credentials",

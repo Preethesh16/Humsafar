@@ -1,8 +1,9 @@
 import express from "express";
 
 import { validateEvent } from "./events/eventSchema.js";
+import { ApprovalError } from "./services/approvalService.js";
 
-export function createApp({ eventHub, scopedCardService, discoveryService, mandateService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
+export function createApp({ eventHub, scopedCardService, discoveryService, mandateService, approvalService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -53,6 +54,35 @@ export function createApp({ eventHub, scopedCardService, discoveryService, manda
     return response.status(result.status === "issued" ? 201 : 422).json(result);
   });
 
+  app.post("/api/approvals/requests", authorize(internalApiToken), (request, response) => {
+    if (!approvalService) return response.status(503).json({ error: { code: "APPROVAL_UNAVAILABLE" } });
+    return approvalResponse(response, () => approvalService.create(request.body), 201);
+  });
+
+  app.get("/api/approvals/:approvalRequestId", authorize(internalApiToken), (request, response) => {
+    if (!approvalService) return response.status(503).json({ error: { code: "APPROVAL_UNAVAILABLE" } });
+    return approvalResponse(response, () => approvalService.get({
+      approvalRequestId: request.params.approvalRequestId,
+      runId: request.query.runId,
+    }));
+  });
+
+  app.post("/api/approvals/:approvalRequestId/decision", authorize(internalApiToken), (request, response) => {
+    if (!approvalService) return response.status(503).json({ error: { code: "APPROVAL_UNAVAILABLE" } });
+    return approvalResponse(response, () => approvalService.decide({
+      ...request.body,
+      approvalRequestId: request.params.approvalRequestId,
+    }), 202);
+  });
+
+  app.post("/api/approvals/:approvalRequestId/consume", authorize(internalApiToken), (request, response) => {
+    if (!approvalService) return response.status(503).json({ error: { code: "APPROVAL_UNAVAILABLE" } });
+    return approvalResponse(response, () => approvalService.consume({
+      ...request.body,
+      approvalRequestId: request.params.approvalRequestId,
+    }));
+  });
+
   app.post("/api/discovery/:category", authorize(internalApiToken), async (request, response) => {
     if (!discoveryService) return response.status(503).json({ error: { code: "DISCOVERY_UNAVAILABLE" } });
     try {
@@ -81,12 +111,29 @@ export function createApp({ eventHub, scopedCardService, discoveryService, manda
     return response.json(await mandateService.syncCustomerMandates(request.body.customerId));
   });
 
+  app.get("/api/prava/mandates/resolve", authorize(internalApiToken), (request, response) => {
+    if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
+    try {
+      const result = mandateService.resolveMandate(request.query.merchant);
+      if (!result) {
+        return response.status(404).json({
+          error: { code: "MANDATE_NOT_FOUND", message: "No active listed mandate for merchant" },
+        });
+      }
+      return response.json(result);
+    } catch (error) {
+      return response.status(400).json({
+        error: { code: "INVALID_MANDATE_LOOKUP", message: error.message },
+      });
+    }
+  });
+
   app.post("/api/prava/mandates/:mandateId/charges/:transactionId/report", authorize(internalApiToken), async (request, response) => {
     if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
     return response.json(await mandateService.reportCharge({
+      ...request.body,
       mandateId: request.params.mandateId,
       transactionId: request.params.transactionId,
-      ...request.body,
     }));
   });
 
@@ -103,6 +150,19 @@ export function createApp({ eventHub, scopedCardService, discoveryService, manda
   });
 
   return app;
+}
+
+function approvalResponse(response, operation, successStatus = 200) {
+  try {
+    return response.status(successStatus).json(operation());
+  } catch (error) {
+    if (error instanceof ApprovalError) {
+      return response.status(error.status).json({
+        error: { code: error.code, message: error.message },
+      });
+    }
+    throw error;
+  }
 }
 
 function authorize(expectedToken) {

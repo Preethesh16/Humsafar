@@ -3,6 +3,7 @@ import { EventHub } from "./events/eventHub.js";
 import { DuffelClient } from "./integrations/duffelClient.js";
 import { PravaClient } from "./integrations/pravaClient.js";
 import { DiscoveryService } from "./services/discoveryService.js";
+import { ApprovalService } from "./services/approvalService.js";
 import { MandateService } from "./services/mandateService.js";
 import { ScopedCardService } from "./services/scopedCardService.js";
 import { TrustService } from "./services/trustService.js";
@@ -28,6 +29,7 @@ const app = createApp({
   scopedCardService,
   discoveryService: new DiscoveryService({ duffelClient: new DuffelClient() }),
   mandateService: new MandateService({ pravaClient, mandateMerchants }),
+  approvalService: new ApprovalService(),
   trustService: new TrustService(),
   internalApiToken,
   publicBaseUrl: process.env.PUBLIC_BASE_URL,

@@ -150,4 +150,4 @@
 - Why: the field identifies the Humsafar application/merchant account. The public repository is an owned, reachable HTTPS project URL and is safer than permanently associating the key with a domain the team does not control.
 - Blocked on: the user creating the key and storing it locally without sharing or committing it.
 - Needs from Jeswin/Deepthi: nothing at this step.
-- Commit: pending (dashboard guidance will be pushed through `preethesh/integrations-backend` and merged to `main`)
+- Commit: `6b79a56` (dashboard guidance committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)

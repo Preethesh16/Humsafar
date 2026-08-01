@@ -85,3 +85,14 @@
 - Blocked on: live Prava test credentials and merchant-specific mandate IDs only; local automated/backend behavior is not blocked.
 - Needs from Jeswin/Deepthi: nothing new.
 - Commit: `966ce3b` (pushed to `preethesh/integrations-backend`; merge to `main` follows this log finalization)
+
+### [2026-08-01 14:18 IST] — Completed remaining backend integrations
+- Prompt: finish the remaining task.
+- Files changed: `.env.example`, `INTERFACES.md`, `backend/src/app.js`, `backend/src/server.js`, `backend/src/integrations/pravaClient.js`, `backend/src/integrations/duffelClient.js`, `backend/src/integrations/withFixtureFallback.js`, `backend/src/services/mandateService.js`, `backend/src/services/discoveryService.js`, `backend/src/services/trustService.js`, `backend/src/fixtures/discovery.js`, `backend/test/integrations.test.js`, `backend/test/mandateService.test.js`, `backend/test/trustService.test.js`, and `progress-preethesh.md`.
+- Changed: completed merchant-specific Prava mandate setup/list-sync/charge-report support; Duffel Flights and Stays searches; labeled Food/Guide fixtures; reusable degradation envelopes; discovery and trust routes; AgentFacts discovery and A2A ping; explicit fixture trust gating.
+- Validation: consulted current official Prava and Duffel references; `npm test` passed 21/21 tests; `npm audit --omit=dev` found zero vulnerabilities; all source files passed Node syntax checks; diff and secret scans passed; live server smoke tests verified AgentFacts, A2A ping, fixture-backed Duffel discovery, and fixture trust responses.
+- Decision: degrade discovery and trust to visibly labeled fixtures, but keep payment issuance fail-closed; expose AgentFacts locally without claiming external NANDA registry submission; do not claim Senso track evidence because no verified Senso endpoint/key is configured.
+- Why: flaky discovery should not kill the demo, while simulated payment success or unverified prize-track claims would violate the project rules.
+- Blocked on: real Prava, Duffel, and Senso calls require local credentials; external NANDA registration and production deployment require a public URL. Code paths and honest fixture behavior are complete.
+- Needs from Jeswin/Deepthi: pass discovery inputs through the documented routes and display the top-level `source`; never label fixture trust/discovery or failed payment issuance as live.
+- Commit: `d211855` (pushed to `preethesh/integrations-backend`; merge to `main` follows this log finalization)

@@ -194,4 +194,4 @@
 - Why: four strong, evidenced track submissions are more credible than six shallow claims. The handbook explicitly penalizes mocked transactions, decorative partner integrations, and misleading results.
 - Blocked on: the core track gate remains the local sandbox-key verification followed by one honest end-to-end sandbox checkout. Senso and NANDA additionally require external access/evidence.
 - Needs from Jeswin/Deepthi: Jeswin should keep payment enforcement deterministic and OpenAI reasoning grounded; Deepthi should prepare distinct sandbox/fixture labels and track-specific evidence only for integrations actually demonstrated.
-- Commit: pending (documentation on `preethesh/integrations-backend`)
+- Commit: `a96ddc8` (review committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)

@@ -99,4 +99,4 @@
 - Validation: `npm test` 36/36 at the repo root; render smoke test extended from 15 to 23 content assertions and now server-renders the whole `App` shell (previously only the panels), catching any crash in the rewritten hero, stepper and footer; clean production build with Inter bundled; servers restarted and the end-to-end SSE round trip re-verified through the Vite proxy.
 - Blocked on: nothing
 - Needs from Jeswin/Preethesh: nothing new.
-- Commit: `PENDING` (pushed to `deepthi/frontend-demo`)
+- Commit: `539a4d9` (pushed to `deepthi/frontend-demo`), after merge commit `0b22b27` brought in `main` at `16c7677`.

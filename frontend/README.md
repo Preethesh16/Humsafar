@@ -75,10 +75,26 @@ progress log asks explicitly that fixture or failed card issuance is never shown
 as a completed live payment. The UI enforces that rather than relying on the
 narrator to remember.
 
-**An absent `source` tag renders as "source unverified", never as live.**
-`INTERFACES.md` Section 4 defines the `live | fixture` tag and Section 2 does not
-list it on `purchase_result`, so the dashboard reads it tolerantly and refuses to
-assume the optimistic case when it is missing.
+**Provenance wording is copied from `precaution.md`, not paraphrased.**
+`src/lib/provenance.js` is the single place that turns a purchase's `source`,
+`status` and `environment` into a label, and every string in it is lifted
+verbatim from that file's table. A nicer-sounding synonym is exactly the drift
+that turns an honest demo into an overstated claim, so the labels are pinned by
+`test/provenance.test.js`.
+
+Rules it enforces:
+
+- an unrecognised or absent `source` reads "source unverified; not evidence of a
+  payment" — never the optimistic case;
+- the legacy `source: "live"` describes where the *data* came from and says
+  nothing about payment, so it stays unproven;
+- a failed sandbox line is **not** claimed as a decline that proves cap
+  enforcement — without a structured cause it could be an ordinary booking
+  failure;
+- `environment: "test"` is always qualified as test inventory;
+- if only some categories exercise Prava, the run is labelled **mixed-mode** and
+  the receipt states how many lines genuinely exercised a payment path, so one
+  real line can never stand for the whole run.
 
 ## Dev proxy
 

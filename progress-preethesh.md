@@ -249,4 +249,4 @@
 - Why: contracts must land before the agent and frontend branches implement approval, mandate, choice, and provenance behavior against them.
 - Blocked on: Prava and OpenAI live smoke checks still require local, gitignored credentials; contract drafting itself is not blocked.
 - Needs from Jeswin/Deepthi: pull `main`, merge it into the assigned personal branch, read `execution-plan.md` and `precaution.md`, and work only within the assigned scope.
-- Commit: pending (handoff log on `preethesh/integrations-backend`)
+- Commit: `1139e07` (handoff committed on `preethesh/integrations-backend`)

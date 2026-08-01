@@ -17,10 +17,12 @@ recovery paths a real product needs anyway:
 
 from dataclasses import dataclass, field
 from typing import Optional
+from uuid import uuid4
 
 from .cards import ScopedCard, StubScopedCardClient
 from .checkout import Checkout, SimulatedCheckout
-from .discovery import DiscoveryProvider, FixtureDiscovery, categories_for_goal
+from .discovery import DiscoveryProvider, FixtureDiscovery
+from .intent import GoalIntent, parse_intent
 from .events import EventEmitter
 from .guardian import Guardian
 from .mediator import Mediator
@@ -40,6 +42,10 @@ class RunConfig:
     overspend_agent: Optional[str] = None
     fail_agent: Optional[str] = None
     auto_approve: bool = True
+    # Correlates this run across the agent layer, the approval protocol
+    # (INTERFACES.md §7) and the OpenAI trace group. Generated when absent so a
+    # run is always identifiable.
+    run_id: str = field(default_factory=lambda: f"run-{uuid4().hex[:12]}")
 
 
 @dataclass
@@ -78,8 +84,20 @@ class Orchestrator:
         self.narrator = narrator
         self.trust = trust
         self.mediator = Mediator()
+        self.intent = GoalIntent(categories=[])
 
     def run(self, config: RunConfig) -> RunReport:
+        # One OpenAI trace group per Humsafar run, so a trace can be correlated
+        # with an approval record and a receipt. Sensitive capture is disabled
+        # by default in ai.py: the trace shows which agent spoke, never a key,
+        # card token, CVV, expiry or raw Prava response.
+        runtime = getattr(self.narrator, "runtime", None)
+        if runtime is not None and hasattr(runtime, "trace_run"):
+            with runtime.trace_run(config.run_id):
+                return self._run(config)
+        return self._run(config)
+
+    def _run(self, config: RunConfig) -> RunReport:
         report = RunReport(goal=config.goal, budget_paise=config.budget_paise, negotiation=None)
 
         specialists = self._assemble(config)
@@ -118,11 +136,20 @@ class Orchestrator:
     # -- phases ---------------------------------------------------------
 
     def _assemble(self, config: RunConfig) -> list[Specialist]:
-        categories = categories_for_goal(config.goal)
+        # Goal parsing is the one genuinely linguistic step in the run, so it is
+        # where a model earns its place. Everything it returns is validated, and
+        # a failure falls back to the keyword parser rather than blocking.
+        self.intent = parse_intent(config.goal, getattr(self.narrator, "runtime", None))
+        categories = self.intent.categories
+
+        emphasis = ", ".join(
+            f"{c} ({self.intent.weight_for(c):.0%})" for c in categories
+        )
         self._say(
             "orchestrator",
             f"Goal: {config.goal}. Budget: {format_inr(config.budget_paise)}. "
-            f"Bringing in {len(categories)} specialists: {', '.join(categories)}.",
+            f"Bringing in {len(categories)} specialists — {emphasis}. "
+            f"[intent: {self.intent.source}]",
         )
 
         specialists = build_specialists(categories, self.provider, config.goal)
@@ -146,6 +173,7 @@ class Orchestrator:
                 allocations, config.budget_paise, rnd
             ),
             narrator=self.narrator,
+            intent=self.intent,
         )
         result = engine.run()
         self._say(

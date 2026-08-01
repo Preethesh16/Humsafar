@@ -96,7 +96,11 @@ class Mediator:
         return allocations, "forced_compromise", statement
 
     def allocate_surplus(
-        self, specialists: list[Specialist], allocations: dict[str, int], budget_paise: int
+        self,
+        specialists: list[Specialist],
+        allocations: dict[str, int],
+        budget_paise: int,
+        intent=None,
     ) -> list[str]:
         """Put leftover budget where it buys the most, one upgrade at a time.
 
@@ -127,7 +131,13 @@ class Mediator:
                     gain = option.rating - current_rating
                     if extra <= 0 or extra > leftover or gain <= 0:
                         continue
+                    # Rating gained per rupee, tilted by how much the user
+                    # emphasised this category. A neutral priority multiplies by
+                    # 1.0, so surplus behaves exactly as before when no goal
+                    # parsing ran.
                     score = gain / extra
+                    if intent is not None:
+                        score *= intent.upgrade_multiplier(specialist.category)
                     candidate = (score, specialist.category, specialist, option.price_paise, option.vendor)
                     # Highest score wins; category name breaks ties so a replay
                     # of the same negotiation produces the same plan.

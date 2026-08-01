@@ -20,6 +20,7 @@ callbacks — so the whole thing is testable offline in milliseconds.
 from typing import Callable, Optional
 
 from .discovery import DiscoveryProvider
+from .intent import GoalIntent
 from .mediator import Mediator, _distribute_capped
 from .models import NegotiationResult, Option, RoundRecord, Specialist
 from .money import format_inr
@@ -93,6 +94,7 @@ class NegotiationEngine:
         on_message: Optional[MessageSink] = None,
         on_split: Optional[SplitSink] = None,
         narrator=None,
+        intent=None,
     ) -> None:
         self.specialists = specialists
         self.budget_paise = budget_paise
@@ -100,6 +102,11 @@ class NegotiationEngine:
         self.on_message = on_message or (lambda agent, text: None)
         self.on_split = on_split or (lambda allocations, rnd: None)
         self.narrator = narrator
+        # A neutral intent leaves every multiplier at 1.0, so a run without goal
+        # parsing behaves exactly as it did before intent existed.
+        self.intent = intent if intent is not None else GoalIntent(
+            categories=[s.category for s in specialists]
+        )
 
     def run(self) -> NegotiationResult:
         rounds: list[RoundRecord] = []
@@ -123,7 +130,7 @@ class NegotiationEngine:
                 )
                 allocations = {s.category: s.ask_paise for s in self.specialists}
                 for note in self.mediator.allocate_surplus(
-                    self.specialists, allocations, self.budget_paise
+                    self.specialists, allocations, self.budget_paise, self.intent
                 ):
                     self._say("mediator", note, record)
                 if allocations != record.asks_paise:
@@ -131,6 +138,7 @@ class NegotiationEngine:
 
                 result = NegotiationResult(allocations, rounds, "converged", self.budget_paise)
                 self.mediator.verify(result)
+                self._explain(result, record)
                 return result
 
             if number < MAX_ROUNDS:
@@ -200,7 +208,16 @@ class NegotiationEngine:
 
         rate = CONCESSION_SCHEDULE[min(number, len(CONCESSION_SCHEDULE)) - 1]
         target = int(min(gap, total_slack) * rate)
-        concessions = _distribute_capped(target, slacks, slacks)
+
+        # Slack says how much an agent *can* give up; the user's stated priority
+        # says how willing it should be. A category the user emphasised concedes
+        # less of the same slack. Caps stay at raw slack, so priority can never
+        # push anyone below their floor — it only reorders who gives ground.
+        weights = [
+            max(0, int(s.slack_paise * self.intent.concession_multiplier(s.category)))
+            for s in self.specialists
+        ]
+        concessions = _distribute_capped(target, weights, slacks)
 
         self._say(
             "mediator",
@@ -215,6 +232,29 @@ class NegotiationEngine:
             before = specialist.ask_paise
             specialist.ask_paise -= concession
             self._say(specialist.category, self._concede_text(specialist, before), record)
+
+    def _explain(self, result: NegotiationResult, record: RoundRecord) -> None:
+        """Let the mediator explain a settlement it did not choose.
+
+        Purely additive: the deterministic "Agreed. The split sums to ..." line
+        has already been said, so a missing or rejected model response costs the
+        run nothing.
+        """
+        if self.narrator is None:
+            return
+        explain = getattr(self.narrator, "explain_settlement", None)
+        if explain is None:
+            return
+
+        text = explain(
+            self.specialists,
+            result.allocations_paise,
+            self.budget_paise,
+            result.exit_reason,
+            len(result.rounds),
+        )
+        if text:
+            self._say("mediator", text, record)
 
     def _concede_text(self, specialist: Specialist, before: int) -> str:
         """Snap a conceded ask down to something the agent can actually buy.

@@ -13,12 +13,17 @@ import os
 import sys
 
 from .cards import ScopedCardClient, StubScopedCardClient
+from .config import load_env
 from .discovery import BackendDiscovery
 from .events import EventEmitter
 from .llm import Narrator
 from .money import format_inr
 from .orchestrator import run_goal
 from .trust import TrustClient
+
+# Load the shared gitignored .env before anything reads os.environ. An explicit
+# shell export still wins; see config.load_env.
+load_env()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -76,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         f"  cards       : {'live backend route' if args.live_cards else 'STUB (simulated, not a real charge)'}\n"
         f"  discovery   : {'backend route' if args.live_discovery else 'local FIXTURE data'}\n"
         f"  trust check : {'on' if args.trust else 'off'}\n"
-        f"  dialogue    : {'OpenAI' if narrator.available else 'deterministic templates'}\n"
+        f"  reasoning   : {'OpenAI Agents SDK' if narrator.available else 'deterministic templates'}\n"
         f"  streaming   : {'off' if args.no_stream else args.backend}\n",
         file=sys.stderr,
     )

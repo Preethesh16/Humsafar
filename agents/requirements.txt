@@ -1,0 +1,19 @@
+# Humsafar agent core — Python dependencies
+#
+# Install:  python3 -m pip install --user -r agents/requirements.txt
+#
+# Pinned, not floated. A hackathon demo that breaks because a transitive
+# release landed mid-weekend is a self-inflicted failure, and the Agents SDK
+# is moving fast enough for that to be a real risk.
+#
+# NOTE: every one of these is OPTIONAL at runtime. With none of them installed
+# the agent core runs end to end on the deterministic path — same allocations,
+# same purchases, templated dialogue instead of model dialogue. Only the
+# OpenAI reasoning layer needs them. See agents/humsafar/ai.py.
+
+openai-agents==0.19.2
+
+# Pulled in by openai-agents; pinned so structured-output validation behaviour
+# cannot shift underneath the schemas in humsafar/schemas.py.
+openai==2.52.0
+pydantic==2.12.5

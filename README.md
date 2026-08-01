@@ -204,6 +204,27 @@ Required by the hackathon rules, and stated precisely:
 
 ---
 
+## Prize-track evidence
+
+Listed with the status each claim honestly has **today**, because a track claim we
+cannot demonstrate is worse than one we do not make. The handbook penalises
+decorative partner integrations, so a track is only claimed where there is something
+runnable to point at.
+
+| Track | What we would claim | Evidence today | Status |
+|---|---|---|---|
+| **Prava Overall** | Prava is the core mechanic: one merchant-scoped, capped credential per agent, minted only after an explicit approval | Scoped-card service, mandate resolver, cap enforcement and the approval gate are implemented and tested. Sandbox authentication verified via `npm run prava:verify`. | ⏳ **Pending the transaction.** No customer, mandate, session, credential or charge exists yet. |
+| **Visa Intelligent Commerce** | Permissions and controls, not just a payment | Per-agent amount caps, merchant-scoped mandates, and an expiring one-shot run-scoped approval that fails closed on a changed plan — all verified end to end | ◑ **Controls demonstrated, completion pending.** The permissions half is real; the transaction half is not. |
+| **OpenAI** | Models materially used for agent reasoning, never for money | The agent core runs deterministically today and degrades to templated dialogue without a key. No `OPENAI_API_KEY` is configured. | ⏳ **Not yet demonstrated.** Deliberate design: no model output may move money, so the money path stays deterministic. |
+| **Localhost Startup-Ready** | A real product direction, not a demo toy | The negotiation mechanic, the containment argument, and the honesty layer are the product thesis | ◑ **Narrative, not code evidence.** |
+| **Project NANDA** | A reusable Prava adapter, discoverable | `GET /.well-known/agentfacts.json` → `200`, `POST /a2a/ping` → `200`, both verified | ◑ **Endpoints demonstrated**, full adapter submission pending. |
+| **Senso** | Trust materially influences a merchant decision | The trust route exists and materially changes purchases, but it is a **local fixture heuristic** and labels itself as such: *"replace with a verified Senso response before claiming track evidence"* | ✗ **Not claimed.** A local heuristic is not Senso. |
+| **Linq** | — | — | ✗ **Not pursued.** Messaging is not Humsafar's core interface, and a bolted-on channel is exactly the decorative integration the handbook penalises. |
+
+Legend: ✓ demonstrated · ◑ partially demonstrated · ⏳ pending · ✗ not claimed
+
+---
+
 ## Team
 
 | | Owns |

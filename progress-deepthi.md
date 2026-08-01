@@ -264,3 +264,19 @@
 - Blocked on: item 1 still needs the run-creation endpoint; item 4 needs Jeswin's identity fields on `main`.
 - Needs from Jeswin/Preethesh: unchanged from the previous entry.
 - Commit: `efd2e11` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-02 02:05 IST] — Added the track-evidence section, closing item 8
+- Prompt: pull `main`, merge my work in, then continue any pending work.
+- Files changed: `README.md`, `progress-deepthi.md`.
+- Merged the accessibility pass to `main` at `0098d64` first, after 75/75, the render suite and a clean build **on `main`**.
+- Then found a real gap in my own supposedly-finished work: `execution-plan.md` Priority 2 item 8 asks for "README, architecture diagram, setup instructions, disclosure, exact source labels, **and track-evidence sections**". I had written every part except the last one, so item 8 was not actually complete.
+- Changed: added a prize-track evidence table covering all seven tracks with the status each claim honestly holds today.
+- **Verified each claim by running it rather than asserting it.** NANDA's `GET /.well-known/agentfacts.json` and `POST /a2a/ping` both return `200`. The trust route returns a `source: "fixture"` envelope whose own reason string reads *"replace with a verified Senso response before claiming track evidence"*. No `OPENAI_API_KEY` is configured, so the agent core runs deterministic dialogue.
+- Decision — **two tracks are explicitly not claimed.** Senso is marked ✗ because a local fixture heuristic is not Senso, exactly as Preethesh's track review concluded. Linq is ✗ because messaging is not our core interface and a bolted-on channel is the decorative integration the handbook penalises. Writing "not claimed" into the README is more useful than silence, because it stops anyone quietly claiming them later under deadline pressure.
+- Decision — **Visa is marked partially demonstrated rather than pending.** The track wants completion *and* permissions/controls; the controls half is genuinely real and tested (per-agent caps, merchant-scoped mandates, an expiring one-shot approval that fails closed on a changed plan). Splitting the status is more accurate than a single verdict on either extreme.
+- Decision — **OpenAI is marked not yet demonstrated, and the reason is stated as a design choice rather than an omission.** No model output may move money, so the money path is deterministic by construction; that is worth saying plainly rather than looking like a missing integration.
+- This follows Preethesh's instruction to me directly: prepare track-specific evidence only for integrations actually demonstrated.
+- Validation: 75/75 tests; every endpoint claim in the table exercised against the running backend before being written down.
+- Blocked on: item 1 needs the run-creation endpoint; item 4 needs Jeswin's identity fields on `main`; items 7, 9 and 10 (deploy, video, Devfolio) need external platform access and a real transaction to record.
+- Needs from Jeswin/Preethesh: unchanged. The track table will need updating the moment the first genuine sandbox charge lands — that single event moves Prava from pending to demonstrated and completes the Visa claim.
+- Commit: `961c8c3` (pushed to `deepthi/frontend-demo`)

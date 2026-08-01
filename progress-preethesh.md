@@ -62,4 +62,4 @@
 - Why: Prava documents repeated fresh credentials per active mandate, but listed mandates and setup sessions are single-merchant. Claiming one mandate across several merchants would be technically unsupported and misleading.
 - Blocked on: live sandbox verification requires a local `PRAVA_SECRET_KEY` and active merchant-specific mandate ID; neither is present in the workspace.
 - Needs from Jeswin/Deepthi: Jeswin should treat `mandateId` as merchant-specific; Deepthi must not label fixture or failed card issuance as a completed live payment.
-- Commit: pending
+- Commit: `60b34a4` (pushed to `preethesh/integrations-backend`; merge to `main` follows this log finalization)

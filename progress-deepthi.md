@@ -180,3 +180,14 @@
 - Blocked on: Jeswin and Preethesh accepting or amending §6 before implementation. Also still blocked on the approval boundary from the previous entry.
 - Needs from Jeswin: agree or push back on §6, especially the pause-and-wait in the orchestrator and the ranking rule. Needs from Preethesh: agree or push back on §6.3, and decide the open question there — whether events gain a `runId` or the backend simply tracks one active run.
 - Commit: `b401f14` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 23:20 IST] — Merged the choice-step proposal into `main`
+- Prompt: pull anything new from `main`, then merge my work into `main`.
+- Files changed: `progress-deepthi.md` only; the merge carried the already-written §6 proposal.
+- Merged in first: `origin/main` `a47c450` — Preethesh's final audit of the revised execution plan. Documentation only, no contract or source changes, so nothing in the dashboard was affected.
+- **New requirement landed on me** from his item (7) and his teammate note: *present per-purchase sandbox/fixture evidence, and never imply all four purchases are genuine from a single Prava checkout.* Partly satisfied already — every purchase card and every receipt line carries its own `source` tag, and an untagged line reads "source unverified". **The gap is at run level:** the receipt header still reads "Every agent has settled · ₹28,800 spent" with no aggregate statement, so a judge glancing at it could read four real purchases where only one was a genuine sandbox charge. A mixed-mode run needs an explicit run-level label, not just per-line tags. Recorded here rather than fixed, because this session's task was the merge; it is the first thing to build once the sandbox charge exists to label.
+- Merged out: `deepthi/frontend-demo` into `main` with `--no-ff`, carrying the proposed `INTERFACES.md` §6 and `brainstorming.md` §6b choice step so Jeswin and Preethesh can review it on `main`.
+- Validation before pushing `main`: clean tree, no conflicts, `npm test` 40/40, Python 80/80.
+- Blocked on: Jeswin and Preethesh accepting or amending §6 — it is still 🟡 proposed, and merging it to `main` publishes the proposal for review, it does not lock it.
+- Needs from Jeswin/Preethesh: review §6. From Preethesh specifically: tell me the shape of the per-purchase sandbox evidence you want surfaced, so the mixed-mode label reflects what Prava actually returns rather than something I invent.
+- Commit: `bf900f8` (merged to `main`)

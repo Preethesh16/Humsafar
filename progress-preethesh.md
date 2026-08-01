@@ -304,4 +304,4 @@
 - Why: listing mandates before any customer session legitimately has no customer to return; treating that as bad credentials blocked a valid new-account setup and misreported the evidence.
 - Blocked on: the next step requires a deliberate mandate-session ceremony with the user's email, selected first merchant, and the cardholder ready for the hosted passkey/card flow.
 - Needs from Jeswin/Deepthi: none for authentication. Continue treating mandate approval as authorization only, not a completed purchase.
-- Commit: pending (verifier correction on `preethesh/integrations-backend`)
+- Commit: `2d9a4d2` (verifier correction committed on `preethesh/integrations-backend`)

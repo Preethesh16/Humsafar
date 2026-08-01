@@ -1,15 +1,21 @@
-/** Presentation metadata for the six speakers in the locked event contract. */
+/**
+ * Presentation metadata for the six speakers in the locked event contract.
+ * Colours follow the warm "paper" palette in styles.css: each specialist owns
+ * an ink colour and a soft tint used for its glyph plate and bar segment.
+ */
 export const AGENT_META = {
-  flights: { label: "Flights", color: "#4f8cff", glyph: "✈" },
-  stay: { label: "Stay", color: "#22c3a6", glyph: "⌂" },
-  food: { label: "Food", color: "#f0a02c", glyph: "◍" },
-  guide: { label: "Guide", color: "#c07bf0", glyph: "◆" },
-  mediator: { label: "Mediator", color: "#e2e8f0", glyph: "§" },
-  orchestrator: { label: "Orchestrator", color: "#94a3b8", glyph: "◇" },
+  flights: { label: "Flights", color: "#547ca8", soft: "#e6eef8", key: "flights" },
+  stay: { label: "Stay", color: "#765b92", soft: "#eee6f6", key: "stay" },
+  food: { label: "Food", color: "#a16b18", soft: "#fff0cc", key: "food" },
+  guide: { label: "Guide", color: "#2e5a42", soft: "#c9f2dd", key: "guide" },
+  mediator: { label: "Mediator", color: "#17221b", soft: "#e8e0d2", key: "mediator" },
+  orchestrator: { label: "Orchestrator", color: "#667169", soft: "#f9f5ec", key: "orchestrator" },
 };
 
 export function metaFor(agent) {
-  return AGENT_META[agent] ?? { label: agent ?? "unknown", color: "#64748b", glyph: "•" };
+  return (
+    AGENT_META[agent] ?? { label: agent ?? "unknown", color: "#8e968f", soft: "#f3efe5", key: "unknown" }
+  );
 }
 
 const inr = new Intl.NumberFormat("en-IN", {

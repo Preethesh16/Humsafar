@@ -7,22 +7,27 @@ import { money } from "../lib/agents.js";
  */
 export function AuditLog({ audit }) {
   return (
-    <section className="panel panel--audit">
-      <header className="panel__head">
-        <h2>Audit log</h2>
-        <span className="pill">{audit.length} events</span>
+    <section className="panel">
+      <header className="panel-head">
+        <div className="panel-title">Audit log</div>
+        <span className="run-id">{audit.length} events</span>
       </header>
 
-      <ol className="audit">
-        {audit.length === 0 && <li className="empty">No events received yet.</li>}
-        {audit.map((entry) => (
-          <li key={`${entry.seq}-${entry.id ?? "n"}`} className="audit__row">
-            <span className="audit__id mono">#{entry.id ?? entry.seq}</span>
-            <span className="audit__type">{entry.event.type}</span>
-            <span className="audit__detail">{describe(entry.event)}</span>
-          </li>
-        ))}
-      </ol>
+      {audit.length === 0 ? (
+        <div style={{ padding: "18px 22px" }}>
+          <div className="rail-empty">No events received yet.</div>
+        </div>
+      ) : (
+        <ol className="audit">
+          {audit.map((entry) => (
+            <li key={`${entry.seq}-${entry.id ?? "n"}`} className="audit__row">
+              <span className="audit__id">#{entry.id ?? entry.seq}</span>
+              <span className="audit__type">{entry.event.type}</span>
+              <span className="audit__detail">{describe(entry.event)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

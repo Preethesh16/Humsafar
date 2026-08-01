@@ -1,11 +1,15 @@
 import { useEffect, useRef } from "react";
 
 import { clockTime, metaFor } from "../lib/agents.js";
+import { AGENT_ICON, IconScale } from "../lib/icons.jsx";
 
 /**
  * The demo's wow moment: agents arguing in real time. Auto-scrolls to the
  * newest message, but only while the viewer is already at the bottom — so
  * scrolling back to re-read an argument mid-demo doesn't get yanked away.
+ *
+ * Round dividers are inserted purely from the `round` already carried on each
+ * message by the reducer; nothing new is computed or fetched here.
  */
 export function DeliberationFeed({ messages, round }) {
   const scrollerRef = useRef(null);
@@ -23,31 +27,60 @@ export function DeliberationFeed({ messages, round }) {
   };
 
   return (
-    <section className="panel panel--feed">
-      <header className="panel__head">
-        <h2>Live deliberation</h2>
-        {round > 0 && <span className="pill">Round {round} of 5</span>}
+    <section className="panel">
+      <header className="panel-head">
+        <div className="panel-title">
+          <span className={`live-dot ${messages.length > 0 ? "running" : ""}`} />
+          Deliberation room
+        </div>
+        <span className="run-id">{round > 0 ? `Round ${round} of 5` : "standing by"}</span>
       </header>
 
-      <div className="feed" ref={scrollerRef} onScroll={onScroll}>
-        {messages.length === 0 && (
-          <p className="empty">Waiting for the first agent to speak…</p>
-        )}
+      {messages.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-seal">
+            <IconScale />
+          </div>
+          <h3>The room is quiet</h3>
+          <p>
+            Four specialists will argue over one finite pot here. The mediator closes
+            the debate the moment the split fits the budget without breaking anyone's
+            stated floor.
+          </p>
+        </div>
+      ) : (
+        <div className="feed" ref={scrollerRef} onScroll={onScroll}>
+          {messages.map((m, index) => {
+            const meta = metaFor(m.agent);
+            const Icon = AGENT_ICON[m.agent] ?? IconScale;
+            const isLead = m.agent === "mediator" || m.agent === "orchestrator";
+            const newRound = index === 0 || messages[index - 1].round !== m.round;
 
-        {messages.map((m) => {
-          const meta = metaFor(m.agent);
-          return (
-            <article key={m.key} className="msg" style={{ "--agent": meta.color }}>
-              <div className="msg__who">
-                <span className="msg__glyph" aria-hidden="true">{meta.glyph}</span>
-                <span className="msg__name">{meta.label}</span>
-                <time className="msg__time">{clockTime(m.timestamp)}</time>
+            return (
+              <div key={m.key}>
+                {newRound && m.round > 0 && (
+                  <div className="phase-divider">Round {m.round}</div>
+                )}
+                <article
+                  className={`event ${isLead ? "is-lead" : ""}`}
+                  style={{ "--agent": meta.color, "--agent-soft": meta.soft }}
+                >
+                  <span className="event-icon">
+                    <Icon />
+                  </span>
+                  <div>
+                    <div className="event-top">
+                      <span className="event-who">{meta.label}</span>
+                      <time className="event-time">{clockTime(m.timestamp)}</time>
+                    </div>
+                    <p className="event-body">{m.message}</p>
+                  </div>
+                </article>
               </div>
-              <p className="msg__body">{m.message}</p>
-            </article>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }

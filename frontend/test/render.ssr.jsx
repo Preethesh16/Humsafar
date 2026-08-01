@@ -15,6 +15,7 @@ import { AuditLog } from "../src/components/AuditLog.jsx";
 import { BudgetSplit } from "../src/components/BudgetSplit.jsx";
 import { DeliberationFeed } from "../src/components/DeliberationFeed.jsx";
 import { FinalReceipt } from "../src/components/FinalReceipt.jsx";
+import { ProofPanel } from "../src/components/ProofPanel.jsx";
 import { PurchaseCards } from "../src/components/PurchaseCards.jsx";
 import { MOCK_EVENTS } from "../src/lib/mockStream.js";
 import { PHASES, initialState, reduce, summarize } from "../src/state/sessionReducer.js";
@@ -43,6 +44,9 @@ const html = [
       isMock
     />,
   ),
+  renderToStaticMarkup(
+    <ProofPanel blockedAttempts={state.blockedAttempts} renegotiations={state.renegotiations} />,
+  ),
   renderToStaticMarkup(<AuditLog audit={state.audit} />),
   renderToStaticMarkup(
     <FinalReceipt
@@ -57,12 +61,15 @@ const html = [
 ].join("\n");
 
 const expectations = [
-  ["Live deliberation", "feed heading"],
+  ["Deliberation room", "feed heading"],
   ["Round 4 of 5", "round counter"],
   ["Convergence condition 1 met", "mediator's closing argument"],
   ["Budget split", "split heading"],
+  ["Scoped credentials", "credential rail heading"],
   ["instr_mock_guide_02", "the re-issued guide credential"],
-  ["Blocked at card level", "over-cap block proof shot"],
+  ["Blocked at card level", "over-cap block on the credential card"],
+  ["Overspend blocked at the card", "proof shot #1 panel"],
+  ["Single slice re-negotiated", "proof shot #2 panel"],
   ["fixture data", "honest source tag"],
   ["mocked stream", "mock labelling on purchases"],
   ["Audit log", "audit heading"],

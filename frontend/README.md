@@ -34,7 +34,23 @@ npm run build     # production bundle
 | `src/state/sessionReducer.js` | Pure fold of the locked event contract into UI state. No React — unit-tested directly. |
 | `src/lib/mockStream.js` | **MOCKED** scripted replay of the `brainstorming.md` Section 7 demo beats. |
 | `src/lib/useEventStream.js` | Switches between the mock replay and `EventSource("/api/events")`. |
-| `src/components/` | Deliberation feed, budget split, per-agent cards, audit log, final receipt. |
+| `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, final receipt. |
+| `src/lib/icons.jsx` | Inline SVG glyphs. Presentation only. |
+| `src/styles.css` | The warm "paper" theme — canvas `#f3efe5`, forest `#1d3b2d`, coral `#e56b52`, mint `#c9f2dd`. |
+
+## Design language
+
+Warm editorial "paper" theme: a light canvas with soft mint and coral radial
+washes, forest-green primary, coral serif italic for emphasis in the headline,
+and monospace uppercase micro-labels for every meta line. Panels are 20px-radius
+paper cards with a soft shadow and a `#ddd6c9` hairline border.
+
+The layout is hero → journey stepper → two-column workspace → truth-layer
+footer. The stepper (Negotiate → Approve → Lock spend → Verify) is derived
+purely from the `phase` the reducer already computes — it is a display mapping,
+not a second state machine.
+
+`@media (prefers-reduced-motion: reduce)` disables every animation.
 
 ## Two things that are deliberate, not accidental
 

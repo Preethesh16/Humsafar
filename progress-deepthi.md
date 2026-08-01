@@ -65,3 +65,25 @@
 - Needs from Jeswin: the real `agent_message` text is what sells the demo — argumentative, specific, one clear claim per message (see `src/lib/mockStream.js` for the tone I built the feed's spacing around). Also emit `split_update` on **every** round, including the ones that stay over budget; the contention is the story.
 - Needs from Preethesh: include the `source` tag on `purchase_result` when you have it. Nothing else — the SSE stream, ids, and `Last-Event-ID` replay all worked first try against my client.
 - Commit: `d6c6286` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 14:32 IST] — Ran the dashboard for review
+- Prompt: asked to see the work running and to pull anything new on `main`.
+- Files changed: none.
+- Changed: nothing — started the backend and the Vite dev server and walked through the demo beats on `http://localhost:5173`.
+- Validation: `/health` returned ok; the dashboard returned HTTP 200; `origin/main` was still at `66e0d75`, so there was nothing to pull.
+- Blocked on: nothing
+- Needs from Jeswin/Preethesh: nothing
+- Commit: n/a (no file changes)
+
+### [2026-08-01 15:05 IST] — Merged Preethesh's backend work and re-themed the UI
+- Prompt: take UI/UX inspiration from a reference demo site, change only the look and feel, leave every bit of logic and flow exactly as it is, and pull anything new on `main`.
+- Files changed: `frontend/src/styles.css` (full rewrite), `frontend/src/App.jsx`, `frontend/src/lib/agents.js`, all five existing components, `frontend/src/components/ProofPanel.jsx` (new), `frontend/src/lib/icons.jsx` (new), `frontend/test/render.ssr.jsx`, `frontend/README.md`.
+- Merged: `origin/main` `95657ea` (Preethesh's discovery, mandate, trust, Duffel and NANDA work) into this branch. The merge was clean and my three `INTERFACES.md` Section 2 clarifications survived alongside his six new endpoint entries.
+- Changed: replaced the dark dashboard theme with a warm editorial "paper" theme — canvas `#f3efe5`, forest `#1d3b2d`, coral `#e56b52`, mint `#c9f2dd`, Inter with a coral serif italic accent in the headline, monospace uppercase micro-labels, 20px paper panels. Restructured the page into hero → journey stepper → two-column workspace → truth-layer footer, and split the two demo proof shots into their own coral panel so a judge sees them without reading the feed.
+- **Constraint honoured, and proved mechanically:** `frontend/src/state/sessionReducer.js`, `frontend/src/lib/useEventStream.js` and `frontend/src/lib/mockStream.js` are byte-for-byte unchanged — verified with `git diff --numstat HEAD` per file before committing. No event shape, no reducer branch, no stream handling, and no phase transition was touched. The journey stepper is a display mapping over the `phase` the reducer already computes, not a second state machine.
+- Decision: kept every honesty affordance through the re-theme rather than letting a prettier design soften them. The simulated-stream notice is still unmissable (amber, above the fold), every purchase still carries its `fixture data · mocked stream` tag, an absent `source` still renders "source unverified", and the receipt still states no payment was made. The render test still asserts the string "live transaction" can never appear on the mocked stream.
+- Decision: added `prefers-reduced-motion` support, which the previous theme lacked.
+- Validation: `npm test` at the repo root passes **36/36** (Preethesh's merge added 7). `npm run test:render` passes with 15 assertions (up from 12) over the full 32-event script. Clean production build. Restarted the backend on the merged code and re-ran the end-to-end check: `/health` ok, his new `/.well-known/agentfacts.json` returns 200, and a POSTed `agent_message` came back through the Vite proxy SSE stream correctly framed.
+- Blocked on: nothing
+- Needs from Jeswin/Preethesh: nothing new.
+- Commit: `4e21e33` (pushed to `deepthi/frontend-demo`)

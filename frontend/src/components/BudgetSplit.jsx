@@ -3,63 +3,68 @@ import { metaFor, money } from "../lib/agents.js";
 
 /**
  * The finite pot, and how the four specialists are currently carving it up.
- * A single stacked bar makes contention legible at a glance: when the segments
- * overflow the budget line, the negotiation has not converged yet.
+ * A single stacked track makes contention legible at a glance: when the
+ * segments overflow the budget the state chip flips to "over budget", which is
+ * exactly the tension the demo is selling.
  */
 export function BudgetSplit({ allocations, summary, round }) {
   const { budget, allocated, unallocated, overBudget } = summary;
   const scale = Math.max(budget, allocated) || 1;
 
   return (
-    <section className="panel">
-      <header className="panel__head">
-        <h2>Budget split</h2>
-        <span className={`pill ${overBudget ? "pill--danger" : ""}`}>
-          {money(allocated)} of {money(budget)}
-          {overBudget ? ` · over by ${money(allocated - budget)}` : ""}
+    <section className="panel rail-card">
+      <div className="rail-head">
+        <span className="rail-title">Budget split</span>
+        <span className={`budget-state ${allocated === 0 ? "" : overBudget ? "over" : "safe"}`}>
+          {allocated === 0 ? "no split yet" : overBudget ? "over budget" : "within budget"}
         </span>
-      </header>
+      </div>
 
-      <div className="bar" role="img" aria-label={`Allocated ${money(allocated)} of ${money(budget)}`}>
+      <div className="budget-numbers">
+        <span className="budget-primary">{money(allocated)}</span>
+        <span className="budget-cap">of {money(budget)}</span>
+      </div>
+
+      <div
+        className="budget-track"
+        role="img"
+        aria-label={`Allocated ${money(allocated)} of ${money(budget)}`}
+      >
         {AGENTS.map((agent) => {
           const value = allocations[agent] ?? 0;
           if (value <= 0) return null;
           const meta = metaFor(agent);
           return (
-            <div
+            <span
               key={agent}
-              className="bar__seg"
+              className="segment"
               style={{ width: `${(value / scale) * 100}%`, background: meta.color }}
               title={`${meta.label}: ${money(value)}`}
             />
           );
         })}
-        {unallocated > 0 && (
-          <div className="bar__seg bar__seg--free" style={{ width: `${(unallocated / scale) * 100}%` }} />
-        )}
       </div>
 
-      <ul className="legend">
+      <p className="budget-note">
+        {allocated === 0
+          ? "Waiting for the first proposed split."
+          : overBudget
+            ? `Round ${round} overshoots by ${money(allocated - budget)}. The mediator will not let this settle.`
+            : `Round ${round} fits, with ${money(unallocated)} unallocated.`}
+      </p>
+
+      <div className="legend">
         {AGENTS.map((agent) => {
           const meta = metaFor(agent);
           const value = allocations[agent] ?? 0;
-          const share = budget > 0 ? Math.round((value / budget) * 100) : 0;
           return (
-            <li key={agent}>
-              <span className="legend__dot" style={{ background: meta.color }} />
-              <span className="legend__label">{meta.label}</span>
-              <span className="legend__value">{money(value)}</span>
-              <span className="legend__share">{value > 0 ? `${share}%` : "—"}</span>
-            </li>
+            <span key={agent}>
+              <i style={{ background: meta.color }} />
+              {meta.label} <b>{value > 0 ? money(value) : "—"}</b>
+            </span>
           );
         })}
-        <li className="legend__free">
-          <span className="legend__dot legend__dot--free" />
-          <span className="legend__label">Unallocated</span>
-          <span className="legend__value">{money(unallocated)}</span>
-          <span className="legend__share">{round > 0 ? `after round ${round}` : "—"}</span>
-        </li>
-      </ul>
+      </div>
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import { metaFor, money } from "../lib/agents.js";
+import { IconCheck } from "../lib/icons.jsx";
 
 /**
  * Confirmation fan-out (brainstorming.md §7 beat 7): the summary the user sees
@@ -25,59 +26,60 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Final receipt">
-      <div className="receipt">
-        <header className="receipt__head">
-          <h2>Every agent has settled</h2>
+      <div className="outcome">
+        <div className="outcome-top">
+          <div>
+            <div className="outcome-kicker">Confirmation fan-out</div>
+            <h2>Every agent has settled</h2>
+          </div>
+          <span className="outcome-check">
+            <IconCheck />
+          </span>
           <button type="button" className="ghost" onClick={onDismiss} aria-label="Close receipt">
             ✕
           </button>
-        </header>
+        </div>
 
         {isMock && (
-          <p className="receipt__warn">
+          <p className="outcome-warn">
             This receipt was produced by the mocked demo stream. No payment was made.
           </p>
         )}
 
-        <ul className="receipt__lines">
+        <ul className="outcome-lines">
           {lines.map((line, index) => {
             const meta = metaFor(line.agent);
             return (
               <li key={`${line.agent}-${index}`}>
-                <span className="legend__dot" style={{ background: meta.color }} />
-                <span className="receipt__agent">{meta.label}</span>
-                <span className="receipt__merchant">{line.merchant}</span>
-                <span className="receipt__amount">{money(line.amount)}</span>
+                <i style={{ background: meta.color }} />
+                <span className="outcome-agent">{meta.label}</span>
+                <span className="outcome-merchant">{line.merchant}</span>
+                <span className="outcome-amount">{money(line.amount)}</span>
               </li>
             );
           })}
         </ul>
 
-        <dl className="receipt__totals">
-          <div>
-            <dt>Budget</dt>
-            <dd>{money(receipt.budget)}</dd>
+        <div className="outcome-stats">
+          <div className="outcome-stat">
+            <span>Budget</span>
+            <b>{money(receipt.budget)}</b>
           </div>
-          <div>
-            <dt>Spent</dt>
-            <dd>{money(receipt.totalSpent)}</dd>
+          <div className="outcome-stat">
+            <span>Spent</span>
+            <b>{money(receipt.totalSpent)}</b>
           </div>
-          <div>
-            <dt>Unspent</dt>
-            <dd>{money(remaining)}</dd>
+          <div className="outcome-stat">
+            <span>Blocked</span>
+            <b>{blockedAttempts.length}</b>
           </div>
-        </dl>
+          <div className="outcome-stat">
+            <span>Recovered</span>
+            <b>{summary.failedPurchases}</b>
+          </div>
+        </div>
 
-        <p className="receipt__proof">
-          <strong>{blockedAttempts.length}</strong> over-cap attempt
-          {blockedAttempts.length === 1 ? "" : "s"} blocked at the card level ·{" "}
-          <strong>{renegotiations.length}</strong> slice
-          {renegotiations.length === 1 ? "" : "s"} re-negotiated after a failure ·{" "}
-          <strong>{summary.failedPurchases}</strong> failed booking
-          {summary.failedPurchases === 1 ? "" : "s"} recovered
-        </p>
-
-        <button type="button" className="primary" onClick={copySummary}>
+        <button type="button" className="run-btn" onClick={copySummary}>
           Copy confirmation summary
         </button>
       </div>

@@ -31,24 +31,68 @@ export class PravaClient {
   }
 
   async chargeMandate({ mandateId, amount, reference }) {
+    const payload = await this.request(`/v1/mandates/${encodeURIComponent(mandateId)}/charge`, {
+      method: "POST",
+      body: { amount, reference },
+    });
+
+    validateChargeResponse(payload.data, payload.responseId);
+    return { data: payload.data, source: "live" };
+  }
+
+  async createMandateSession(input) {
+    const payload = await this.request("/v1/sessions", {
+      method: "POST",
+      body: input,
+    });
+    if (payload.data?.authorizeOnly !== true || !payload.data?.iframe_url) {
+      throw new PravaApiError("Prava did not return a mandate approval session", {
+        code: "PRAVA_INVALID_MANDATE_SESSION",
+        responseId: payload.responseId,
+      });
+    }
+    return { data: payload.data, source: "live" };
+  }
+
+  async listMandates({ customerId, standingOnly = true }) {
+    const query = new URLSearchParams({
+      customer_id: customerId,
+      standing_only: String(standingOnly),
+    });
+    const payload = await this.request(`/v1/mandates?${query}`);
+    if (!Array.isArray(payload.data?.mandates)) {
+      throw new PravaApiError("Prava returned an invalid mandate list", {
+        code: "PRAVA_INVALID_RESPONSE",
+        responseId: payload.responseId,
+      });
+    }
+    return { data: payload.data, source: "live" };
+  }
+
+  async reportMandateCharge({ mandateId, transactionId, ...body }) {
+    const payload = await this.request(
+      `/v1/mandates/${encodeURIComponent(mandateId)}/charges/${encodeURIComponent(transactionId)}/report`,
+      { method: "POST", body },
+    );
+    return { data: payload.data, source: "live" };
+  }
+
+  async request(path, { method = "GET", body } = {}) {
     if (!this.apiKey) {
       throw new PravaApiError("PRAVA_SECRET_KEY is not configured", {
         code: "PRAVA_NOT_CONFIGURED",
       });
     }
 
-    const response = await this.fetchImpl(
-      `${this.baseUrl}/v1/mandates/${encodeURIComponent(mandateId)}/charge`,
-      {
-        method: "POST",
+    const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method,
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ amount, reference }),
+        body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(this.timeoutMs),
-      },
-    );
+      });
 
     const responseId = response.headers.get("x-response-id") ?? undefined;
     const payload = await parseJson(response, responseId);
@@ -64,9 +108,7 @@ export class PravaClient {
       );
     }
 
-    validateChargeResponse(payload, responseId);
-
-    return { data: payload, source: "live" };
+    return { data: payload, responseId };
   }
 }
 

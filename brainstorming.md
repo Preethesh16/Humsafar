@@ -95,7 +95,7 @@ Handbook recommends **SDK/API** for hackathon builds needing an embedded/native 
 ### Adopted from AiDHD (a same-hackathon teammate-adjacent project, reviewed for inspiration, not copied structurally — see comparison below)
 1. **Partial-failure recovery:** if one specialist's booking fails, the orchestrator re-negotiates ONLY that agent's slice, not a full restart.
 2. **Graceful credential degradation:** every external integration sits behind a thin adapter that falls back to realistic fixture data if a live key/API is missing or flaky — logged which one was used. Never hard-block on a dead key mid-demo.
-3. **Cheap multi-track wiring:** a one-line Senso trust-score check per specialist before it buys (opens the Senso track); Project NANDA AgentFacts registration + basic A2A ping (opens the NANDA track).
+3. **Bounded multi-track wiring:** a trust check per specialist plus AgentFacts and a basic A2A ping are useful integration foundations. They do **not** open the Senso or NANDA tracks by themselves: claim Senso only after a verified live Senso decision materially affects merchant selection, and claim NANDA only after the public AgentFacts endpoint is registered and any required adapter PR/evidence is submitted.
 4. **Confirmation fan-out:** after all agents finish, fan a summary out to at least one channel.
 
 ### Deliberately NOT adopted from AiDHD

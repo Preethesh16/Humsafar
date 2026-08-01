@@ -23,8 +23,14 @@ python3 -m humsafar --goal "Plan my Goa trip" --budget 30000 --demo
 | `--demo` | Shorthand for `--overspend stay --fail guide` — both proof shots |
 | `--no-stream` | Don't POST events to the backend |
 | `--live-cards` | Mint through `POST /api/scoped-cards` instead of the stub |
+| `--live-discovery` | Discover options via `POST /api/discovery/:category` |
+| `--trust` | Run the pre-purchase trust check via `POST /api/trust/check` |
 | `--llm` | Use OpenAI for agent dialogue (needs `OPENAI_API_KEY`) |
 | `--backend URL` | Backend base URL (default `http://127.0.0.1:3000`) |
+
+With `--live-discovery`, the run prints what each category *actually* resolved
+to (`data sources: flights=fixture, stay=live, …`) rather than what was asked
+for — a live route that fell back to fixtures must never read as live.
 
 Tests:
 
@@ -77,8 +83,20 @@ Two details that make the negotiation real rather than decorative:
 | `guardian.py` | Pre-mint intent/anomaly check |
 | `cards.py` | `mintScopedCard` client + offline stub |
 | `checkout.py` | Purchase execution seam (Preethesh owns the live side) |
+| `trust.py` | Pre-purchase trust check (Senso track) |
 | `events.py` | Locked event emission + a mirror of the backend validator |
 | `orchestrator.py` | The end-to-end flow |
+
+## The trust check actually changes what gets bought
+
+The Senso track needs the score to *materially influence* a decision, not just
+appear in a log. A merchant that doesn't come back `allow` loses the sale to the
+next acceptable option inside the same slice. It deliberately does **not** hard
+block: the backend's `TrustService` is currently a fixture heuristic that says so
+in its own `reason`, and an unreachable trust service is treated as advisory —
+letting a flaky dependency veto every purchase would be a worse failure than
+proceeding with the flag recorded. If nothing clears, the agent buys and the flag
+is carried into the purchase details and the receipt.
 
 ## Honesty rules baked into the code
 

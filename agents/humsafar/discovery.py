@@ -10,7 +10,11 @@ Every option carries `source`, so the dashboard and the submission can state
 honestly which numbers were live and which were fixtures.
 """
 
-from typing import Protocol
+import json
+import sys
+import urllib.error
+import urllib.request
+from typing import Optional, Protocol
 
 from .models import Option
 from .money import to_paise
@@ -78,6 +82,90 @@ class FixtureDiscovery:
             )
             for vendor, description, merchant, price, rating in rows
         ]
+
+
+class BackendDiscovery:
+    """Options from `POST /api/discovery/:category` (Preethesh's service).
+
+    That route returns the Section 4 `{ data, source }` envelope, with Duffel
+    behind a fixture fallback for flights and stay. Two shape differences from
+    the local fixtures are handled here:
+
+    * **`merchant` is not in the response.** `vendor` is used as the merchant
+      identifier, since that is what a mandate is registered against.
+    * **Flight offers carry no `rating`.** They are treated as unrated (0.0)
+      rather than given an invented score, which means the flights agent
+      prefers the cheapest offer and the mediator will not spend surplus
+      "upgrading" it. That is the correct behaviour when we have no evidence a
+      pricier offer is better — inventing a rating to make the demo livelier
+      would be fabricating data.
+
+    Falls back to fixtures if the backend is unreachable, so discovery can
+    never be the thing that kills a run.
+    """
+
+    def __init__(
+        self,
+        base_url: str = "http://127.0.0.1:3000",
+        token: Optional[str] = None,
+        timeout: float = 15.0,
+        fallback: Optional[DiscoveryProvider] = None,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.token = token
+        self.timeout = timeout
+        self.fallback = fallback if fallback is not None else FixtureDiscovery()
+        self.sources: dict[str, str] = {}
+
+    def discover(self, category: str, goal: str) -> list[Option]:
+        headers = {"Content-Type": "application/json"}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+
+        request = urllib.request.Request(
+            f"{self.base_url}/api/discovery/{category}",
+            data=json.dumps({"goal": goal}).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, OSError, TimeoutError, json.JSONDecodeError) as exc:
+            print(f"[discovery] {category}: falling back to fixtures ({exc})", file=sys.stderr)
+            self.sources[category] = "fixture"
+            return self.fallback.discover(category, goal)
+
+        source = str(body.get("source", "fixture"))
+        self.sources[category] = source
+
+        options = []
+        for row in body.get("data", []) or []:
+            try:
+                price = to_paise(row["price"])
+            except (KeyError, ValueError, TypeError):
+                continue
+            if price <= 0:
+                continue
+            vendor = str(row.get("vendor") or "Unknown")
+            options.append(
+                Option(
+                    category=category,
+                    vendor=vendor,
+                    description=str(row.get("description") or ""),
+                    price_paise=price,
+                    rating=float(row.get("rating") or 0.0),
+                    source="live" if source == "live" else "fixture",
+                    merchant=str(row.get("merchant") or vendor),
+                )
+            )
+
+        if not options:
+            print(f"[discovery] {category}: empty response, using fixtures", file=sys.stderr)
+            self.sources[category] = "fixture"
+            return self.fallback.discover(category, goal)
+
+        return options
 
 
 def categories_for_goal(goal: str) -> list[str]:

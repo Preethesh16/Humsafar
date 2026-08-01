@@ -24,7 +24,7 @@ from .discovery import DiscoveryProvider, FixtureDiscovery, categories_for_goal
 from .events import EventEmitter
 from .guardian import Guardian
 from .mediator import Mediator
-from .models import NegotiationResult, Purchase, Specialist
+from .models import NegotiationResult, Option, Purchase, Specialist
 from .money import format_inr, to_paise, to_rupees
 from .negotiation import NegotiationEngine, build_specialists
 
@@ -69,12 +69,14 @@ class Orchestrator:
         checkout: Optional[Checkout] = None,
         provider: Optional[DiscoveryProvider] = None,
         narrator=None,
+        trust=None,
     ) -> None:
         self.emitter = emitter
         self.card_client = card_client or StubScopedCardClient()
         self.checkout = checkout or SimulatedCheckout()
         self.provider = provider or FixtureDiscovery()
         self.narrator = narrator
+        self.trust = trust
         self.mediator = Mediator()
 
     def run(self, config: RunConfig) -> RunReport:
@@ -201,6 +203,8 @@ class Orchestrator:
             )
             return
 
+        option, trust_note = self._apply_trust(specialist, option, slice_paise)
+
         guardian = Guardian({o.merchant for o in specialist.options})
         verdict = guardian.check(specialist.category, option, slice_paise, config.goal)
         if not verdict.allowed:
@@ -242,6 +246,10 @@ class Orchestrator:
         result = self.checkout.pay(option, card)
         status = "success" if result.ok else "failed"
         amount = option.price_paise if result.ok else 0
+        # One string for both the audit record and the streamed event — the
+        # receipt is built from these, and a receipt that disagrees with the
+        # live feed is worse than either one alone.
+        detail = f"{result.get('detail', '')}{trust_note}"
 
         report.purchases.append(
             Purchase(
@@ -252,17 +260,60 @@ class Orchestrator:
                 status=status,
                 card_id=card["cardId"],
                 source=result.get("source", "fixture"),
-                detail=result.get("detail", ""),
+                detail=detail,
             )
         )
         self.emitter.purchase_result(
-            specialist.category, status, amount, option.merchant, result.get("detail", "")
+            specialist.category, status, amount, option.merchant, detail
         )
         self._say(
             specialist.category,
             f"{'Booked' if result.ok else 'Failed'} {option.vendor} at "
             f"{format_inr(option.price_paise)} on a card capped at {format_inr(slice_paise)}.",
         )
+
+    def _apply_trust(
+        self, specialist: Specialist, option: Option, slice_paise: int
+    ) -> tuple[Option, str]:
+        """Let the trust score change the merchant, not just annotate it.
+
+        The Senso track asks for the score to materially influence a decision.
+        So a flagged merchant loses the sale to the next acceptable option that
+        still fits the slice. If nothing clears, the agent buys anyway and the
+        flag is carried into the purchase details — the backend's current
+        heuristic labels itself as a fixture, and refusing to buy on a
+        placeholder would fail the demo for no real safety gain.
+        """
+        if self.trust is None:
+            return option, ""
+
+        verdict = self.trust.check(option)
+        if verdict.allowed:
+            return option, ""
+
+        alternatives = sorted(
+            (
+                o
+                for o in specialist.options
+                if o.price_paise <= slice_paise and o.merchant != option.merchant
+            ),
+            key=lambda o: (-o.rating, o.price_paise),
+        )
+        for candidate in alternatives:
+            if self.trust.check(candidate).allowed:
+                self._say(
+                    specialist.category,
+                    f"Trust check flagged {option.vendor} ({verdict.decision}, score "
+                    f"{verdict.score:.2f}). Switching to {candidate.vendor} instead.",
+                )
+                return candidate, f" [trust: switched from {option.vendor}, {verdict.source} score]"
+
+        self._say(
+            specialist.category,
+            f"Trust check flagged {option.vendor} ({verdict.decision}, score "
+            f"{verdict.score:.2f}) and no alternative cleared. Proceeding, flagged.",
+        )
+        return option, f" [trust: {verdict.decision}, {verdict.source} score, not blocked]"
 
     def _recover(
         self,
@@ -437,6 +488,7 @@ def run_goal(
         fail_agent=kwargs.pop("fail_agent", None),
         auto_approve=kwargs.pop("auto_approve", True),
     )
+    kwargs.setdefault("trust", None)
     # The failure beat is a property of checkout, but it is configured on the
     # run — wire it here so callers only have to name the agent.
     if config.fail_agent and "checkout" not in kwargs:

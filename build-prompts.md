@@ -18,11 +18,12 @@ top of them and you iterate in small, testable increments.
 
 Before writing a single line of code, read these files in full, in this order:
 1. /brainstorming.md — full project context, decisions, and rationale
-2. /progress-jeswin.md — your own prior work (this may be your first session — if
+2. /INTERFACES.md — locked cross-team function, event, fixture, and adapter contracts
+3. /progress-jeswin.md — your own prior work (this may be your first session — if
    it only has a "not started yet" entry, that's expected)
-3. /progress-preethesh.md — what the backend/integrations teammate has built,
+4. /progress-preethesh.md — what the backend/integrations teammate has built,
    what interfaces they've exposed or are about to expose, what they're blocked on
-4. /progress-deepthi.md — what the frontend teammate needs from you (event
+5. /progress-deepthi.md — what the frontend teammate needs from you (event
    shapes, data formats) and what they've already built against
 
 Your scope for this build: the orchestrator, the specialist buyer agents
@@ -82,10 +83,12 @@ Before writing a single line of code, read these files in full, in this order:
    rules, the Prava sandbox test card, the free-API stack decisions) and
    Section 3 (the Prava mechanic and the open technical question you must
    resolve first)
-2. /progress-preethesh.md — your own prior work
-3. /progress-jeswin.md — what the agent-core teammate needs from you (the
+2. /INTERFACES.md — locked cross-team contracts; implement these exact shapes
+   and document any proposed change before changing code
+3. /progress-preethesh.md — your own prior work
+4. /progress-jeswin.md — what the agent-core teammate needs from you (the
    exact `mintScopedCard` function signature they're calling)
-4. /progress-deepthi.md — what event data the frontend teammate needs
+5. /progress-deepthi.md — what event data the frontend teammate needs
    streamed to them
 
 Your scope for this build, in priority order:
@@ -101,7 +104,8 @@ Your scope for this build, in priority order:
    truly incurs no charges before running anything at volume.
 4. The Node/Express orchestration service that Jeswin's Python agent layer
    calls into, and that streams live events (agent messages, proposed splits,
-   purchases) to Deepthi's frontend over WebSocket/SSE.
+   purchases) to Deepthi's frontend over SSE using the locked `INTERFACES.md`
+   event shapes.
 5. A credential-degradation adapter wrapping every external call (Prava,
    Duffel, Senso, NANDA) that falls back to a realistic fixture response if a
    key is missing or the call fails, and LOGS which one was used — never let a
@@ -118,13 +122,16 @@ code, update local `main`, then create or switch to this branch. Commit and
 push only to this branch, and open a pull request from it into `main`. Never
 push feature work directly to `main` or to another teammate's branch.
 
-Work in small phases. After each phase: test it actually runs against the
-real sandbox (not just that the code compiles), commit and push, pull and
-merge the others' latest changes, then append a new dated entry to
-/progress-preethesh.md — what changed, why, what's blocked, what you need
-from Jeswin or Deepthi, and the commit hash. Do this every time you make a
-meaningful change. Explicitly flag any interface change (function signatures,
-event schema) that the other two depend on.
+Work in small phases. Log every user prompt in /progress-preethesh.md, even if
+it results in no file change; use `Commit: n/a` when there is nothing to
+commit and do not create empty commits. Whenever any file changes, update
+/progress-preethesh.md in the same phase with the files changed, validation
+performed, decision made, reason, blockers, teammate needs, and commit hash
+once pushed. Test real behavior rather than only compilation, then commit and
+push the personal branch, integrate the latest `main`, resolve conflicts
+deliberately, and merge through a reviewed pull request. Explicitly document
+any locked-interface proposal in INTERFACES.md before changing dependent code,
+and notify Jeswin and Deepthi.
 
 Now: read the four files, then tell me what you're starting with and why,
 then begin — starting with the mandate/multi-card sandbox question.
@@ -145,9 +152,10 @@ explain the UI itself.
 Before writing a single line of code, read these files in full, in this order:
 1. /brainstorming.md — full project context, especially Section 7 (the demo
    script) and Section 8 (team split)
-2. /progress-deepthi.md — your own prior work
-3. /progress-jeswin.md — what agent/negotiation data will exist to display
-4. /progress-preethesh.md — what event schema the backend will stream to you,
+2. /INTERFACES.md — locked cross-team function, event, fixture, and adapter contracts
+3. /progress-deepthi.md — your own prior work
+4. /progress-jeswin.md — what agent/negotiation data will exist to display
+5. /progress-preethesh.md — what event schema the backend will stream to you,
    and what's still pending
 
 Your scope for this build:

@@ -6,7 +6,7 @@
 
 **Required Git workflow:** update local `main` → create or switch to `jeswin/agent-core` → do and test the work on that branch → commit and push `jeswin/agent-core` → open a pull request and merge it into `main` after review and conflict checks. After merging, update local `main` before starting the next phase.
 
-**Before every session:** read `/brainstorming.md`, then `/progress-preethesh.md` and `/progress-deepthi.md` in full, THEN this file, before writing or changing anything.
+**Before every session:** read `/brainstorming.md`, `/INTERFACES.md`, `/progress-preethesh.md`, and `/progress-deepthi.md` in full, THEN this file, before writing or changing anything.
 
 **Every time the AI makes a change:** append a new entry below. Never delete old entries — this is a log, not a status board. Include: timestamp, what changed, why, what's blocked, what you need from another teammate, and the exact git commit hash once pushed.
 

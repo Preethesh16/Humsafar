@@ -120,7 +120,7 @@ Flow: one master mandate (passkey) → mediator-approved split → orchestrator 
 - **⚠️ Amadeus is DEAD as an option** — self-service portal decommissioned July 17, 2026, new registrations already paused. Do not attempt to sign up for it.
 - **Guide/Activities + Food:** live partner API access (Viator, GetYourGuide, OpenTable) needs a partner-approval process that will not clear in 48 hours. Use realistic fixture data shaped like their real response formats, openly disclosed in the submission as an MVP cut and a stated next-step integration.
 - **Payments:** Prava SDK/API (sandbox test card above; production access requestable Aug 1–8 if we want it).
-- **Backend:** Node.js + Express as the orchestration API / bridge between the Python agent layer and the frontend; streams events via WebSocket/SSE.
+- **Backend:** Node.js + Express as the orchestration API / bridge between the Python agent layer and the frontend; streams one-way dashboard events via SSE, as locked in `INTERFACES.md`. Use a separate POST endpoint if a future frontend action needs client-to-server communication.
 - **Frontend:** React — live deliberation feed, budget split visualization, per-agent purchase cards, audit log.
 - **Mobile flourish (optional):** Flutter screen for the one-tap passkey approve/deny moment.
 - **Data:** MongoDB or Postgres for sessions, allocations, audit trail.
@@ -165,7 +165,7 @@ Punchline: "A team of agents spent your budget together — not one of them coul
 
 ## 8. TEAM & ROLE SPLIT (see individual progress files for live status)
 - **Jeswin** — Agent/AI core: orchestrator, specialist agents, mediator, negotiation engine, Prava `mintScopedCard` logic and abstraction.
-- **Preethesh** — Integrations & backend: Prava SDK/API wiring (sandbox test card, production request if pursued), Duffel API, Node/Express orchestration service + WebSocket/SSE streaming, credential-degradation adapter, Senso + NANDA wiring, Guide/Food fixture data.
+- **Preethesh** — Integrations & backend: Prava SDK/API wiring (sandbox test card, production request if pursued), Duffel API, Node/Express orchestration service + SSE streaming, credential-degradation adapter, Senso + NANDA wiring, Guide/Food fixture data.
 - **Deepthi** — Frontend, demo & submission: React dashboard (deliberation feed, split viz, purchase cards, audit log), confirmation fan-out, optional Flutter passkey screen, demo video, Devfolio submission writeup and disclosure section.
 
 Each person's `/progress-<name>.md` is the source of truth for what's actually been done — read all three before starting a new work session, not just your own.

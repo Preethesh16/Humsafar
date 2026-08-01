@@ -163,3 +163,31 @@
 - Blocked on: the interactive approval flow needs a real approval boundary from Jeswin — approval is auto-granted today, so there is nothing for a UI control to gate yet.
 - Needs from Jeswin: expose the non-auto approval boundary Preethesh's audit asks for, and tell me how the dashboard should signal approval back — a plain POST endpoint, per the `INTERFACES.md` §2 note that the SSE stream stays one-directional.
 - Commit: `0478aad` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 19:05 IST] — Proposed the human choice step ("taste step") to the team
+- Prompt: add a new feature to the Markdown files, assigned to whoever can implement each part — after the agents settle the budget, the user picks the actual option (hotel room, flight, etc.) from a shortlist inside that slice, with photos and a preview, ranked by quality.
+- Files changed: `INTERFACES.md` (new §6), `brainstorming.md` (new §6b, plus demo-script and role-split additions), `progress-deepthi.md`.
+- Merged first: `origin/main` `39278cb` — 11 commits of Preethesh's Prava sandbox-access work and track review. Clean merge, no contract changes.
+- Changed: wrote the feature up as a **proposed, not locked** contract so Jeswin and Preethesh can accept or reject it before anyone writes code. Everything specified is additive — two new event types (`choice_requested`, `choice_made`), one new endpoint (`POST /api/choices`), and extra fields on discovery options. **No existing shape changes**, so the current flow keeps working untouched if this is deferred.
+- Decision — **where the step sits.** After the mediator finalises the split and before any card is minted. Any earlier and the user picks something the budget may not cover; any later and a credential has been minted for an option about to change.
+- Decision — **the ranking rule is a correctness constraint, not a preference.** Rank by rating only where a real rating exists. Duffel stays return one; Duffel flight offers do not, and §2 already forbids inventing one. Where nothing real exists, rank by price and say so. "Top rated" over an unrated list is a false claim.
+- Decision — **added an `environment: "test" | "production"` field.** Duffel's free tier is test mode, which returns placeholder inventory. That is a genuine live API call so `source: "live"` is accurate, but calling it live alone would imply real market data. This was the subtlest honesty trap in the whole idea and it needed its own field rather than a footnote.
+- Decision — **a timeout with `chosenBy: "user" | "agent-timeout"`.** This is the only step in the run that waits on a human, so it must not be able to hang a live demo. A timed-out auto-pick must never be presented as a human decision, hence the field on the event rather than a UI-only distinction.
+- Recorded as settled-impossible, so nobody burns time on them mid-build: real booking sites cannot be iframed (they send `X-Frame-Options`); a Duffel stay has no external property website to open because Duffel *is* the booking channel; and ranking by review-text analysis is not backed by any data we hold.
+- Decision — **I did not write into `progress-jeswin.md` or `progress-preethesh.md`.** Those are append-only personal logs owned by their authors. Cross-team assignments belong in the shared files, so the work split went into `INTERFACES.md` §6.8 and `brainstorming.md` §8, which is where both of them already read for contract changes.
+- Sequencing recorded explicitly: this is **below a genuine Prava sandbox transaction**. Cards are still stubs, and judging criterion 4 wants Prava meaningful and central — a richer picker on simulated payments scores worse than a plain UI on a real one.
+- Validation: 37/37 JS tests and 80/80 Python still pass after the merge; documentation-only change on my side, no source touched.
+- Blocked on: Jeswin and Preethesh accepting or amending §6 before implementation. Also still blocked on the approval boundary from the previous entry.
+- Needs from Jeswin: agree or push back on §6, especially the pause-and-wait in the orchestrator and the ranking rule. Needs from Preethesh: agree or push back on §6.3, and decide the open question there — whether events gain a `runId` or the backend simply tracks one active run.
+- Commit: `b401f14` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 23:20 IST] — Merged the choice-step proposal into `main`
+- Prompt: pull anything new from `main`, then merge my work into `main`.
+- Files changed: `progress-deepthi.md` only; the merge carried the already-written §6 proposal.
+- Merged in first: `origin/main` `a47c450` — Preethesh's final audit of the revised execution plan. Documentation only, no contract or source changes, so nothing in the dashboard was affected.
+- **New requirement landed on me** from his item (7) and his teammate note: *present per-purchase sandbox/fixture evidence, and never imply all four purchases are genuine from a single Prava checkout.* Partly satisfied already — every purchase card and every receipt line carries its own `source` tag, and an untagged line reads "source unverified". **The gap is at run level:** the receipt header still reads "Every agent has settled · ₹28,800 spent" with no aggregate statement, so a judge glancing at it could read four real purchases where only one was a genuine sandbox charge. A mixed-mode run needs an explicit run-level label, not just per-line tags. Recorded here rather than fixed, because this session's task was the merge; it is the first thing to build once the sandbox charge exists to label.
+- Merged out: `deepthi/frontend-demo` into `main` with `--no-ff`, carrying the proposed `INTERFACES.md` §6 and `brainstorming.md` §6b choice step so Jeswin and Preethesh can review it on `main`.
+- Validation before pushing `main`: clean tree, no conflicts, `npm test` 40/40, Python 80/80.
+- Blocked on: Jeswin and Preethesh accepting or amending §6 — it is still 🟡 proposed, and merging it to `main` publishes the proposal for review, it does not lock it.
+- Needs from Jeswin/Preethesh: review §6. From Preethesh specifically: tell me the shape of the per-purchase sandbox evidence you want surfaced, so the mixed-mode label reflects what Prava actually returns rather than something I invent.
+- Commit: `bf900f8` (merged to `main`)

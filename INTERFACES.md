@@ -151,6 +151,98 @@ This does not change any function signature or event shape — it is a new termi
 
 ---
 
+## 6. Human choice step — "the agent picks the budget, the user picks the taste"
+
+Status: 🟡 **PROPOSED, not locked.** Raised by Deepthi 2026-08-01. Jeswin and Preethesh must both agree before anyone implements. Nothing below changes an existing shape — it is all additive, so the current flow keeps working untouched if this is deferred or dropped.
+
+### Why
+
+Today the mediator fixes each slice and the specialist then picks the option itself. That silently assumes the agent can predict human taste, which it cannot — two rooms at the same price are not interchangeable to a person. This step keeps the *money* decision with the agents (which is the product) and hands the *taste* decision to the user (which is not).
+
+### Where it goes in the flow
+
+```
+negotiate → mediator finalises the split → [NEW: user picks one option per category] → mint scoped cards → buy
+```
+
+It sits **after** allocation and **before** card minting, so the user never picks something the budget cannot cover, and no credential is minted for an option that is about to change.
+
+### 6.1 `choice_requested` — Jeswin emits, Deepthi renders
+
+One per category, after the split is final.
+
+```
+{ type: "choice_requested",
+  agent: "flights" | "stay" | "food" | "guide",
+  slice: number,              // the agreed budget for this category, rupees
+  options: [ {
+    optionId: string,         // stable within a run; what the user sends back
+    vendor: string,
+    description: string,
+    price: number,            // rupees, must be <= slice
+    currency: "INR",
+    rating: number | null,    // null when genuinely unrated — NEVER invent one
+    ratingBasis: "star" | "fixture-score" | null,
+    photos: [ { url: string, caption?: string } ],   // may be empty
+    source: "live" | "fixture",
+    environment: "test" | "production" | null        // see 6.5
+  } ],
+  ranking: "rating" | "price",   // how the list was ordered, and why (see 6.4)
+  timeoutSeconds: number }        // after this, the agent picks — see 6.6
+```
+
+### 6.2 `choice_made` — emitted after the user decides, for the audit trail
+
+```
+{ type: "choice_made", agent: string, optionId: string, vendor: string,
+  price: number, chosenBy: "user" | "agent-timeout" }
+```
+
+`chosenBy` is not decoration. A timed-out auto-pick must never be presented as a human decision.
+
+### 6.3 `POST /api/choices` — Preethesh implements, Deepthi calls
+
+Body: `{ agent: string, optionId: string }`. Returns `202` on accept, `400` for an unknown `optionId`, `409` if that category's choice is already settled.
+
+Client-to-server needs its own POST because the SSE stream stays one-directional (§2). **Open question for Preethesh:** the backend must know which run a choice belongs to. Either add a `runId` to every event, or have the backend track a single active run. Single-active-run is enough for the demo and much cheaper — Preethesh's call.
+
+### 6.4 Ranking rule — this is a correctness constraint, not a preference
+
+- Rank by `rating` **only where a real rating exists**. Duffel stays return one; **Duffel flight offers do not** (§2 producer notes). 
+- Where nothing real exists, rank by price and set `ranking: "price"`. 
+- The UI must say which was used. "Top rated" over a list that has no ratings is a false claim.
+- **No invented ratings, ever**, and fixture preference scores must never be copied onto a live response — this is already locked in §3 and applies here unchanged.
+
+### 6.5 `environment` — the test-inventory honesty problem
+
+Duffel's free test mode returns **test inventory** (placeholder airlines and properties), not real bookable ones. It is a genuine live API call, so `source: "live"` is accurate — but calling it "live" alone would imply real market data.
+
+So a live-sourced option also carries `environment`, and the UI must label test inventory distinctly from production inventory. A test-mode property is not a real hotel, and the demo must not imply otherwise.
+
+### 6.6 Timeout, because a live demo cannot hang
+
+If no choice arrives within `timeoutSeconds`, the agent picks the top-ranked option itself and emits `choice_made` with `chosenBy: "agent-timeout"`. The run never blocks waiting for a human who has walked away. Deepthi shows the countdown; the receipt distinguishes user-chosen from auto-chosen.
+
+### 6.7 What is NOT possible — settled, do not spend time re-litigating
+
+- **Embedding a real booking site in an iframe.** Booking.com, Airbnb, Expedia, MakeMyTrip and Agoda all send `X-Frame-Options` / `frame-ancestors` headers that make the browser refuse to render them inside our page. This cannot be worked around from our side. Use an in-app preview panel; optionally a real pop-up window via `window.open`.
+- **Opening "the property's own website" for a Duffel stay.** Duffel *is* the booking channel; there is generally no external property page to link to. The photos and description come from Duffel itself.
+- **Ranking by analysing review text.** We have no reviews API and no review text anywhere. We can rank by the rating numbers we genuinely receive. Claiming we analysed reviews would be fabricated evidence of the exact kind §3 and the handbook already prohibit.
+
+### 6.8 Who does what
+
+| Owner | Work |
+|---|---|
+| **Preethesh** | `POST /api/choices`; run/choice tracking; pass through Duffel Stays `photos`, which discovery currently parses and discards; add a stable `optionId`; carry `environment` alongside `source`; return enough options per category to make a shortlist meaningful |
+| **Jeswin** | Pause after allocation; build the shortlist within each slice; apply the §6.4 ranking rule; emit `choice_requested`; block on the choice with the §6.6 timeout; emit `choice_made`; buy exactly what the user chose |
+| **Deepthi** | The choice panel — option cards inside the slice, photo preview, rating with its basis, price; the `source`/`environment` labels; the countdown; POST the choice; show user-chosen vs auto-chosen on the receipt |
+
+### 6.9 Sequencing
+
+This is **additive and lower priority than a genuine Prava sandbox transaction.** Judging criterion 4 requires Prava to be meaningful and central, and every card is still a stub today. A richer picker on top of simulated payments scores worse than a plain UI on a real one. Build this only once the sandbox charge and its cap-rejection proof exist, and treat §6.1 plus the Deepthi column as the minimum viable slice — the photo preview is polish, the choice itself is the feature.
+
+---
+
 ## How to use this file
 This is already 🟢 LOCKED so all three of you can start in parallel right now with zero setup meeting. Skim it once (5 minutes, not 15) so everyone's seen the same contract, then split off.
 

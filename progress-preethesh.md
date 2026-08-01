@@ -293,4 +293,4 @@
 - Why: the shown publishable key is intended for browser SDK initialization and cannot authenticate the current REST backend; the secret key must remain server-only.
 - Blocked on: the user entering the two already-saved values locally and running `npm run prava:verify`.
 - Needs from Jeswin/Deepthi: none now; Deepthi may later consume only the publishable key through an approved browser SDK path.
-- Commit: pending (dashboard mapping log on `preethesh/integrations-backend`)
+- Commit: `c4d4144` (dashboard mapping committed on `preethesh/integrations-backend`)

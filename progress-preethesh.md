@@ -294,3 +294,14 @@
 - Blocked on: the user entering the two already-saved values locally and running `npm run prava:verify`.
 - Needs from Jeswin/Deepthi: none now; Deepthi may later consume only the publishable key through an approved browser SDK path.
 - Commit: `c4d4144` (dashboard mapping committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 00:10 IST] — Corrected and passed the live sandbox access verification
+- Prompt: ran `npm run prava:verify` with the locally configured keys and received `CUSTOMER_NOT_FOUND` for the placeholder Humsafar customer.
+- Files changed: `.env.example`, `backend/scripts/verifyPravaAccess.js`, `backend/test/verifyPravaAccess.test.js`, and `progress-preethesh.md`.
+- Changed: corrected the verifier to distinguish invalid authentication from an authenticated merchant account whose application customer has not been created yet. `CUSTOMER_NOT_FOUND` now returns `authentication: "ok"`, `customer: "not_created"`, and zero mandates instead of the false `authentication: "failed"` label. Clarified that `PRAVA_TEST_CUSTOMER_ID` is our stable external application identifier and becomes associated during the first session.
+- Validation: current official Prava Create Session documentation confirms `user_id` is the unique identifier from our system and that invalid keys return `AUTH_1001`/`AUTH_1002`, not `CUSTOMER_NOT_FOUND`. Root tests passed 60/60. The read-only command was rerun against the real local sandbox secret and returned authentication OK, customer not created, zero mandates, and a sanitized response ID; no session, mandate, credential, or transaction was created.
+- Decision: G1 Prava credential authentication is passed. Keep `humsafar-demo-user` stable and create its first merchant-specific mandate session only when the cardholder is ready to complete the hosted approval flow.
+- Why: listing mandates before any customer session legitimately has no customer to return; treating that as bad credentials blocked a valid new-account setup and misreported the evidence.
+- Blocked on: the next step requires a deliberate mandate-session ceremony with the user's email, selected first merchant, and the cardholder ready for the hosted passkey/card flow.
+- Needs from Jeswin/Deepthi: none for authentication. Continue treating mandate approval as authorization only, not a completed purchase.
+- Commit: `2d9a4d2` (verifier correction committed on `preethesh/integrations-backend`)

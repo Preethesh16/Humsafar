@@ -1,4 +1,5 @@
 import { metaFor, money } from "../lib/agents.js";
+import { labelForPurchase, provenCount, runMode, runModeLabel } from "../lib/provenance.js";
 import { IconCheck } from "../lib/icons.jsx";
 
 /**
@@ -13,15 +14,22 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
   const lines = receipt.purchases ?? [];
   const remaining = (receipt.budget ?? 0) - (receipt.totalSpent ?? 0);
 
+  // precaution.md: the receipt must never let one line's result stand for the
+  // run. State the run's mode, and how many lines actually exercised a payment
+  // path, so "everyone settled" can't be read as "four real orders".
+  const mode = runMode(lines);
+  const modeLabel = runModeLabel(mode);
+  const proven = provenCount(lines);
+
   const copySummary = () => {
     const text = [
       `Humsafar — trip settled${isMock ? " (MOCKED DEMO DATA)" : ""}`,
       // The fan-out payload carries the same labels as the screen — a summary
       // pasted into a channel must not read as a live order either.
+      `${modeLabel.text}. ${proven} of ${lines.length} exercised a payment path.`,
       ...lines.map((l) => {
         const amount = l.status === "failed" ? "not charged" : money(l.amount);
-        const tag = l.source === "live" ? "live order" : l.source === "fixture" ? "simulated" : "source unverified";
-        return `${metaFor(l.agent).label}: ${amount} — ${l.merchant} [${tag}]`;
+        return `${metaFor(l.agent).label}: ${amount} — ${l.merchant} [${labelForPurchase(l).text}]`;
       }),
       `Total: ${money(receipt.totalSpent)} of ${money(receipt.budget)} (${money(remaining)} unspent)`,
       `${blockedAttempts.length} over-cap attempt(s) blocked at the card level.`,
@@ -52,6 +60,15 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
           </p>
         )}
 
+        <div className={`runmode runmode--${modeLabel.tone}`}>
+          <b>{modeLabel.text}</b>
+          {modeLabel.detail && <span>{modeLabel.detail}</span>}
+          <span className="runmode__count">
+            {proven} of {lines.length} purchase{lines.length === 1 ? "" : "s"} exercised a
+            payment path.
+          </span>
+        </div>
+
         <ul className="outcome-lines">
           {lines.map((line, index) => {
             const meta = metaFor(line.agent);
@@ -66,12 +83,9 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
                 <span className="outcome-agent">{meta.label}</span>
                 <span className="outcome-merchant">
                   {line.merchant}
-                  {line.source && (
-                    <span className={`tag tag--${line.source}`}>
-                      {line.source === "live" ? "live order" : "simulated · fixture"}
-                    </span>
-                  )}
-                  {!line.source && <span className="tag tag--unverified">source unverified</span>}
+                  <span className={`tag tag--${labelForPurchase(line).tone}`}>
+                    {labelForPurchase(line).text}
+                  </span>
                 </span>
                 <span className="outcome-amount">
                   {failed ? "not charged" : money(line.amount)}

@@ -1,5 +1,6 @@
 import { AGENTS } from "../state/sessionReducer.js";
 import { metaFor, money } from "../lib/agents.js";
+import { labelForPurchase } from "../lib/provenance.js";
 import { AGENT_ICON, IconShield } from "../lib/icons.jsx";
 
 /**
@@ -80,12 +81,9 @@ export function PurchaseCards({ cards, purchases, blockedAttempts, isMock }) {
                     </span>
                   </div>
                   <p className="buy__details">{p.details}</p>
-                  <span className={`tag tag--${p.source ?? "unverified"}`}>
-                    {p.source === "live"
-                      ? "live transaction"
-                      : p.source === "fixture"
-                        ? "fixture data"
-                        : "source unverified"}
+                  {/* Exact precaution.md wording — never a friendlier synonym. */}
+                  <span className={`tag tag--${labelForPurchase(p).tone}`}>
+                    {labelForPurchase(p).text}
                     {isMock ? " · mocked stream" : ""}
                   </span>
                 </div>

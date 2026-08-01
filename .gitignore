@@ -4,3 +4,5 @@ coverage/
 .env.*
 !.env.example
 npm-debug.log*
+.ssr-out/
+dist/

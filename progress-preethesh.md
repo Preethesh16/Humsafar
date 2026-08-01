@@ -282,4 +282,4 @@
 - Why: using the publishable key on server calls would fail authentication, while exposing the secret key in browser code would compromise the merchant account.
 - Blocked on: the user placing both values in the local gitignored `.env`; only the secret is required for the immediate read-only verification.
 - Needs from Jeswin/Deepthi: Jeswin needs neither raw key. Deepthi may use only the publishable key if the browser SDK phase is implemented and must never import or expose `PRAVA_SECRET_KEY`.
-- Commit: pending (dual-key documentation on `preethesh/integrations-backend`)
+- Commit: `ef4f615` (dual-key documentation committed on `preethesh/integrations-backend`)

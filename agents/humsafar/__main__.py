@@ -13,10 +13,12 @@ import os
 import sys
 
 from .cards import ScopedCardClient, StubScopedCardClient
+from .discovery import BackendDiscovery
 from .events import EventEmitter
 from .llm import Narrator
 from .money import format_inr
 from .orchestrator import run_goal
+from .trust import TrustClient
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -30,6 +32,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--no-stream", action="store_true", help="Do not POST events to the backend")
     parser.add_argument("--live-cards", action="store_true", help="Mint through the real backend route")
+    parser.add_argument(
+        "--live-discovery",
+        action="store_true",
+        help="Discover options via POST /api/discovery/:category instead of local fixtures",
+    )
+    parser.add_argument(
+        "--trust",
+        action="store_true",
+        help="Run the pre-purchase trust check via POST /api/trust/check",
+    )
     parser.add_argument("--llm", action="store_true", help="Use OpenAI for agent dialogue")
     parser.add_argument("--overspend", metavar="AGENT", help="Have this agent attempt an over-slice charge")
     parser.add_argument("--fail", metavar="AGENT", help="Fail this agent's booking once, then recover")
@@ -55,12 +67,15 @@ def main(argv: list[str] | None = None) -> int:
         else StubScopedCardClient()
     )
     narrator = Narrator(enabled=args.llm)
+    provider = BackendDiscovery(base_url=args.backend, token=token) if args.live_discovery else None
+    trust = TrustClient(base_url=args.backend, token=token) if args.trust else None
 
     print(
         f"\n  HUMSAFAR — {args.goal}\n"
         f"  budget      : Rs {args.budget}\n"
         f"  cards       : {'live backend route' if args.live_cards else 'STUB (simulated, not a real charge)'}\n"
-        f"  discovery   : FIXTURE data (not live merchant inventory)\n"
+        f"  discovery   : {'backend route' if args.live_discovery else 'local FIXTURE data'}\n"
+        f"  trust check : {'on' if args.trust else 'off'}\n"
         f"  dialogue    : {'OpenAI' if narrator.available else 'deterministic templates'}\n"
         f"  streaming   : {'off' if args.no_stream else args.backend}\n",
         file=sys.stderr,
@@ -72,6 +87,8 @@ def main(argv: list[str] | None = None) -> int:
         emitter,
         card_client=card_client,
         narrator=narrator,
+        provider=provider,
+        trust=trust,
         overspend_agent=overspend,
         fail_agent=fail,
     )
@@ -89,6 +106,13 @@ def main(argv: list[str] | None = None) -> int:
         f"\n  spent {format_inr(report.total_spent_paise)} of {format_inr(report.budget_paise)}"
         f"  |  within budget: {report.within_budget}"
     )
+    if provider is not None and provider.sources:
+        # Print what each category actually resolved to, not what was asked
+        # for — a live route that fell back to fixtures must not read as live.
+        summary = ", ".join(f"{c}={s}" for c, s in sorted(provider.sources.items()))
+        print(f"  data sources: {summary}")
+    if trust is not None:
+        print(f"  trust checks: {trust.checks}")
     if emitter.delivery_failures:
         print(f"  note: {emitter.delivery_failures} event(s) were not delivered to the dashboard")
     print()

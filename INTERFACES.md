@@ -44,6 +44,13 @@ Locked backend endpoints:
 - `POST /api/prava/mandates/:mandateId/charges/:transactionId/report` — report checkout success/failure to Prava.
 - `GET /.well-known/agentfacts.json` and `POST /a2a/ping` — NANDA/AgentFacts discovery and basic A2A availability.
 
+**How the agent layer consumes discovery and trust (Jeswin, 2026-08-01) — read if you change either route's response:**
+
+- `POST /api/discovery/:category` responses have **no `merchant` field**, so the agent layer uses `vendor` as the merchant identifier — which is what a mandate gets registered against in `PRAVA_MANDATE_MERCHANTS_JSON`. If a distinct merchant identifier is added later, the agent layer will prefer it automatically; nothing else needs to change.
+- **Duffel flight offers carry no `rating`.** They are treated as unrated (`0.0`), not given an invented score. Consequence: the flights agent prefers the cheapest offer and the mediator will not spend surplus budget "upgrading" a flight, because we have no evidence the pricier offer is better. This is deliberate — fabricating a rating to make the demo livelier would be fabricating data.
+- Discovery falls back to the agent layer's local fixtures if the route is unreachable or returns an empty list, and the run prints the source each category *actually* resolved to. A fallback is never reported as live.
+- `POST /api/trust/check` **materially changes the purchase**: a merchant that does not come back `allow` loses the sale to the next acceptable option inside the same slice. It is not a hard block — the current fixture heuristic labels itself as such, and an unreachable trust service is treated as advisory rather than a veto. When nothing clears, the agent proceeds and the flag is carried into `purchase_result.details` and the receipt entry.
+
 The two POST routes accept `Authorization: Bearer <INTERNAL_API_TOKEN>` when that environment variable is configured. A non-loopback deployment must configure it. Never put Prava credentials in these request bodies.
 
 Every event is a JSON object with a `type` field:

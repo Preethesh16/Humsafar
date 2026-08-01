@@ -7,15 +7,18 @@ the contracts locked in INTERFACES.md.
 
 from .cards import ScopedCardClient, StubScopedCardClient
 from .checkout import SimulatedCheckout
-from .discovery import FixtureDiscovery
+from .discovery import BackendDiscovery, FixtureDiscovery
 from .events import EventEmitter
 from .mediator import Mediator
 from .negotiation import NegotiationEngine, build_specialists
 from .orchestrator import Orchestrator, RunConfig, RunReport, run_goal
+from .trust import TrustClient
 
 __all__ = [
+    "BackendDiscovery",
     "EventEmitter",
     "FixtureDiscovery",
+    "TrustClient",
     "Mediator",
     "NegotiationEngine",
     "Orchestrator",

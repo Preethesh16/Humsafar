@@ -271,4 +271,4 @@
 - Why: possession of a dashboard key and availability of that key to the local process are different states. Keeping the key outside Git/chat preserves it while allowing the existing sandbox client to authenticate once configured.
 - Blocked on: local `.env` creation by the credential owner.
 - Needs from Jeswin/Deepthi: none for this credential placement step.
-- Commit: pending (credential clarification log on `preethesh/integrations-backend`)
+- Commit: `9a45dd9` (credential clarification committed on `preethesh/integrations-backend`)

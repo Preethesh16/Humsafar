@@ -228,3 +228,14 @@
 - Blocked on: local `.env` is still absent, so Prava and OpenAI credential smoke checks cannot run. The user must place keys locally without sharing them; Prava's four open operational questions remain listed in `precaution.md`.
 - Needs from Jeswin/Deepthi: both must review the shared contract additions in `execution-plan.md` before dependent code. Jeswin owns Agents SDK and deterministic orchestration integration; Deepthi owns interactive UX, provenance, deployment and submission assets.
 - Commit: `3334f23` (execution plan committed on `preethesh/integrations-backend`; merge finalization is recorded by the follow-up log commit)
+
+### [2026-08-01 23:44 IST] — Clarified the three-person ownership split
+- Prompt: asked whether the remaining work was split specifically among Deepthi, Jeswin, and Preethesh and requested the named breakdown.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: confirmed the three owners and restated their boundaries: Preethesh owns integrations/payment/backend contracts, Jeswin owns OpenAI agent core and deterministic orchestration, and Deepthi owns frontend/product experience, deployment presentation, and submission assets.
+- Validation: checked the assignments against `execution-plan.md`; no ownership conflict or unassigned core work was found.
+- Decision: preserve one accountable owner per major layer while requiring contract review at shared boundaries.
+- Why: clear ownership prevents duplicate implementations and lets the three personal branches progress independently after the contract gate.
+- Blocked on: none for this clarification.
+- Needs from Jeswin/Deepthi: follow the acceptance criteria and dependency gates in `execution-plan.md`.
+- Commit: pending (clarification log on `preethesh/integrations-backend`)

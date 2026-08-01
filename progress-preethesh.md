@@ -74,3 +74,14 @@
 - Blocked on: live Prava issuance remains blocked on a local secret key and active merchant-specific mandate IDs.
 - Needs from Jeswin/Deepthi: Jeswin should POST the locked event objects to `/api/events`; Deepthi should consume `GET /api/events` and may use `Last-Event-ID` reconnect replay.
 - Commit: `09abcf4` (pushed to `preethesh/integrations-backend`; merge to `main` follows this log finalization)
+
+### [2026-08-01 13:31 IST] — Clarified implementation status
+- Prompt: asked what happened after the implementation update.
+- Files changed: `progress-preethesh.md` only, to satisfy prompt-level logging; no implementation files changed.
+- Changed: recorded a plain-language status clarification.
+- Validation: confirmed `preethesh/integrations-backend`, `main`, and both corresponding GitHub branches were synchronized at `2ce60ac` before this log-only update.
+- Decision: pause additional implementation until the user confirms the next phase; do not attempt a live Prava call without local credentials and approved mandate IDs.
+- Why: the completed code is healthy, while live sandbox execution needs external configuration that is intentionally absent from Git.
+- Blocked on: live Prava test credentials and merchant-specific mandate IDs only; local automated/backend behavior is not blocked.
+- Needs from Jeswin/Deepthi: nothing new.
+- Commit: pending

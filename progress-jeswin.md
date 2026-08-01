@@ -107,3 +107,26 @@
 - Needs from Preethesh: nothing new for this phase. Priority 1 items 6–9 consume his mandate resolver, structured `THRESHOLD_EXCEEDED`, and the extended card contract — all merged, all next on my list.
 - Needs from Deepthi: nothing blocking.
 - Commit: `3da620f` (pushed to `jeswin/agent-core`)
+
+### [2026-08-02 03:05 IST] — Live OpenAI testing: four defects only a real key could expose
+- Prompt: added the OpenAI API key to `.env` and asked for the live smoke test.
+- Files changed: `agents/humsafar/{ai,llm,intent,negotiation,discovery}.py`, `agents/tests/test_ai.py`, `.env.example`.
+- Changed: made the Agents SDK path fast, reliable and quota-aware after running it for real. Unit tests with a fake runtime could not have caught any of the four.
+
+**1. Latency.** A full run took **25.9s across 10 sequential model calls**, against a negotiation beat meant to last 45s. Specialists in a round argue independently, so they now run concurrently via `ask_many` behind a semaphore. **25.9s → ~7s.**
+
+**2. Wrong model class.** `gpt-5-nano` spent **31.8s of extended reasoning** to produce one two-sentence negotiating line, blowing the timeout so all four specialists fell back. Reasoning models are the wrong tool for short in-character dialogue. `gpt-4.1-nano` does it in **2.2s**.
+
+**3. Event-loop churn.** `asyncio.run` creates and destroys a loop per call, and the OpenAI client's connection pool binds to the loop it first used. The mediator failed *every single run* with what looked like a network fault. The runtime now owns one persistent loop for its lifetime. This one cost the most time to find because the symptom named the wrong thing.
+
+**4. Quota — and this needs the team's attention.** Rate limits are **per-model**, and this account is on a free/unverified tier: `gpt-4.1-mini` allows **50 requests per DAY** and was already exhausted during development, with an RPM low enough that three back-to-back runs trip it. Narration is now limited to the opening round (**10 calls → 6**), and a rate-limit response switches the whole run to deterministic text rather than burning the remaining allowance on calls that cannot succeed. Transient transport errors get exactly one retry; rate limits get none, per `precaution.md`.
+
+**Two correctness defects seen live and fixed:**
+- Agents argued from positions they had already conceded — the Stay Agent announced it was staying at the Taj after settling for Anjuna Beach Resort. Every figure was one it had been given, so `mentions_only` passed it, but the claim was incoherent on screen. Prompts now carry the current ask, what it currently buys, and that the opening position is gone.
+- The Intent Agent **dropped flights and stay from a Goa trip**, non-deterministically, having returned all four for the same goal minutes earlier. A trip with no flights and nowhere to sleep is not a plan, and it silently left most of the budget unspent (₹7,800 of ₹30,000). Model *priorities* are still trusted; its *omissions* are not. Any category a confidently-travel goal needs is restored at neutral weight, while narrowing still survives for non-travel goals — which is what the agent exists to do.
+- Validation: 125 Python tests pass. Deterministic output unchanged at ₹28,800 of ₹30,000. Three consecutive live runs each produced **₹28,800 and 4 purchases** whether narration succeeded, degraded, or was rate-limited — which is the resilience property the design exists for. Model availability verified directly against the account: `gpt-5.6-sol`, `gpt-4.1`, `gpt-4.1-nano`, `gpt-5-nano` all serve; `gpt-4.1-mini` is quota-exhausted.
+- Decision: `HUMSAFAR_REASONING_MODEL=gpt-5.6-sol` is now the default — the smoke check `execution-plan.md` required has been done and it works with structured output at ~3s. Specialists use `gpt-4.1-nano` for latency and to avoid the drained bucket.
+- **Needs from the team (Imran/Preethesh):** please check the OpenAI billing/credits page for this account. The handbook says $100 participation credits were issued, but a 50-requests-per-day ceiling is free-tier behaviour, which suggests the credit was not applied or the account is unverified. `precaution.md` already flags that Discord rollout reports are not proof for a particular account. The demo survives this — one run is comfortably within limits — but repeated rehearsal and recording will not be.
+- Blocked on: nothing in code.
+- Needs from Deepthi: nothing new. Orchestrator messages carry `[intent: openai|keyword]` and per-category emphasis if she wants to surface agent identity/stage.
+- Commit: `1542015` (pushed to `jeswin/agent-core`)

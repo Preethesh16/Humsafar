@@ -118,3 +118,14 @@
 - Blocked on: Preethesh must receive a sandbox `PRAVA_SECRET_KEY`, create merchant-specific approved mandates, and choose an actual supported merchant checkout target; Duffel/OpenAI/Senso live paths need their respective credentials; deployment and exact submission cutoff require external platform access.
 - Needs from Jeswin/Deepthi: Jeswin should wire a real checkout implementation after the merchant target is selected and expose a non-auto approval boundary; Deepthi should add the interactive goal/budget/approval flow, prepare the demo video and Devfolio writeup/disclosure, and reconcile the documentation-only commit on her branch. Flutter, Senso, and NANDA track evidence remain optional until the core live transaction is proven.
 - Commit: `999f874` (status audit committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 17:54 IST] — Decided sandbox versus production access
+- Prompt: asked whether Prava production access is required and whether the production-access form from the Prava email should be submitted.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: recorded the access decision and safe operating boundary.
+- Validation: checked the current official Prava quickstart, environment, intent-invocation, and production-verification documentation plus the live Devfolio requirements. Prava explicitly positions sandbox for development/testing and production as separately provisioned after verification; Devfolio requires Prava to be a real part of the product and an agent to complete or enable a transaction, but does not require production access.
+- Decision: submit the temporary production-access form now because review is asynchronous and optional access may strengthen the demo, but do not wait for it or make it the critical path. Finish and record a genuine sandbox flow first. A real sandbox API result is acceptable evidence; the current local stub is not. Do not use production until checkout is real, approval is explicit, and the team understands merchant/compliance consequences.
+- Why: production access requires additional verification and does not turn the current simulated checkout into a real order. Sandbox proves the integration safely and is the fastest credible submission path; applying early preserves the production option without risking the deadline.
+- Blocked on: the workspace still lacks `PRAVA_SECRET_KEY` and approved merchant-specific sandbox mandates. The contents of the user's email were not provided, so any form-specific deadline or condition in that email must be followed directly.
+- Needs from Jeswin/Deepthi: no new code dependency; preserve clear sandbox/production/fixture labels in the demo and submission.
+- Commit: pending (access decision will be pushed through `preethesh/integrations-backend` and merged to `main`)

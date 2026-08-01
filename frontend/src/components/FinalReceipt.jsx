@@ -16,7 +16,13 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
   const copySummary = () => {
     const text = [
       `Humsafar — trip settled${isMock ? " (MOCKED DEMO DATA)" : ""}`,
-      ...lines.map((l) => `${metaFor(l.agent).label}: ${money(l.amount)} — ${l.merchant}`),
+      // The fan-out payload carries the same labels as the screen — a summary
+      // pasted into a channel must not read as a live order either.
+      ...lines.map((l) => {
+        const amount = l.status === "failed" ? "not charged" : money(l.amount);
+        const tag = l.source === "live" ? "live order" : l.source === "fixture" ? "simulated" : "source unverified";
+        return `${metaFor(l.agent).label}: ${amount} — ${l.merchant} [${tag}]`;
+      }),
       `Total: ${money(receipt.totalSpent)} of ${money(receipt.budget)} (${money(remaining)} unspent)`,
       `${blockedAttempts.length} over-cap attempt(s) blocked at the card level.`,
       `${renegotiations.length} slice(s) re-negotiated after a failure.`,
@@ -49,12 +55,27 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
         <ul className="outcome-lines">
           {lines.map((line, index) => {
             const meta = metaFor(line.agent);
+            // A receipt line carries its own `status` and `source` (INTERFACES.md
+            // §2 producer notes). Neither may be dropped: a failed line must not
+            // read as a completed purchase, and a fixture line must not read as
+            // a live order.
+            const failed = line.status === "failed";
             return (
-              <li key={`${line.agent}-${index}`}>
+              <li key={`${line.agent}-${index}`} className={failed ? "is-failed" : ""}>
                 <i style={{ background: meta.color }} />
                 <span className="outcome-agent">{meta.label}</span>
-                <span className="outcome-merchant">{line.merchant}</span>
-                <span className="outcome-amount">{money(line.amount)}</span>
+                <span className="outcome-merchant">
+                  {line.merchant}
+                  {line.source && (
+                    <span className={`tag tag--${line.source}`}>
+                      {line.source === "live" ? "live order" : "simulated · fixture"}
+                    </span>
+                  )}
+                  {!line.source && <span className="tag tag--unverified">source unverified</span>}
+                </span>
+                <span className="outcome-amount">
+                  {failed ? "not charged" : money(line.amount)}
+                </span>
               </li>
             );
           })}

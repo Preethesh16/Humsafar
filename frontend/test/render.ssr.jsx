@@ -77,11 +77,47 @@ const expectations = [
   ["renegotiation_triggered", "renegotiation in the audit log"],
   ["Every agent has settled", "final receipt"],
   ["No payment was made", "mock receipt warning"],
+  ["simulated · fixture", "receipt lines labelled as fixtures, not live orders"],
 ];
 
 for (const [needle, description] of expectations) {
   assert.ok(html.includes(needle), `rendered markup should contain ${description}: "${needle}"`);
 }
+
+// A receipt line shaped exactly like the agent core's `_close()` output, which
+// carries per-line `status` and `source` (INTERFACES.md §2 producer notes).
+// A fixture line must not read as a live order, and a failed line must not read
+// as a completed purchase.
+const liveReceipt = renderToStaticMarkup(
+  <FinalReceipt
+    receipt={{
+      budget: 30000,
+      totalSpent: 21000,
+      purchases: [
+        { agent: "flights", merchant: "Duffel Test Airways", amount: 11800, status: "success", source: "live", details: "x" },
+        { agent: "food", merchant: "OpenTable-shaped fixture", amount: 4850, status: "success", source: "fixture", details: "y" },
+        { agent: "guide", merchant: "Viator-shaped fixture", amount: 0, status: "failed", source: "fixture", details: "sold out" },
+        { agent: "stay", merchant: "Untagged merchant", amount: 4350, status: "success", details: "no source tag" },
+      ],
+    }}
+    summary={{ failedPurchases: 1 }}
+    blockedAttempts={[]}
+    renegotiations={[]}
+    isMock={false}
+    onDismiss={() => {}}
+  />,
+);
+
+assert.ok(liveReceipt.includes("live order"), "a live line must be labelled as a live order");
+assert.ok(liveReceipt.includes("simulated · fixture"), "a fixture line must be labelled simulated");
+assert.ok(liveReceipt.includes("source unverified"), "an untagged line must be labelled unverified");
+assert.ok(liveReceipt.includes("not charged"), "a failed line must not show a charged amount");
+assert.ok(!liveReceipt.includes("₹0"), "a failed line must not render a zero-rupee charge");
+assert.equal(
+  (liveReceipt.match(/live order/g) ?? []).length,
+  1,
+  "exactly one line is a live order — fixture lines must not borrow the label",
+);
 
 // The app shell itself must render — it carries the hero, the journey stepper
 // and the simulated-stream notice, none of which the panel renders above cover.

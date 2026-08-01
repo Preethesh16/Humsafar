@@ -373,7 +373,10 @@ h1 em {
 .outcome-lines li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid rgba(92, 137, 108, 0.24); border-radius: 12px; background: rgba(255, 255, 255, 0.6); font-size: 12.5px; }
 .outcome-lines i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .outcome-agent { width: 74px; font-weight: 700; }
-.outcome-merchant { flex: 1; color: var(--muted); }
+.outcome-merchant { flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); }
+.outcome-merchant .tag { margin-top: 0; }
+.outcome-lines li.is-failed { border-color: #e5b1a6; background: rgba(229, 107, 82, 0.07); }
+.outcome-lines li.is-failed .outcome-amount { color: var(--coral-ink); }
 .outcome-amount { font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .outcome-stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid rgba(92, 137, 108, 0.28); border-radius: 14px; overflow: hidden; background: rgba(255, 255, 255, 0.6); }

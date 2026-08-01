@@ -52,11 +52,14 @@ const SCRIPT = [
   [500, { type: "split_update", allocations: { flights: 11800, stay: 9200, food: 4850, guide: 4150 }, totalBudget: BUDGET, round: 4 }],
   [400, { type: "card_issued", agent: "guide", cardId: "instr_mock_guide_02", amountCap: 4150 }],
   [800, { type: "purchase_result", agent: "guide", status: "success", amount: 4150, merchant: "Viator-shaped fixture", details: "Fort Aguada heritage walk + sunset cruise", source: "fixture" }],
+  // Receipt lines carry `status` and `source` exactly as the agent core's
+  // `_close()` emits them (INTERFACES.md §2 producer notes), so the mocked
+  // receipt exercises the same labelling path as a real run.
   [700, { type: "final_receipt", purchases: [
-    { agent: "flights", merchant: "Duffel Test Airways", amount: 11800 },
-    { agent: "stay", merchant: "Duffel Stays Sandbox", amount: 9200 },
-    { agent: "food", merchant: "OpenTable-shaped fixture", amount: 4850 },
-    { agent: "guide", merchant: "Viator-shaped fixture", amount: 4150 },
+    { agent: "flights", merchant: "Duffel Test Airways", amount: 11800, status: "success", source: "fixture", details: "BLR → GOI return, 2 pax" },
+    { agent: "stay", merchant: "Duffel Stays Sandbox", amount: 9200, status: "success", source: "fixture", details: "Vagator guesthouse, 3 nights" },
+    { agent: "food", merchant: "OpenTable-shaped fixture", amount: 4850, status: "success", source: "fixture", details: "3 dinner reservations" },
+    { agent: "guide", merchant: "Viator-shaped fixture", amount: 4150, status: "success", source: "fixture", details: "Heritage walk + sunset cruise" },
   ], totalSpent: 30000, budget: BUDGET }],
 ];
 

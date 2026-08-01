@@ -161,4 +161,4 @@
 - Why: production access adds verification and real-world merchant/compliance risk without being required to demonstrate the integration. Sandbox gives the team the fastest safe path to genuine Prava API evidence.
 - Blocked on: the user creating the sandbox key and storing it locally without sharing or committing it.
 - Needs from Jeswin/Deepthi: describe successful Prava results as sandbox transactions, never production or real-money transactions.
-- Commit: pending (sandbox-only decision will be pushed through `preethesh/integrations-backend` and merged to `main`)
+- Commit: `906a443` (sandbox-only decision committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)

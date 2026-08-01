@@ -18,6 +18,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Optional
 
@@ -26,28 +27,59 @@ from .money import to_rupees
 REDACTED = "<redacted>"
 
 
+# Everything a merchant checkout needs and nothing else may ever see. Per
+# INTERFACES.md §1 these are transient: never logged, never in an event, never
+# in a receipt, never in an exception message.
+CREDENTIAL_FIELDS = ("cardToken", "dynamicCvv", "expiryMonth", "expiryYear")
+
+
 class ScopedCard(dict):
-    """The locked mintScopedCard result, with token-safe printing."""
+    """The locked mintScopedCard result, with credential-safe printing."""
 
     @property
     def issued(self) -> bool:
         return self.get("status") == "issued"
 
+    @property
+    def error_code(self) -> str:
+        """Structured failure reason, e.g. THRESHOLD_EXCEEDED."""
+        return str(self.get("errorCode") or "")
+
     def safe(self) -> dict:
-        """A copy with the credential removed, for logs and events."""
-        return {**self, "cardToken": REDACTED if self.get("cardToken") else ""}
+        """A copy with every credential removed, for logs, events and receipts.
+
+        `cardId` and `transactionId` survive deliberately: they are identifiers,
+        not secrets, and `precaution.md` names them among the fields that may be
+        recorded. The token, dynamic CVV and expiry never leave this object.
+        """
+        redacted = dict(self)
+        for field in CREDENTIAL_FIELDS:
+            if field in redacted:
+                redacted[field] = REDACTED if redacted[field] else ""
+        return redacted
 
     def __repr__(self) -> str:
         return f"ScopedCard({self.safe()!r})"
 
+    def __str__(self) -> str:
+        return repr(self)
 
-def failed_card(merchant: str, amount_cap_paise: int, error: str) -> ScopedCard:
+
+def failed_card(
+    merchant: str, amount_cap_paise: int, error: str, error_code: str = "SCOPED_CARD_REJECTED"
+) -> ScopedCard:
     return ScopedCard(
         cardId="",
         cardToken="",
+        transactionId=None,
+        dynamicCvv="",
+        expiryMonth="",
+        expiryYear="",
         merchant=merchant,
         amountCap=to_rupees(amount_cap_paise),
         status="failed",
+        source="sandbox",
+        errorCode=error_code,
         error=error,
     )
 
@@ -129,6 +161,42 @@ class ScopedCardClient:
             return failed_card(merchant, amount_cap_paise, f"card service unreachable: {exc}")
 
     def _resolve_mandate(self, merchant: str) -> Optional[str]:
+        """Ask the backend which mandate covers this merchant.
+
+        Replaces the previous approach of inverting `PRAVA_MANDATE_MERCHANTS_JSON`
+        in Python. That duplicated backend state across two processes, and once
+        `syncCustomerMandates` started populating the registry at runtime the
+        copy in this process was simply wrong — an env var cannot learn about a
+        mandate approved five minutes ago.
+
+        The local registry stays only as an offline fallback so tests and
+        keyless runs still work; the backend is the source of truth whenever it
+        is reachable.
+        """
+        headers = {}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+
+        query = urllib.parse.urlencode({"merchant": merchant})
+        request = urllib.request.Request(
+            f"{self.base_url}/api/prava/mandates/resolve?{query}",
+            headers=headers,
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                body = json.loads(response.read().decode("utf-8"))
+            mandate_id = (body.get("data") or {}).get("mandateId")
+            if mandate_id:
+                return str(mandate_id)
+        except urllib.error.HTTPError as exc:
+            # 404 is a legitimate answer: no approved mandate for this merchant.
+            # Anything else still falls through to the offline registry.
+            if exc.code == 404:
+                return self.registry.get(merchant.strip().lower())
+        except (urllib.error.URLError, OSError, TimeoutError, json.JSONDecodeError):
+            pass
+
         return self.registry.get(merchant.strip().lower())
 
 
@@ -154,6 +222,17 @@ class StubScopedCardClient:
         self.minted: list[tuple[str, int]] = []
         self.mandate_caps: dict[str, int] = dict(mandate_caps or {})
 
+    def authorize(self, merchant: str, cap_paise: int) -> None:
+        """Record the ceiling a mandate was approved at, before any charge.
+
+        Mirrors reality: a mandate is approved for a merchant at an amount, and
+        only afterwards are credentials minted against it. The earlier version
+        inferred the ceiling from whichever charge happened to arrive first,
+        which quietly broke once the over-cap proof moved ahead of the purchase
+        — the inflated attempt became the ceiling and was authorised.
+        """
+        self.mandate_caps.setdefault(merchant.strip().lower(), cap_paise)
+
     def mint(self, merchant: str, amount_cap_paise: int) -> ScopedCard:
         if amount_cap_paise <= 0:
             return failed_card(merchant, amount_cap_paise, "amountCap must be positive")
@@ -161,11 +240,16 @@ class StubScopedCardClient:
         key = merchant.strip().lower()
         approved = self.mandate_caps.setdefault(key, amount_cap_paise)
         if amount_cap_paise > approved:
+            # Mirrors the structured code Prava surfaces on an over-cap Visa
+            # decline, so the orchestrator's classification path is exercised
+            # offline. The `simulated` wording in the message is what keeps this
+            # from ever being presented as card-network proof.
             return failed_card(
                 merchant,
                 amount_cap_paise,
                 f"simulated mandate ceiling for {merchant} is "
                 f"{to_rupees(approved):.2f}; refusing {to_rupees(amount_cap_paise):.2f}",
+                error_code="THRESHOLD_EXCEEDED",
             )
 
         self.minted.append((merchant, amount_cap_paise))
@@ -173,7 +257,12 @@ class StubScopedCardClient:
         return ScopedCard(
             cardId=f"stub-instruction-{index:03d}",
             cardToken=f"stub-token-{index:03d}",
+            transactionId=f"stub-txn-{index:03d}",
+            dynamicCvv="000",
+            expiryMonth="12",
+            expiryYear="30",
             merchant=merchant,
             amountCap=to_rupees(amount_cap_paise),
             status="issued",
+            source="fixture",
         )

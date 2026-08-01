@@ -12,6 +12,7 @@ import argparse
 import os
 import sys
 
+from .approval import AutoApproval, PolledApproval
 from .cards import ScopedCardClient, StubScopedCardClient
 from .config import load_env
 from .discovery import BackendDiscovery
@@ -47,6 +48,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run the pre-purchase trust check via POST /api/trust/check",
     )
+    parser.add_argument(
+        "--await-approval",
+        action="store_true",
+        help="Wait for a real human decision via the approval API before minting",
+    )
+    parser.add_argument(
+        "--approval-ttl", type=int, default=120, help="Approval request lifetime in seconds"
+    )
     parser.add_argument("--llm", action="store_true", help="Use OpenAI for agent dialogue")
     parser.add_argument("--overspend", metavar="AGENT", help="Have this agent attempt an over-slice charge")
     parser.add_argument("--fail", metavar="AGENT", help="Fail this agent's booking once, then recover")
@@ -74,6 +83,11 @@ def main(argv: list[str] | None = None) -> int:
     narrator = Narrator(enabled=args.llm)
     provider = BackendDiscovery(base_url=args.backend, token=token) if args.live_discovery else None
     trust = TrustClient(base_url=args.backend, token=token) if args.trust else None
+    approval = (
+        PolledApproval(base_url=args.backend, token=token, ttl_seconds=args.approval_ttl)
+        if args.await_approval
+        else AutoApproval()
+    )
 
     print(
         f"\n  HUMSAFAR — {args.goal}\n"
@@ -81,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
         f"  cards       : {'live backend route' if args.live_cards else 'STUB (simulated, not a real charge)'}\n"
         f"  discovery   : {'backend route' if args.live_discovery else 'local FIXTURE data'}\n"
         f"  trust check : {'on' if args.trust else 'off'}\n"
+        f"  approval    : {'HUMAN via approval API' if args.await_approval else 'auto (no human decision)'}\n"
         f"  reasoning   : {'OpenAI Agents SDK' if narrator.available else 'deterministic templates'}\n"
         f"  streaming   : {'off' if args.no_stream else args.backend}\n",
         file=sys.stderr,
@@ -94,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         narrator=narrator,
         provider=provider,
         trust=trust,
+        approval=approval,
         overspend_agent=overspend,
         fail_agent=fail,
     )

@@ -68,12 +68,35 @@ class Guardian:
 
     @staticmethod
     def describe_card_block(
-        agent: str, attempted_paise: int, cap_paise: int, backend_error: Optional[str]
+        agent: str,
+        attempted_paise: int,
+        cap_paise: int,
+        error_code: str = "",
+        backend_error: Optional[str] = None,
     ) -> str:
-        """Wording for a block that Prava (not this checker) performed."""
+        """Wording for a refusal Prava performed, named by its actual cause.
+
+        Only `THRESHOLD_EXCEEDED` — the Visa decline Prava surfaces in a failed
+        charge's `errorCode` — means the amount cap did the blocking. Everything
+        else is a real refusal for a different reason, and calling it cap
+        enforcement would be claiming a safety property we did not demonstrate.
+
+        This distinction is the whole point of the proof shot. A mandate that is
+        merely used up refusing a charge proves nothing about overspending.
+        """
         detail = f" Prava said: {backend_error}" if backend_error else ""
+        attempted = format_inr(attempted_paise)
+        cap = format_inr(cap_paise)
+
+        if error_code == "THRESHOLD_EXCEEDED":
+            return (
+                f"Blocked at the card level: {agent} attempted {attempted} against a card capped "
+                f"at {cap}. The credential is merchant-locked and amount-capped, so the network "
+                f"declined it (THRESHOLD_EXCEEDED).{detail}"
+            )
+
         return (
-            f"Blocked at the card level: {agent} attempted {format_inr(attempted_paise)} against a "
-            f"card capped at {format_inr(cap_paise)}. The credential is merchant-locked and "
-            f"amount-capped, so the charge could not be authorised.{detail}"
+            f"{agent}'s {attempted} attempt against a {cap} cap was refused, but NOT by the amount "
+            f"cap — the reason was {error_code or 'unknown'}. This is not evidence of "
+            f"card-level overspend protection and must not be presented as the proof shot.{detail}"
         )

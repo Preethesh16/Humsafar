@@ -187,13 +187,41 @@ class EventEmitter:
             }
         )
 
-    def approval_requested(self, allocations_paise: dict[str, int]) -> None:
+    def approval_requested(
+        self,
+        allocations_paise: dict[str, int],
+        run_id: str = "",
+        approval_request_id: str = "",
+        digest: str = "",
+        expires_at: str = "",
+    ) -> None:
+        # runId / approvalRequestId / digest / expiresAt are documented in
+        # INTERFACES.md §2 but not yet enforced by eventSchema.js, so they are
+        # additive here — Deepthi needs them to correlate the approval UI with
+        # the exact plan being approved.
         self.emit(
-            {"type": "approval_requested", "allocations": wire_allocations(allocations_paise)}
+            {
+                "type": "approval_requested",
+                "allocations": wire_allocations(allocations_paise),
+                "runId": run_id,
+                "approvalRequestId": approval_request_id,
+                "digest": digest,
+                "expiresAt": expires_at,
+            }
         )
 
-    def approval_given(self) -> None:
-        self.emit({"type": "approval_given", "timestamp": now_iso()})
+    def approval_given(
+        self, run_id: str = "", approval_request_id: str = "", digest: str = ""
+    ) -> None:
+        self.emit(
+            {
+                "type": "approval_given",
+                "timestamp": now_iso(),
+                "runId": run_id,
+                "approvalRequestId": approval_request_id,
+                "digest": digest,
+            }
+        )
 
     def card_issued(self, agent: str, card_id: str, amount_cap_paise: int) -> None:
         self.emit(

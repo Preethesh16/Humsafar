@@ -162,3 +162,14 @@
 - Blocked on: the user creating the sandbox key and storing it locally without sharing or committing it.
 - Needs from Jeswin/Deepthi: describe successful Prava results as sandbox transactions, never production or real-money transactions.
 - Commit: `906a443` (sandbox-only decision committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 22:32 IST] — Reviewed Jeswin's proposed Prava transaction plan
+- Prompt: asked whether the attached implementation plan from Jeswin's assistant is worth executing.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: recorded a technical review of the proposed access, over-cap proof, approval boundary, mandate setup, settlement, mandate scope, and verification phases.
+- Validation: read the attached 91-line plan in full; compared it with the current Prava client, scoped-card service, agent card/checkout/orchestrator seams, environment loading, contracts, and tests; checked today's official Prava sandbox, REST checkout, mandate charge/report, mandate lifecycle, error, and test-card documentation.
+- Decision: accept the plan's priority, operator-script idea, pre-purchase cap test, and approval boundary, but reject execution as written. Reporting `APPROVED` to Prava is reconciliation after a merchant checkout attempt, not checkout execution; it cannot be used by `LiveCheckout` as a substitute for a processor/merchant result. Drop the unsupported one-approval/four-merchant assumption unless Prava support explicitly confirms it, because `any` permits any merchant for a one-time mandate but the documented one-time lifecycle still consumes after one settled charge.
+- Why: the proposed Phase 3b could create a completed Prava record without a merchant attempt and then label it a live order, reproducing the exact evidence-integrity risk the project has guarded against. The current locked card shape also omits transaction ID, CVV, and expiry; environment paths are wrong for this workspace; `npm start` does not load `.env`; and moving the cap attempt earlier must target the selected merchant rather than `options[0]`.
+- Blocked on: sandbox key creation and a decision from Prava support on whether their documented manual sandbox report is intended as the processor simulation for hackathon evidence, plus an honest checkout target if the submission claims an order rather than only a completed Prava sandbox lifecycle.
+- Needs from Jeswin/Deepthi: Jeswin should revise Phase 3 around a real or explicitly simulated processor boundary and a `sandbox` source label; Deepthi must render sandbox separately from production/live. No implementation should begin from the attached plan unchanged.
+- Commit: pending (plan review will be pushed through `preethesh/integrations-backend` and merged to `main`)

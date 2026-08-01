@@ -52,3 +52,14 @@
 - Blocked on: nothing
 - Needs from Jeswin/Deepthi: read `INTERFACES.md` before boundary work and flag proposed contract changes before implementation.
 - Commit: `a906ab0` (pushed to `preethesh/integrations-backend`; fast-forward merged and pushed to `main`)
+
+### [2026-08-01 13:18 IST] — Started implementation and resolved Prava mandate model
+- Prompt: start working on implementation.
+- Files changed: `.gitignore`, `.env.example`, `package.json`, `backend/src/integrations/pravaClient.js`, `backend/src/services/scopedCardService.js`, `backend/test/pravaClient.test.js`, `backend/test/scopedCardService.test.js`, `INTERFACES.md`, `brainstorming.md`, and `progress-preethesh.md`.
+- Changed: implemented the authenticated Prava mandate-charge client and the locked `mintScopedCard` service; added fail-closed validation, mandate-to-merchant enforcement, idempotency references, safe structured logging, environment templates, tests, and corrected architecture documentation.
+- Validation: re-read all six Markdown files; fetched GitHub and confirmed this branch matched `origin/main`; checked official Prava concepts, session, authentication, and mandate-charge references current on Aug 1, 2026; `npm test` passed 8/8 tests; Node syntax checks and `git diff --check` passed; credential scan found no committed secret value.
+- Decision: implement one `POST /v1/mandates/{id}/charge` per scoped credential; require a registered mandate-to-merchant match; map Prava `instructionId` to `cardId`; never log credential fields; fail closed without live configuration rather than presenting a fixture payment as real.
+- Why: Prava documents repeated fresh credentials per active mandate, but listed mandates and setup sessions are single-merchant. Claiming one mandate across several merchants would be technically unsupported and misleading.
+- Blocked on: live sandbox verification requires a local `PRAVA_SECRET_KEY` and active merchant-specific mandate ID; neither is present in the workspace.
+- Needs from Jeswin/Deepthi: Jeswin should treat `mandateId` as merchant-specific; Deepthi must not label fixture or failed card issuance as a completed live payment.
+- Commit: pending

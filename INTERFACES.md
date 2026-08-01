@@ -21,7 +21,9 @@ mintScopedCard(mandateId: string, merchant: string, amountCap: number)
 ```
 
 - Jeswin's orchestrator calls this once per specialist agent, after the mediator finalizes the split.
-- Preethesh owns what happens inside it (real Prava sandbox call, or — if the mandate-to-multi-card sandbox question resolves the other way — an internal loop that issues one token per merchant per purchase under the hood). **Either way, the function signature above does not change.** That's the whole point of the abstraction.
+- Preethesh owns what happens inside it. The official Prava REST model allows repeated credential minting against an active mandate, but a `listed` mandate remains locked to the single merchant approved during setup. For the current API, Jeswin must therefore pass the mandate belonging to that specialist's merchant; the backend fails closed if the supplied merchant does not match the mandate registry. **The function signature above does not change.**
+- `cardId` maps to Prava's `instructionId`, the stable identifier for the minted credential instruction. `cardToken` maps to `credentials.token`. Neither raw token nor dynamic CVV may be logged.
+- The public function returns the exact object above. The lower-level Prava client uses the `{ data, source }` integration envelope from Section 4 internally; do not add `source` to this locked return shape without coordinating a contract change.
 - If Preethesh's real implementation isn't ready yet, Jeswin should build against a stub that returns a fake `cardToken` and `status: "issued"` after a short delay, so his negotiation/orchestration logic isn't blocked.
 
 ---

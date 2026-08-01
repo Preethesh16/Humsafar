@@ -75,9 +75,9 @@ Handbook recommends **SDK/API** for hackathon builds needing an embedded/native 
 2. Spins up specialist agents per category (Flights, Stay, Food, Guide/Activities).
 3. Specialists **negotiate over the same finite pot** — each argues for its share, pushes back on others.
 4. A neutral **Mediator** arbitrates until the split sums to ≤ budget and no agent's minimum viable ask is violated.
-5. Orchestrator mints a **merchant-scoped, one-time Prava card per agent**, sized to its agreed slice.
+5. Orchestrator mints a **merchant-scoped, one-time Prava credential per agent**, sized to its agreed slice. With Prava's current REST API, each merchant requires its own approved listed mandate; a future batch/multi-merchant approval flow is required to deliver the intended single-tap UX honestly.
 6. Each agent completes a **real transaction** on its own card — never touching a raw card number, never able to reach another agent's slice or the rest of the money.
-7. User approves **once**, up front, via one passkey-approved master mandate — then just watches the team reason, argue, and buy.
+7. Target UX: user approves **once**, up front, then watches the team reason, argue, and buy. Current REST-backed MVP: one listed mandate approval per merchant, after which repeat charges against that merchant need no new passkey. Do not claim the target single-tap flow is live until Prava exposes or confirms a batch/multi-merchant approval mechanism.
 
 **Why multi-agent is load-bearing, not decorative:**
 1. Resource contention — several agents competing over one pot is impossible to reason about with a single agent.
@@ -105,9 +105,9 @@ Their multi-channel group-of-humans input model (WhatsApp/iMessage/web ingestion
 
 ## 3. PRAVA MECHANIC (the core technical bet)
 
-Flow: one master mandate (passkey) → mediator-approved split → orchestrator mints a merchant-scoped one-time card per agent via Prava SDK/API → each agent transacts on its own credential → cards are merchant-locked + amount-capped at the network level, so overspend is physically blocked, not just policy-blocked.
+Target flow: one approval → mediator-approved split → orchestrator mints a merchant-scoped one-time credential per agent → each agent transacts on its own credential. Current verified REST flow: one passkey-approved listed mandate per merchant → repeated single-use credentials can be minted against that mandate within its caps without another passkey. Merchant and amount enforcement happen at the card-network level.
 
-**Open technical question to resolve early in the sandbox (do this FIRST, before building the rest):** confirm whether one master mandate can mint **multiple** scoped cards directly, or whether the real pattern is one scoped token per merchant per purchase derived under the mandate. Build a `mintScopedCard(mandateId, merchant, amountCap)` abstraction so the rest of the system doesn't care which is true underneath.
+**Resolved from the official Prava REST documentation on Aug 1, 2026:** [`POST /v1/mandates/{id}/charge`](https://docs.prava.space/api-reference/mandate-charge) mints a fresh single-use credential against an active mandate as many times as its frequency and charge caps allow. A [`listed` mandate](https://docs.prava.space/concepts/mandates) is locked to the merchant approved during setup, and [session creation](https://docs.prava.space/api-reference/create-session) accepts exactly one merchant. Therefore the current API does not establish that one master mandate can cover several merchants. The MVP uses one mandate per specialist merchant behind `mintScopedCard(mandateId, merchant, amountCap)` and fails closed on a mandate/merchant mismatch. Live sandbox verification is still pending a `PRAVA_SECRET_KEY` and approved mandate IDs.
 
 ---
 

@@ -128,4 +128,4 @@
 - Why: production access requires additional verification and does not turn the current simulated checkout into a real order. Sandbox proves the integration safely and is the fastest credible submission path; applying early preserves the production option without risking the deadline.
 - Blocked on: the workspace still lacks `PRAVA_SECRET_KEY` and approved merchant-specific sandbox mandates. The contents of the user's email were not provided, so any form-specific deadline or condition in that email must be followed directly.
 - Needs from Jeswin/Deepthi: no new code dependency; preserve clear sandbox/production/fixture labels in the demo and submission.
-- Commit: pending (access decision will be pushed through `preethesh/integrations-backend` and merged to `main`)
+- Commit: `cea9f3c` (access decision committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)

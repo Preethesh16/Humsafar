@@ -110,4 +110,4 @@
 - Note for the team: this trap is not frontend-specific. Anyone running a watching dev process against this repo from WSL will hit it, so it is documented in `frontend/README.md`.
 - Blocked on: nothing
 - Needs from Jeswin/Preethesh: nothing.
-- Commit: `PENDING2` (pushed to `deepthi/frontend-demo`)
+- Commit: `fa86e0e` (pushed to `deepthi/frontend-demo`)

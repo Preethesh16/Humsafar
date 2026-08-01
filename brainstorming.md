@@ -150,6 +150,32 @@ Target flow: one approval → mediator-approved split → orchestrator mints a m
 
 ---
 
+## 6b. THE TASTE STEP — agents decide the money, the user decides the taste (PROPOSED)
+
+Status: 🟡 **proposed 2026-08-01, not built.** Full contract in `INTERFACES.md` §6. Additive — the current flow is unaffected if this is deferred.
+
+**The gap it closes.** Right now the mediator fixes each slice and the specialist then picks the option itself. That quietly assumes an agent can predict human taste. It cannot. Two rooms at ₹4,000 are not interchangeable to a person — one faces a car park, one faces the sea, and no amount of negotiation logic knows which you want.
+
+**The fix.** After the split is final and before any card is minted, each agent presents a shortlist of options that fit its slice, and the user picks one. The agents keep the decision that is genuinely theirs (how to divide a finite pot) and hand back the one that never was (which of these do you actually like).
+
+**Why this makes the product stronger, not just prettier:**
+- It answers the sharpest objection to any agentic-commerce demo — "I would never let a bot choose my hotel." Now it doesn't. It chooses your *budget*.
+- The negotiation beat is unaffected. The contention over one pot is still the whole show; this adds a human beat after it, it does not replace it.
+- It makes the spend cap concrete on screen: every option shown is *inside* the slice, so the constraint is visible rather than asserted.
+
+**Where the options come from.** Duffel covers flights and stays and returns several results per search, with photos and a star rating on stays. Guide and Food stay on disclosed fixtures. Ranking is by real rating where one exists, by price where it does not — Duffel flight offers carry no rating and must never be given an invented one.
+
+**Three things that are settled as impossible — do not re-litigate mid-build:**
+1. Real booking sites cannot be embedded in an iframe; they block it with `X-Frame-Options`. Preview inside our own panel, or open a real pop-up window.
+2. A Duffel stay has no external "property website" to open — Duffel *is* the booking channel. Photos come from Duffel.
+3. We cannot rank by analysing review text. There is no reviews API and no review text in the system. Ranking by the rating numbers we actually receive is honest; claiming review analysis is not.
+
+**One honesty trap worth naming.** Duffel's free tier is *test mode*, which returns placeholder inventory. That is a real API call, so `source: "live"` is accurate — but it is not real market data, so options also carry `environment: "test" | "production"` and the UI must label them differently. A test-mode property is not a real hotel.
+
+**Priority.** Below a genuine Prava sandbox transaction. Cards are still stubs; a richer picker on top of simulated payments scores worse than a plain UI on a real one.
+
+---
+
 ## 7. DEMO SCRIPT (target ~3 minutes)
 1. Type: "Plan my Goa trip under ₹30k." (5s)
 2. Specialists appear and argue over the split; mediator settles it. (45s) ← the wow moment
@@ -161,12 +187,19 @@ Target flow: one approval → mediator-approved split → orchestrator mints a m
 
 Punchline: "A team of agents spent your budget together — not one of them could overspend it, and when one hit a snag, only its own slice had to be redone."
 
+**If the taste step (§6b) ships**, insert a new beat 3 and re-time the rest: after the mediator settles the split, each agent shows a shortlist inside its slice and the user picks one per category (~25s), before the single approval. The narration gains its strongest line — *"the agents decided how much; I decided which."* Do not let this beat run long: it is the one part of the demo that waits on a human, so rehearse it with the picks already decided.
+
 ---
 
 ## 8. TEAM & ROLE SPLIT (see individual progress files for live status)
 - **Jeswin** — Agent/AI core: orchestrator, specialist agents, mediator, negotiation engine, Prava `mintScopedCard` logic and abstraction.
 - **Preethesh** — Integrations & backend: Prava SDK/API wiring (sandbox test card, production request if pursued), Duffel API, Node/Express orchestration service + SSE streaming, credential-degradation adapter, Senso + NANDA wiring, Guide/Food fixture data.
 - **Deepthi** — Frontend, demo & submission: React dashboard (deliberation feed, split viz, purchase cards, audit log), confirmation fan-out, optional Flutter passkey screen, demo video, Devfolio submission writeup and disclosure section.
+
+**Proposed additions from the taste step (§6b / `INTERFACES.md` §6) — not yet agreed by Jeswin and Preethesh:**
+- **Preethesh** — `POST /api/choices`; run/choice tracking; pass through the Duffel Stays photos discovery currently discards; stable `optionId`; `environment` alongside `source`.
+- **Jeswin** — pause after allocation; shortlist within each slice; the rating-vs-price ranking rule; `choice_requested` / `choice_made`; the no-hang timeout; buy exactly what the user chose.
+- **Deepthi** — the choice panel, photo preview, rating and source/environment labelling, countdown, and the user-chosen vs auto-chosen distinction on the receipt.
 
 Each person's `/progress-<name>.md` is the source of truth for what's actually been done — read all three before starting a new work session, not just your own.
 

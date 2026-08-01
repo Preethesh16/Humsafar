@@ -136,3 +136,14 @@
 - Blocked on: nothing
 - Needs from Jeswin/Preethesh: pull `main` before your next phase — the `frontend/` tree and the repo-wide LF normalisation are now on it.
 - Commit: `3b7361e` (merge commit on `main`; branch `deepthi/frontend-demo` level with it)
+
+### [2026-08-01 16:50 IST] — First real end-to-end run: agent core → backend → dashboard
+- Prompt: asked what work is left for me.
+- Files changed: none — this was a verification pass, logged because the result changes what "done" means for my scope.
+- Changed: nothing. Ran Jeswin's agent core for real (`python3 -m humsafar --goal "Plan my Goa trip" --budget 30000 --demo`) against the running backend, captured the 51 events it streamed, and folded them through my actual `sessionReducer` to see exactly what the dashboard would render.
+- Result: **the live path works.** All nine locked event types were consumed, phase reached `complete`, four credentials were issued, five purchases recorded with one failure recovered, and both demo proof shots arrived (1 `blocked_attempt`, 1 `renegotiation_triggered`). Zero events fell through to the unrecognised-type path. Budget ₹30,000, allocated ₹28,800, spent ₹28,800.
+- Why this mattered: until now the live path had only ever been tested with hand-POSTed events. Judging criterion 1 is whether intent → result actually works live, so an untested real integration was the biggest unknown left in my scope.
+- **Confirmed the receipt fix was load-bearing:** every real receipt line came back with `source: "fixture"` and a `details` string ending "not a live merchant order". Before this morning's fix the dashboard would have rendered all four simulated bookings as completed orders with amounts charged.
+- Blocked on: nothing in my lane.
+- Needs from Jeswin/Preethesh: nothing — the agent core streamed exactly the locked shapes.
+- Commit: `8fdde2f` (pushed to `deepthi/frontend-demo`)

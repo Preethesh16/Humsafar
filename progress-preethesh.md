@@ -227,4 +227,4 @@
 - Why: this gives the OpenAI track a material product role without allowing model output to move money, keeps the three branches independently actionable behind explicit contract gates, and protects the core transaction from optional track/polish work.
 - Blocked on: local `.env` is still absent, so Prava and OpenAI credential smoke checks cannot run. The user must place keys locally without sharing them; Prava's four open operational questions remain listed in `precaution.md`.
 - Needs from Jeswin/Deepthi: both must review the shared contract additions in `execution-plan.md` before dependent code. Jeswin owns Agents SDK and deterministic orchestration integration; Deepthi owns interactive UX, provenance, deployment and submission assets.
-- Commit: pending (planning documentation on `preethesh/integrations-backend`)
+- Commit: `3334f23` (execution plan committed on `preethesh/integrations-backend`; merge finalization is recorded by the follow-up log commit)

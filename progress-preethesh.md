@@ -260,4 +260,4 @@
 - Why: this closes stale-approval replay, cross-process mandate drift, lost Prava decline causes, and sandbox-vs-success ambiguity without letting models or browser code control payment credentials.
 - Blocked on: `.env` is absent, so the read-only Prava authentication check and all deliberate sandbox calls remain blocked on Preethesh placing the existing sandbox key locally. The taste-step backend remains intentionally deferred until genuine Prava evidence passes G4.
 - Needs from Jeswin/Deepthi: Jeswin must consume the new resolver/approval endpoints, pass the new correlated approval events, and redact `cardToken`, `dynamicCvv`, expiry, and transaction identifiers in `ScopedCard.safe()` before any live-card run. Deepthi must use the approval request ID/digest/run ID, keep `INTERNAL_API_TOKEN` out of browser bundles, and render payment provenance separately from outcome. Both must pull the contract commit before dependent work.
-- Commit: pending (G0/G2 implementation on `preethesh/integrations-backend`)
+- Commit: `9d9d5f5` (G0/G2 implementation committed on `preethesh/integrations-backend`)

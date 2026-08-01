@@ -130,3 +130,24 @@
 - Blocked on: nothing in code.
 - Needs from Deepthi: nothing new. Orchestrator messages carry `[intent: openai|keyword]` and per-category emphasis if she wants to surface agent identity/stage.
 - Commit: `1542015` (pushed to `jeswin/agent-core`)
+
+### [2026-08-02 04:00 IST] — Priority 1 items 6–9: approval gate, mandate resolver, credential hygiene, cap proof
+- Prompt: continue.
+- Files changed: added `agents/humsafar/approval.py`, `agents/tests/test_approval_and_cards.py`; edited `agents/humsafar/{orchestrator,cards,guardian,events,__main__}.py`.
+- Changed: implemented items 6–9 against the contracts Preethesh locked in `9f47a99`. Item 10 (taste step) stays deferred — `execution-plan.md` gates it behind proven Prava evidence.
+
+**Item 6 — the cap proof now proves the right thing.** The over-cap attempt runs **before** that agent's own purchase and targets **the merchant it is about to buy from**. Both halves matter: afterwards a `max_charges: 1` mandate is already consumed, so the refusal would come from an exhausted use limit while we claimed card-network cap enforcement; and aimed at any other merchant it would be refused as `MANDATE_MERCHANT_NOT_ALLOWED` — a real refusal, for entirely the wrong reason. `describe_card_block` now names the actual cause: **only `THRESHOLD_EXCEEDED` is described as the amount cap blocking**, and `MANDATE_NOT_ACTIVE`, `TRIES_EXHAUSTED` or an unknown code are explicitly labelled *"not evidence of card-level overspend protection, must not be presented as the proof shot"*.
+
+Reordering exposed a modelling flaw in my own offline stub: it inferred the mandate ceiling from whichever charge arrived first, so once the over-cap attempt moved ahead of the purchase, **the inflated amount became the ceiling and was authorised**. Mandates are now authorised at their slice before any charge, which is what actually happens with Prava. Caught by an existing test failing, not by inspection.
+
+**Item 7 — mandate resolution via `GET /api/prava/mandates/resolve`.** My previous approach inverted `PRAVA_MANDATE_MERCHANTS_JSON` in Python, which duplicated backend state across two processes and could not learn about a mandate approved at runtime by `syncCustomerMandates`. The local map survives only as an offline fallback; the backend is the source of truth whenever reachable.
+
+**Item 8 — approval is server state, not a boolean.** `PolledApproval` drives the §7 protocol: create → poll → consume → only then mint. The digest binds the decision to an exact plan, consumption is one-shot, and **decline, expiry, a failed consume and an unreachable service are all treated identically: do not mint.** `AutoApproval` stays the default for keyless runs and declares itself non-human on the wire (`[auto-approved: no human decision was taken]`) so a fixture run can never be presented as one a person authorised.
+
+**Item 9 — `ScopedCard.safe()` redacts every transient credential**: `cardToken`, `dynamicCvv`, `expiryMonth`, `expiryYear`. `cardId` and `transactionId` survive deliberately — they are identifiers the report endpoint needs, and `precaution.md` permits recording them.
+
+- Validation: **151 Python and 59 Node tests pass** (26 new). Verified **live against the running backend**: a human `APPROVE` produced 4 purchases and ₹28,800; a human `DECLINE` produced **zero purchases, zero spend and no `card_issued` event at all**. Also asserted mechanically that no credential string reaches any event, and that the over-cap attempt precedes the same agent's mint.
+- Interface note for **Deepthi**: `approval_requested` now carries `runId`, `approvalRequestId`, `digest` and `expiresAt`; `approval_given` carries `runId`, `approvalRequestId` and `digest`. These are documented in `INTERFACES.md` §2 but **not yet enforced by `eventSchema.js`**, so they are additive and safe. The approval UI needs `approvalRequestId` + `digest` to POST a decision, and `expiresAt` for the countdown. Run `python3 -m humsafar --demo --await-approval` and the agent will genuinely wait for her button.
+- Interface note for **Preethesh**: no contract changed. `ScopedCardClient` now calls your resolver; the stub grew an `authorize(merchant, cap)` hook that is a no-op against live Prava, where mandates are provisioned out of band.
+- Blocked on: nothing in code. Item 10 and `LiveCheckout` both wait on genuine Prava sandbox evidence, which is the team's current gate.
+- Commit: `7dd56c7` (pushed to `jeswin/agent-core`)

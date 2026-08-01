@@ -84,4 +84,4 @@
 - Why: the completed code is healthy, while live sandbox execution needs external configuration that is intentionally absent from Git.
 - Blocked on: live Prava test credentials and merchant-specific mandate IDs only; local automated/backend behavior is not blocked.
 - Needs from Jeswin/Deepthi: nothing new.
-- Commit: pending
+- Commit: `966ce3b` (pushed to `preethesh/integrations-backend`; merge to `main` follows this log finalization)

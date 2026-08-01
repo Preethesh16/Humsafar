@@ -330,9 +330,29 @@ h1 em {
   font: 750 8.5px/1 var(--mono); letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--muted); background: var(--paper-2); border: 1px solid var(--line);
 }
-.tag--live { color: #256b45; background: #dff4e8; border-color: #a9d6bc; }
-.tag--fixture { color: var(--amber-ink); background: var(--amber-soft); border-color: #e5c785; }
-.tag--unverified { color: var(--coral-ink); background: var(--coral-soft); border-color: #e6afa3; }
+/* Provenance tones. Deliberately distinct at a glance: green only ever means a
+   payment path was genuinely exercised. */
+.tag--ok { color: #256b45; background: #dff4e8; border-color: #a9d6bc; }
+.tag--warn { color: var(--amber-ink); background: var(--amber-soft); border-color: #e5c785; }
+.tag--danger { color: var(--coral-ink); background: var(--coral-soft); border-color: #e6afa3; }
+.tag--neutral { color: var(--muted); background: var(--paper-2); border-color: var(--line-strong); }
+
+/* Run-level provenance banner on the receipt. */
+.runmode {
+  display: flex; flex-direction: column; gap: 3px;
+  margin: 0 0 18px; padding: 12px 14px;
+  border: 1px solid var(--line-strong); border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+}
+.runmode b { font-size: 12.5px; }
+.runmode span { color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+.runmode__count { font-family: var(--mono); font-size: 10.5px !important; }
+.runmode--warn { border-color: #e5c785; background: #fff8e5; }
+.runmode--warn b { color: var(--amber-ink); }
+.runmode--danger { border-color: #e6afa3; background: #fff4f0; }
+.runmode--danger b { color: var(--coral-ink); }
+.runmode--ok { border-color: #a9d6bc; background: #edf9f2; }
+.runmode--ok b { color: var(--forest-2); }
 
 /* --------------------------------- proof ---------------------------------- */
 .proof { padding: 18px 20px; border: 1px solid #e6afa3; border-radius: var(--radius); background: #fff6f2; box-shadow: var(--shadow-small); animation: outcome-in 0.45s ease; }

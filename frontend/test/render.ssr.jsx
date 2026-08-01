@@ -71,13 +71,13 @@ const expectations = [
   ["Blocked at card level", "over-cap block on the credential card"],
   ["Overspend blocked at the card", "proof shot #1 panel"],
   ["Single slice re-negotiated", "proof shot #2 panel"],
-  ["fixture data", "honest source tag"],
+  ["fixture / simulated; no payment attempted", "exact precaution.md fixture label"],
   ["mocked stream", "mock labelling on purchases"],
   ["Audit log", "audit heading"],
   ["renegotiation_triggered", "renegotiation in the audit log"],
   ["Every agent has settled", "final receipt"],
   ["No payment was made", "mock receipt warning"],
-  ["simulated · fixture", "receipt lines labelled as fixtures, not live orders"],
+  ["Fixture-only run — no payment was attempted", "run-level provenance banner"],
 ];
 
 for (const [needle, description] of expectations) {
@@ -88,13 +88,16 @@ for (const [needle, description] of expectations) {
 // carries per-line `status` and `source` (INTERFACES.md §2 producer notes).
 // A fixture line must not read as a live order, and a failed line must not read
 // as a completed purchase.
+// The exact scenario precaution.md warns about: ONE category genuinely
+// exercises Prava sandbox, the other three are fixtures. The receipt must not
+// let that one real line stand for the whole run.
 const liveReceipt = renderToStaticMarkup(
   <FinalReceipt
     receipt={{
       budget: 30000,
       totalSpent: 21000,
       purchases: [
-        { agent: "flights", merchant: "Duffel Test Airways", amount: 11800, status: "success", source: "live", details: "x" },
+        { agent: "flights", merchant: "Sandbox merchant", amount: 11800, status: "success", source: "sandbox", details: "x" },
         { agent: "food", merchant: "OpenTable-shaped fixture", amount: 4850, status: "success", source: "fixture", details: "y" },
         { agent: "guide", merchant: "Viator-shaped fixture", amount: 0, status: "failed", source: "fixture", details: "sold out" },
         { agent: "stay", merchant: "Untagged merchant", amount: 4350, status: "success", details: "no source tag" },
@@ -108,16 +111,30 @@ const liveReceipt = renderToStaticMarkup(
   />,
 );
 
-assert.ok(liveReceipt.includes("live order"), "a live line must be labelled as a live order");
-assert.ok(liveReceipt.includes("simulated · fixture"), "a fixture line must be labelled simulated");
-assert.ok(liveReceipt.includes("source unverified"), "an untagged line must be labelled unverified");
+assert.ok(liveReceipt.includes("Mixed-mode run"), "a mixed run must be labelled mixed-mode");
+assert.ok(
+  liveReceipt.includes("1 of 4 purchases exercised a payment path"),
+  "the receipt must state how many lines genuinely exercised a payment path",
+);
+assert.ok(liveReceipt.includes("completed sandbox checkout"), "the sandbox line keeps its real label");
+assert.ok(
+  liveReceipt.includes("fixture / simulated; no payment attempted"),
+  "fixture lines keep the exact precaution.md wording",
+);
+assert.ok(
+  liveReceipt.includes("source unverified; not evidence of a payment"),
+  "an untagged line stays pessimistic",
+);
 assert.ok(liveReceipt.includes("not charged"), "a failed line must not show a charged amount");
 assert.ok(!liveReceipt.includes("₹0"), "a failed line must not render a zero-rupee charge");
 assert.equal(
-  (liveReceipt.match(/live order/g) ?? []).length,
+  (liveReceipt.match(/completed sandbox checkout/g) ?? []).length,
   1,
-  "exactly one line is a live order — fixture lines must not borrow the label",
+  "only the sandbox line may claim a completed checkout — no line inherits it",
 );
+for (const banned of ["order placed", "real money", "production"]) {
+  assert.ok(!liveReceipt.includes(banned), `receipt must never say "${banned}"`);
+}
 
 // The app shell itself must render — it carries the hero, the journey stepper
 // and the simulated-stream notice, none of which the panel renders above cover.

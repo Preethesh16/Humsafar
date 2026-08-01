@@ -96,3 +96,47 @@
 - Blocked on: real Prava, Duffel, and Senso calls require local credentials; external NANDA registration and production deployment require a public URL. Code paths and honest fixture behavior are complete.
 - Needs from Jeswin/Deepthi: pass discovery inputs through the documented routes and display the top-level `source`; never label fixture trust/discovery or failed payment issuance as live.
 - Commit: `d211855` (pushed to `preethesh/integrations-backend`; merge to `main` follows this log finalization)
+
+### [2026-08-01 17:18 IST] — Reviewed Jeswin handoff and restored backend-driven negotiation
+- Prompt: review Jeswin's completed agent-core handoff, including his request for Preethesh to decide whether the backend demo fixtures should create contention.
+- Files changed: `backend/src/fixtures/discovery.js`, `backend/test/integrations.test.js`, `agents/humsafar/discovery.py`, `agents/tests/test_integrations.py`, `INTERFACES.md`, and `progress-preethesh.md`.
+- Changed: aligned the backend's labeled offline Goa choices with the agent layer's deliberate price ladder; expanded every category to at least four real options; added fixture-only preference scores; added a regression test locking the ₹16,100 viable floor and ₹35,600 preferred total around the default ₹30,000 demo budget; and replaced the obsolete Vistara option with Air India in both discovery paths and the parser test.
+- Validation: fetched and fast-forwarded the latest `origin/main` into `preethesh/integrations-backend`; read all project Markdown files; inspected the agent selection, concession, surplus-allocation, discovery, trust, and checkout paths; reproduced the backend-fixture defect end to end (round-one convergence and only ₹17,400 spent); verified from Air India's official merger notice that Vistara ceased operating under its own brand in November 2024; `npm test` passed all 37 backend/frontend tests; all 80 Python tests passed; `npm audit --omit=dev` found zero vulnerabilities; Node syntax, diff, stale-airline, and credential scans passed; and a real backend plus agent demo streamed all 50 events, negotiated over two rounds, exercised both proof shots, spent ₹28,800, and stayed within budget with all four discovery sources labeled `fixture`.
+- Decision: use the same transparent synthetic price ladder on both offline discovery paths. Fixture ratings are allowed only on rows labeled `source: "fixture"`; live Duffel flights remain unrated and must never inherit synthetic scores.
+- Why: the former backend set made the four preferred choices total only ₹17,400 against ₹30,000, eliminating the product's central negotiation beat. The new invariant makes the preferred plan exceed budget while keeping a complete floor plan affordable, so concessions are genuine downgrades between purchasable options rather than scripted dialogue.
+- Blocked on: live Prava, Duffel, and Senso verification still requires credentials; this fixture correction is not blocked.
+- Needs from Jeswin/Deepthi: Jeswin can now use `--live-discovery` without losing negotiation when the backend transparently falls back to fixtures; Deepthi should continue displaying the existing fixture labels. No event shape changed.
+- Commit: `7c317f1` (implementation committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 17:40 IST] — Audited what remains before submission
+- Prompt: asked what work remains.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: recorded a repo-, contract-, integration-, teammate-branch-, and submission-level readiness audit. The fixture demo is complete, but a judge-valid live commerce run, interactive approval/input UX, deployment, track evidence, and submission assets remain.
+- Validation: read all eight Markdown files in full; fetched every GitHub branch and confirmed `main` and `preethesh/integrations-backend` were clean at `1ae3d7d`; found Deepthi's documentation-only `116ecf6` still outside `main`; confirmed no local `.env` and no configured Prava, Duffel, OpenAI, deployment, or internal-auth variables; `npm test` passed 37/37 and Python passed 80/80; installed the exact locked frontend dependencies, then passed the 24-assertion SSR smoke test and production build with zero audit vulnerabilities; inspected the approval, checkout, Prava mandate, Duffel, frontend input, deployment, and fan-out paths; checked the live Devfolio page and current official Prava session/use-limit documentation.
+- Decision: prioritize real Prava sandbox evidence and a real checkout before optional prize-track work. The current `max_charges: 1` mandate and post-purchase over-cap attempt must be validated or reordered, because a second invocation could fail from an exhausted use limit rather than prove amount-cap enforcement. Do not claim the stub refusal as card-network proof.
+- Why: the public hackathon page requires Prava to be a real part of the product and an agent to complete or enable a transaction. The current demo is honest and reliable, but its cards and checkouts are still simulated by default, approval is auto-granted, and the dashboard goal/budget row is read-only.
+- Blocked on: Preethesh must receive a sandbox `PRAVA_SECRET_KEY`, create merchant-specific approved mandates, and choose an actual supported merchant checkout target; Duffel/OpenAI/Senso live paths need their respective credentials; deployment and exact submission cutoff require external platform access.
+- Needs from Jeswin/Deepthi: Jeswin should wire a real checkout implementation after the merchant target is selected and expose a non-auto approval boundary; Deepthi should add the interactive goal/budget/approval flow, prepare the demo video and Devfolio writeup/disclosure, and reconcile the documentation-only commit on her branch. Flutter, Senso, and NANDA track evidence remain optional until the core live transaction is proven.
+- Commit: `999f874` (status audit committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 17:54 IST] — Decided sandbox versus production access
+- Prompt: asked whether Prava production access is required and whether the production-access form from the Prava email should be submitted.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: recorded the access decision and safe operating boundary.
+- Validation: checked the current official Prava quickstart, environment, intent-invocation, and production-verification documentation plus the live Devfolio requirements. Prava explicitly positions sandbox for development/testing and production as separately provisioned after verification; Devfolio requires Prava to be a real part of the product and an agent to complete or enable a transaction, but does not require production access.
+- Decision: submit the temporary production-access form now because review is asynchronous and optional access may strengthen the demo, but do not wait for it or make it the critical path. Finish and record a genuine sandbox flow first. A real sandbox API result is acceptable evidence; the current local stub is not. Do not use production until checkout is real, approval is explicit, and the team understands merchant/compliance consequences.
+- Why: production access requires additional verification and does not turn the current simulated checkout into a real order. Sandbox proves the integration safely and is the fastest credible submission path; applying early preserves the production option without risking the deadline.
+- Blocked on: the workspace still lacks `PRAVA_SECRET_KEY` and approved merchant-specific sandbox mandates. The contents of the user's email were not provided, so any form-specific deadline or condition in that email must be followed directly.
+- Needs from Jeswin/Deepthi: no new code dependency; preserve clear sandbox/production/fixture labels in the demo and submission.
+- Commit: `cea9f3c` (access decision committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)
+
+### [2026-08-01 18:02 IST] — Locked the step-by-step execution order
+- Prompt: confirmed that the remaining work should be completed sequentially, finishing the current access step before starting the next one.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: recorded the agreed order: submit the Prava production-access form without waiting on approval, obtain and verify sandbox access, complete one genuine sandbox transaction and cap-rejection proof, then implement interactive UX/deployment, and finish the video and submission package last.
+- Validation: confirmed the working tree was clean and both `main` and `preethesh/integrations-backend` were synchronized before this log entry.
+- Decision: keep exactly one active milestone at a time and verify its evidence before moving forward.
+- Why: this prevents optional production access and partner-track work from distracting from the sandbox transaction that the core submission needs.
+- Blocked on: the user completing the Prava production-access form or sharing its non-secret questions for review.
+- Needs from Jeswin/Deepthi: nothing at this step.
+- Commit: `278b3bf` (workflow decision committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)

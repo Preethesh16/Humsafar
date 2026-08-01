@@ -4,6 +4,12 @@ import test from "node:test";
 import { DuffelClient } from "../src/integrations/duffelClient.js";
 import { withFixtureFallback } from "../src/integrations/withFixtureFallback.js";
 import { DiscoveryService } from "../src/services/discoveryService.js";
+import {
+  flightFixtures,
+  foodFixtures,
+  guideFixtures,
+  stayFixtures,
+} from "../src/fixtures/discovery.js";
 
 const logger = { info() {}, warn() {} };
 
@@ -46,4 +52,28 @@ test("food and guide results always disclose fixture source", async () => {
     assert.equal(result.source, "fixture");
     assert.equal(result.data.every((item) => item.source === "fixture"), true);
   }
+});
+
+test("default demo fixtures create real contention without making the plan impossible", () => {
+  const categories = [flightFixtures, stayFixtures, foodFixtures, guideFixtures];
+  const floor = categories.reduce(
+    (total, options) => total + Math.min(...options.map((option) => option.price)),
+    0,
+  );
+  const preferred = categories.reduce((total, options) => {
+    const choice = options.reduce((best, option) => {
+      if (option.rating > best.rating) return option;
+      if (option.rating === best.rating && option.price < best.price) return option;
+      return best;
+    });
+    return total + choice.price;
+  }, 0);
+
+  assert.equal(categories.every((options) => options.length >= 4), true);
+  assert.equal(categories.flat().every((option) => option.source === "fixture"), true);
+  assert.equal(categories.flat().every((option) => Number.isFinite(option.rating)), true);
+  assert.equal(floor, 16_100);
+  assert.equal(preferred, 35_600);
+  assert.ok(floor <= 30_000, "the cheapest complete plan must fit the demo budget");
+  assert.ok(preferred > 30_000, "preferred choices must force the agents to negotiate");
 });

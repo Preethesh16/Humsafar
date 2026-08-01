@@ -47,7 +47,7 @@ Locked backend endpoints:
 **How the agent layer consumes discovery and trust (Jeswin, 2026-08-01) — read if you change either route's response:**
 
 - `POST /api/discovery/:category` responses have **no `merchant` field**, so the agent layer uses `vendor` as the merchant identifier — which is what a mandate gets registered against in `PRAVA_MANDATE_MERCHANTS_JSON`. If a distinct merchant identifier is added later, the agent layer will prefer it automatically; nothing else needs to change.
-- **Duffel flight offers carry no `rating`.** They are treated as unrated (`0.0`), not given an invented score. Consequence: the flights agent prefers the cheapest offer and the mediator will not spend surplus budget "upgrading" a flight, because we have no evidence the pricier offer is better. This is deliberate — fabricating a rating to make the demo livelier would be fabricating data.
+- **Live Duffel flight offers carry no `rating`.** They are treated as unrated (`0.0`), not given an invented score. Consequence: on live Duffel data the flights agent prefers the cheapest offer and the mediator will not spend surplus budget "upgrading" a flight, because we have no evidence the pricier offer is better. The explicitly labeled offline flight fixtures do carry scripted preference scores so the deterministic demo can exercise negotiation; those scores must never be copied onto a live Duffel response or presented as live ratings.
 - Discovery falls back to the agent layer's local fixtures if the route is unreachable or returns an empty list, and the run prints the source each category *actually* resolved to. A fallback is never reported as live.
 - `POST /api/trust/check` **materially changes the purchase**: a merchant that does not come back `allow` loses the sale to the next acceptable option inside the same slice. It is not a hard block — the current fixture heuristic labels itself as such, and an unreachable trust service is treated as advisory rather than a veto. When nothing clears, the agent proceeds and the flag is carried into `purchase_result.details` and the receipt entry.
 
@@ -99,20 +99,22 @@ Every event is a JSON object with a `type` field:
 
 ---
 
-## 3. Fixture data shape — Guide/Activities and Food (Preethesh owns, others may read)
+## 3. Fixture data shape — offline discovery (Preethesh owns, others may read)
 
 ```
 {
-  category: "guide" | "food",
+  category: "flights" | "stay" | "guide" | "food",
   vendor: string,
   description: string,
   price: number,
   currency: "INR",
-  rating: number,        // out of 5, mirrors real Viator/OpenTable shape
+  rating: number,        // out of 5; a scripted preference score on offline fixtures
   source: "fixture"      // ALWAYS present — never omit this, it's what makes
                           // the disclosure honest in the submission
 }
 ```
+
+The default Goa fixture set is also a tested demo invariant: for a ₹30,000 budget, the cheapest complete four-category plan must fit while the sum of each agent's highest-rated choice must exceed the budget. As of 2026-08-01 those totals are ₹16,100 and ₹35,600 respectively. This guarantees genuine price-option concessions instead of a round-one rubber stamp. These are synthetic demo fixtures, not market quotes; `source: "fixture"` remains mandatory on every row.
 
 ---
 

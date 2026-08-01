@@ -68,7 +68,7 @@ class BackendDiscoveryParsingTest(ServerCase):
                 # A Duffel-shaped flight offer: no rating, no merchant.
                 {"id": "off_1", "category": "flights", "vendor": "IndiGo",
                  "description": "BLR-GOI", "price": 6200, "currency": "INR", "source": "live"},
-                {"id": "off_2", "category": "flights", "vendor": "Vistara",
+                {"id": "off_2", "category": "flights", "vendor": "Air India",
                  "description": "BLR-GOI", "price": 11800, "currency": "INR", "source": "live"},
             ],
             "source": "live",

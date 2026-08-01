@@ -106,4 +106,4 @@
 - Why: the former backend set made the four preferred choices total only ₹17,400 against ₹30,000, eliminating the product's central negotiation beat. The new invariant makes the preferred plan exceed budget while keeping a complete floor plan affordable, so concessions are genuine downgrades between purchasable options rather than scripted dialogue.
 - Blocked on: live Prava, Duffel, and Senso verification still requires credentials; this fixture correction is not blocked.
 - Needs from Jeswin/Deepthi: Jeswin can now use `--live-discovery` without losing negotiation when the backend transparently falls back to fixtures; Deepthi should continue displaying the existing fixture labels. No event shape changed.
-- Commit: pending (will be pushed to `preethesh/integrations-backend`, merged to `main`, and finalized in a follow-up log commit)
+- Commit: `7c317f1` (implementation committed on `preethesh/integrations-backend`; push and merge to `main` finalized by the following log commit)

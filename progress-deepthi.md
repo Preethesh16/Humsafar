@@ -125,3 +125,14 @@
 - Blocked on: nothing
 - Needs from Jeswin: nothing — the producer notes were accurate and caught a real bug on my side.
 - Commit: `4e578b4` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 16:35 IST] — Merged the frontend branch into `main`
+- Prompt: pull anything new on `main`, then merge my branch into `main`.
+- Files changed: none beyond this log — the merge itself carried the already-reviewed frontend commits.
+- Changed: fast-forwarded local `main` to `origin/main` at `16c7677`, then merged `deepthi/frontend-demo` into `main` with `--no-ff` so the branch stays legible in history, matching the pull-request-style merges already on `main`.
+- Validation, run on `main` *after* the merge and *before* pushing: no conflicts and a clean working tree; `npm test` 36/36; the render smoke test passed with 24 content assertions; a clean production build; and a secret scan across the merged tree found nothing. Pushed `16c7677..3b7361e`. Confirmed `origin/main` carries the merge and that the only commit authors across the merged range are Jeswin and me.
+- Decision: merged with `--no-ff` rather than fast-forwarding, so the 13 frontend commits stay grouped under one reviewable merge point instead of being interleaved into `main`'s linear history.
+- Post-merge: fast-forwarded `deepthi/frontend-demo` back onto `main` so the branch and `main` are level at `3b7361e` with zero divergence, ready for the next phase.
+- Blocked on: nothing
+- Needs from Jeswin/Preethesh: pull `main` before your next phase — the `frontend/` tree and the repo-wide LF normalisation are now on it.
+- Commit: `3b7361e` (merge commit on `main`; branch `deepthi/frontend-demo` level with it)

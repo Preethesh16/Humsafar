@@ -121,7 +121,7 @@ Target flow: one approval → mediator-approved split → orchestrator mints a m
 - **Guide/Activities + Food:** live partner API access (Viator, GetYourGuide, OpenTable) needs a partner-approval process that will not clear in 48 hours. Use realistic fixture data shaped like their real response formats, openly disclosed in the submission as an MVP cut and a stated next-step integration.
 - **Payments:** Prava SDK/API (sandbox test card above; production access requestable Aug 1–8 if we want it).
 - **Backend:** Node.js + Express as the orchestration API / bridge between the Python agent layer and the frontend; streams one-way dashboard events via SSE, as locked in `INTERFACES.md`. Use a separate POST endpoint if a future frontend action needs client-to-server communication.
-- **Frontend:** React — live deliberation feed, budget split visualization, per-agent purchase cards, audit log.
+- **Frontend:** React 19 + Vite, in `/frontend` — live deliberation feed, budget split visualization, per-agent purchase cards, audit log, and the confirmation fan-out receipt. Consumes the locked SSE contract; ships with a clearly-labelled mocked stream so the dashboard demos without the agent layer running. See `/frontend/README.md`.
 - **Mobile flourish (optional):** Flutter screen for the one-tap passkey approve/deny moment.
 - **Data:** MongoDB or Postgres for sessions, allocations, audit trail.
 

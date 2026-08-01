@@ -93,6 +93,9 @@ Every event is a JSON object with a `type` field:
 
 - Deepthi builds her dashboard against a **mocked stream** matching this exact shape first — don't wait for Preethesh's real backend.
 - If Preethesh needs to add a field mid-build, he edits this file, adds the field, and flags it in his progress.md — he does not silently ship a differently-shaped event.
+- **Clarification (Deepthi, 2026-08-01, no shape changed):** `purchase_result` may optionally carry the Section 4 `source: "live" | "fixture"` tag. It is **optional** — the dashboard reads it tolerantly and renders a missing tag as "source unverified", never as live. Emitting it is encouraged because it is what makes the demo's honesty story concrete per purchase.
+- **Unknown event types are safe to add.** The dashboard routes any unrecognised `type` straight to the audit log instead of discarding it, so a new event shows on screen the moment it is emitted — but it still needs an entry here before anyone renders it specially.
+- **CORS / transport note:** `EventSource` cannot send custom headers, so `GET /api/events` must stay unauthenticated and same-origin. Deepthi's Vite dev server proxies `/api` and `/health` to `127.0.0.1:3000` rather than requiring CORS headers on the backend; a deployed build must be served from the same origin as the API.
 
 ---
 

@@ -39,3 +39,89 @@
 - Blocked on: nothing
 - Needs from Jeswin/Preethesh: review interface changes before the branch is merged into `main`.
 - Commit: n/a (documentation updated locally; not pushed)
+
+### [2026-08-01 13:52 IST] — Fixed a repo-wide CRLF problem before any frontend work
+- Prompt: read every Markdown file, operate as Deepthi's senior frontend/demo owner, decide and act on issues found, log changes, and use the personal-branch workflow.
+- Files changed: `.gitattributes` (new), `.gitignore`.
+- Problem found: `git status` showed all 21 tracked files modified. `git diff --ignore-cr-at-eol` proved the diff was **entirely CRLF line endings, zero content change** — the repo sits on a Windows drive (`/mnt/d`) accessed from WSL. Left alone, my first commit would have rewritten every one of Preethesh's files and produced a guaranteed, meaningless merge conflict against `jeswin/agent-core`.
+- Decision: added `.gitattributes` with `* text=auto eol=lf` and ran `git add --renormalize .` rather than discarding the working tree. Renormalize is non-destructive (it only restages content that already matches the index) and, unlike a one-off cleanup, it stops the churn recurring for Jeswin and Preethesh too.
+- Validation: `git status` went from 21 phantom modifications to clean; confirmed `git add --renormalize` staged nothing, proving the files were byte-identical to the index apart from line endings.
+- Blocked on: nothing
+- Needs from Jeswin/Preethesh: nothing — the fix is repo-wide and needs no action from either of you, but expect your own phantom-modified files to disappear after you pull.
+- Commit: `ec539bd` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 14:20 IST] — Built the React dashboard against a mocked stream
+- Prompt: same session — continued into the first implementation phase.
+- Files changed: `frontend/` (new: `package.json`, `package-lock.json`, `vite.config.js`, `index.html`, `README.md`, `src/main.jsx`, `src/App.jsx`, `src/styles.css`, `src/state/sessionReducer.js`, `src/lib/{mockStream,useEventStream,agents}.js`, `src/components/{DeliberationFeed,BudgetSplit,PurchaseCards,AuditLog,FinalReceipt}.jsx`, `test/sessionReducer.test.js`, `test/render.ssr.jsx`), plus `INTERFACES.md`, `brainstorming.md`, `.gitignore`.
+- Changed: the full scope-1 dashboard — live deliberation feed, budget split visualisation, per-agent scoped-card/purchase cards, audit log — plus the scope-3 confirmation fan-out receipt. React 19 + Vite 8 on Node 20.20.2.
+- Key decision — **the event fold is a pure, React-free reducer** (`src/state/sessionReducer.js`). Every locked event type is handled in one file that can be unit-tested with plain `node --test`, so when Preethesh changes the contract there is exactly one place to update and 15 tests that fail loudly instead of a silently blank panel.
+- Key decision — **unknown event types are routed to the audit log, not dropped.** If Preethesh ships a `senso_trust_check` event mid-build it appears on screen immediately rather than vanishing. Tested.
+- Key decision — **the mock is loud, by design.** A persistent amber banner, a `mocked stream` tag on every purchase, and an explicit "no payment was made" line on the receipt. The handbook makes a mocked payment shown as real a disqualifier risk, and Preethesh's log asked that fixture/failed issuance is never rendered as a completed live payment. That is enforced in the UI, not left to the narrator. The render test asserts the string "live transaction" never appears while on the mocked stream.
+- Key decision — **an absent `source` tag renders "source unverified", never live.** Section 4 defines the tag but Section 2 does not list it on `purchase_result`, so I read it tolerantly and refuse the optimistic default.
+- Key decision — **dev proxy instead of backend CORS.** `EventSource` cannot send custom headers and the backend sets no CORS headers, so the stream must be same-origin. `vite.config.js` proxies `/api` and `/health` to `127.0.0.1:3000`, which keeps a dev-only concern out of Preethesh's backend entirely.
+- Validation (all run, not assumed): `npm test` at the repo root passes **29/29** (14 of Preethesh's backend + 15 new reducer tests). `npm run build` produces a clean bundle (211 kB / 66 kB gzip). `npm run test:render` server-renders every panel against the fully-folded 32-event mock script and asserts 12 expected strings. **End-to-end against the real backend:** started `npm start` and `npm run dev`, POSTed a `split_update` and a `card_issued` to `/api/events`, and read both frames back through the Vite proxy at `http://127.0.0.1:5173/api/events` with correct `id:` framing; a reconnect with `Last-Event-ID: 1` correctly replayed only frame 2. Servers stopped cleanly afterwards.
+- Interface changes flagged: **none of the locked shapes changed.** I added three clarifying notes to `INTERFACES.md` Section 2 — `source` is optional on `purchase_result`, unknown event types are safe to add, and the CORS/same-origin constraint on `GET /api/events`.
+- Blocked on: nothing. The dashboard is fully demoable today on the mocked stream and consumes the real stream the moment Jeswin's agents emit events.
+- Needs from Jeswin: the real `agent_message` text is what sells the demo — argumentative, specific, one clear claim per message (see `src/lib/mockStream.js` for the tone I built the feed's spacing around). Also emit `split_update` on **every** round, including the ones that stay over budget; the contention is the story.
+- Needs from Preethesh: include the `source` tag on `purchase_result` when you have it. Nothing else — the SSE stream, ids, and `Last-Event-ID` replay all worked first try against my client.
+- Commit: `d6c6286` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 14:32 IST] — Ran the dashboard for review
+- Prompt: asked to see the work running and to pull anything new on `main`.
+- Files changed: none.
+- Changed: nothing — started the backend and the Vite dev server and walked through the demo beats on `http://localhost:5173`.
+- Validation: `/health` returned ok; the dashboard returned HTTP 200; `origin/main` was still at `66e0d75`, so there was nothing to pull.
+- Blocked on: nothing
+- Needs from Jeswin/Preethesh: nothing
+- Commit: n/a (no file changes)
+
+### [2026-08-01 15:05 IST] — Merged Preethesh's backend work and re-themed the UI
+- Prompt: take UI/UX inspiration from a reference demo site, change only the look and feel, leave every bit of logic and flow exactly as it is, and pull anything new on `main`.
+- Files changed: `frontend/src/styles.css` (full rewrite), `frontend/src/App.jsx`, `frontend/src/lib/agents.js`, all five existing components, `frontend/src/components/ProofPanel.jsx` (new), `frontend/src/lib/icons.jsx` (new), `frontend/test/render.ssr.jsx`, `frontend/README.md`.
+- Merged: `origin/main` `95657ea` (Preethesh's discovery, mandate, trust, Duffel and NANDA work) into this branch. The merge was clean and my three `INTERFACES.md` Section 2 clarifications survived alongside his six new endpoint entries.
+- Changed: replaced the dark dashboard theme with a warm editorial "paper" theme — canvas `#f3efe5`, forest `#1d3b2d`, coral `#e56b52`, mint `#c9f2dd`, Inter with a coral serif italic accent in the headline, monospace uppercase micro-labels, 20px paper panels. Restructured the page into hero → journey stepper → two-column workspace → truth-layer footer, and split the two demo proof shots into their own coral panel so a judge sees them without reading the feed.
+- **Constraint honoured, and proved mechanically:** `frontend/src/state/sessionReducer.js`, `frontend/src/lib/useEventStream.js` and `frontend/src/lib/mockStream.js` are byte-for-byte unchanged — verified with `git diff --numstat HEAD` per file before committing. No event shape, no reducer branch, no stream handling, and no phase transition was touched. The journey stepper is a display mapping over the `phase` the reducer already computes, not a second state machine.
+- Decision: kept every honesty affordance through the re-theme rather than letting a prettier design soften them. The simulated-stream notice is still unmissable (amber, above the fold), every purchase still carries its `fixture data · mocked stream` tag, an absent `source` still renders "source unverified", and the receipt still states no payment was made. The render test still asserts the string "live transaction" can never appear on the mocked stream.
+- Decision: added `prefers-reduced-motion` support, which the previous theme lacked.
+- Validation: `npm test` at the repo root passes **36/36** (Preethesh's merge added 7). `npm run test:render` passes with 15 assertions (up from 12) over the full 32-event script. Clean production build. Restarted the backend on the merged code and re-ran the end-to-end check: `/health` ok, his new `/.well-known/agentfacts.json` returns 200, and a POSTed `agent_message` came back through the Vite proxy SSE stream correctly framed.
+- Blocked on: nothing
+- Needs from Jeswin/Preethesh: nothing new.
+- Commit: `9de1257` (pushed to `deepthi/frontend-demo`), after merge commit `bff608b` brought in `main` at `95657ea`.
+
+### [2026-08-01 15:40 IST] — Matched the reference visual exactly, merged Jeswin's agent core
+- Prompt: use the reference demo site's colour theme, font style, spacing and overall visualisation, with a screenshot supplied; change only the design, keep all logic as specified in the Markdown files; pull anything new on `main`.
+- Files changed: `frontend/src/styles.css`, `frontend/src/App.jsx`, `frontend/src/main.jsx`, `frontend/src/lib/icons.jsx`, `frontend/test/render.ssr.jsx`, `frontend/package.json`, `frontend/package-lock.json`, `.gitignore`, `progress-deepthi.md`.
+- Merged: `origin/main` `16c7677`, which brought in Jeswin's agent core (orchestrator, specialists, mediator, negotiation) and his backend discovery/trust consumption. One conflict, in `.gitignore` — both sides had appended different entries, so I kept both (my `.ssr-out/` and `dist/`, his Python `__pycache__/`, `*.py[cod]`, `.venv/`, `venv/`). Nothing was dropped. My `INTERFACES.md` clarifications survived, verified by grep after the merge.
+- Changed, against the reference's real CSS rather than a guess: pulled the reference page's stylesheet directly and matched its tokens — canvas `#f3efe5`, paper `#fffdf8`, forest `#1d3b2d`, coral `#e56b52`, mint `#c9f2dd`, line `#ddd6c9`, radius 20px, and its two exact radial background washes. Rebuilt the hero to the screenshot's actual structure (headline left, body copy right, full-width command bar below, then the journey stepper), enlarged the headline to `clamp(42px, 5.2vw, 76px)` at weight 800 with `-0.055em` tracking and a Georgia coral italic second line, switched the brand mark to the lettermark "H", and made completed journey steps show a check instead of a number.
+- Decision — **self-hosted Inter.** The reference site declares `font-family: Inter, ...` with no `@font-face` and no font link, so it silently falls back to system sans on any machine without Inter installed. For a judged live demo that is an unacceptable coin flip, so I added `@fontsource-variable/inter` and bundled it. The typography now matches the screenshot on any machine, offline.
+- Decision — **no goal/budget input was added.** The reference's command bar centres on a text input, a ceiling input and a "Replay the demo" button. Wiring those would mean new state and a new submit path, which the brief forbids, so the bar renders the same three slots read-only from existing state and reuses the pre-existing source toggle as its action control. Appearance matched, logic untouched.
+- **Constraint honoured, proved mechanically:** `sessionReducer.js`, `useEventStream.js` and `mockStream.js` are unchanged since their original commit `d6c6286` — verified with `git diff --quiet` against both `d6c6286` and `HEAD`.
+- Validation: `npm test` 36/36 at the repo root; render smoke test extended from 15 to 23 content assertions and now server-renders the whole `App` shell (previously only the panels), catching any crash in the rewritten hero, stepper and footer; clean production build with Inter bundled; servers restarted and the end-to-end SSE round trip re-verified through the Vite proxy.
+- Blocked on: nothing
+- Needs from Jeswin/Preethesh: nothing new.
+- Commit: `539a4d9` (pushed to `deepthi/frontend-demo`), after merge commit `0b22b27` brought in `main` at `16c7677`.
+
+### [2026-08-01 15:58 IST] — Fixed the stale dev server that hid every UI change
+- Prompt: asked why the dark theme was still showing.
+- Files changed: `frontend/vite.config.js`, `frontend/README.md`, `progress-deepthi.md`.
+- Problem found: the re-themed code was correct and committed, but the browser was being served the old dark build. Two Vite processes were running. The original one still held port 5173 and was answering with `--bg: #0b0f17`; the newer one had logged `Port 5173 is in use, trying another one...` and quietly moved to 5174. On top of that, the first process had never picked up any of my edits at all, because **inotify does not fire on `/mnt/d` under WSL2** — it was serving cached transforms from when it started.
+- Decision: fixed both halves rather than just restarting. Added `server.watch.usePolling` (interval 300ms) so file changes are actually detected on this Windows-drive/WSL setup, and `server.strictPort: true` so a second dev server now refuses to start instead of silently relocating. The silent port fallback is what turned a stale process into a confusing "my changes did nothing" symptom, and it would have recurred every session.
+- Validation: killed all four stale PIDs, restarted one dev server, confirmed exactly one Vite process running, and confirmed `http://127.0.0.1:5173/src/styles.css` now serves `--canvas: #f3efe5`, `--paper: #fffdf8`, `--forest: #1d3b2d`, `--coral: #e56b52` instead of the old dark tokens. Backend health and the `/health` proxy both still return ok.
+- Note for the team: this trap is not frontend-specific. Anyone running a watching dev process against this repo from WSL will hit it, so it is documented in `frontend/README.md`.
+- Blocked on: nothing
+- Needs from Jeswin/Preethesh: nothing.
+- Commit: `fa86e0e` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 16:20 IST] — Audited the build against the spec; found and fixed a mislabelling bug
+- Prompt: asked whether all the features work as specified in the Markdown files.
+- Files changed: `frontend/src/components/FinalReceipt.jsx`, `frontend/src/lib/mockStream.js`, `frontend/src/styles.css`, `frontend/test/render.ssr.jsx`, `progress-deepthi.md`.
+- Audit performed: re-read Jeswin's new producer-behaviour notes in `INTERFACES.md` §2 and checked each one against the dashboard, then read the agent core's `events.py` and `orchestrator.py` directly instead of trusting the prose.
+- Checked and correct: repeated `split_update` at the same round (the reducer always takes the latest, never keys by round); over-budget early rounds render as overflow rather than being clamped; `final_receipt` is treated as the terminal signal; all four allocation keys always present. Currency units were the biggest risk — the agent core works in integer paise — but `to_rupees()` converts at the event boundary, so the wire carries rupees and the existing formatting is right.
+- **Bug found and fixed:** each `final_receipt.purchases` line carries its own `status` and `source`, and the receipt rendered neither. A fixture line and a *failed* line both displayed as completed purchases with an amount charged. On the mocked stream the banner masked it; on the live stream there is no banner, so this was a real mislabelling of a fixture as a completed order — the exact disqualifier risk in the handbook. Failed lines now read "not charged", fixture lines "simulated · fixture", live lines "live order", untagged lines "source unverified". The copied fan-out summary carries the same labels.
+- Decision: also filled `status`/`source` into the mocked receipt lines so the mock exercises the same labelling path as a real run. This touches `mockStream.js`, which I had otherwise kept frozen — the event shapes and stream flow are unchanged, only the fixture payload gained the two fields the real producer already sends. Flagging it explicitly because I had previously reported that file as untouched.
+- Known gap, not fixed: `summarize()` totals only the four locked categories, so an allocation key outside those four would be omitted from the allocated total. Jeswin's note says the current MVP goals never emit one; fixing it would mean changing reducer logic, so I am flagging rather than pre-emptively changing it.
+- Validation: 36/36 at the repo root, render assertions up to 24, clean build. The new test builds a receipt shaped exactly like the agent core's `_close()` output and asserts a fixture line cannot borrow the live-order label.
+- **Scope still outstanding (not started):** the optional Flutter passkey screen, and the demo video plus Devfolio submission writeup — pitch, Prava integration explanation, disclosure section and track evidence. These are items 4 and 5 of my brief in `build-prompts.md`.
+- Blocked on: nothing
+- Needs from Jeswin: nothing — the producer notes were accurate and caught a real bug on my side.
+- Commit: `4e578b4` (pushed to `deepthi/frontend-demo`)

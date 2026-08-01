@@ -136,3 +136,30 @@
 - Blocked on: nothing
 - Needs from Jeswin/Preethesh: pull `main` before your next phase — the `frontend/` tree and the repo-wide LF normalisation are now on it.
 - Commit: `3b7361e` (merge commit on `main`; branch `deepthi/frontend-demo` level with it)
+
+### [2026-08-01 16:50 IST] — First real end-to-end run: agent core → backend → dashboard
+- Prompt: asked what work is left for me.
+- Files changed: none — this was a verification pass, logged because the result changes what "done" means for my scope.
+- Changed: nothing. Ran Jeswin's agent core for real (`python3 -m humsafar --goal "Plan my Goa trip" --budget 30000 --demo`) against the running backend, captured the 51 events it streamed, and folded them through my actual `sessionReducer` to see exactly what the dashboard would render.
+- Result: **the live path works.** All nine locked event types were consumed, phase reached `complete`, four credentials were issued, five purchases recorded with one failure recovered, and both demo proof shots arrived (1 `blocked_attempt`, 1 `renegotiation_triggered`). Zero events fell through to the unrecognised-type path. Budget ₹30,000, allocated ₹28,800, spent ₹28,800.
+- Why this mattered: until now the live path had only ever been tested with hand-POSTed events. Judging criterion 1 is whether intent → result actually works live, so an untested real integration was the biggest unknown left in my scope.
+- **Confirmed the receipt fix was load-bearing:** every real receipt line came back with `source: "fixture"` and a `details` string ending "not a live merchant order". Before this morning's fix the dashboard would have rendered all four simulated bookings as completed orders with amounts charged.
+- Blocked on: nothing in my lane.
+- Needs from Jeswin/Preethesh: nothing — the agent core streamed exactly the locked shapes.
+- Commit: `8fdde2f` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-01 18:20 IST] — Pulled Preethesh's fixture fix and re-verified the contention beat
+- Prompt: pull anything new from `main`.
+- Files changed: none beyond this log; the merge brought in Preethesh's and Jeswin's work.
+- Merged: `origin/main` `2f3622e` — 8 commits, mostly Preethesh's discovery-fixture correction plus status and workflow logs. Clean merge, no conflicts.
+- Interface check: `INTERFACES.md` §3 changed (the fixture shape now covers all four categories, and `rating` is documented as a scripted preference score present only on offline fixtures). **No event shape changed**, so the dashboard needed no edit.
+- Validation: `npm test` 37/37, Python 80/80, render smoke test 24 assertions.
+- **Caught a stale-process trap again, this time on the backend.** My first re-run after the merge produced ₹17,400 of ₹30,000 — the exact figure Preethesh had identified as the defect. The backend process predated the merge and was still serving the old fixtures. After restarting it, the same command produced ₹28,800, matching his reported result. Worth naming for the team: on this repo any long-running dev process must be restarted after a pull, because the WSL/`/mnt/d` watching problem means nothing reloads itself.
+- Confirmed the beat the dashboard exists to show: round 1 now asks ₹35,600 against a ₹30,000 budget, so the split bar overflows and the state chip reads "over budget" before the agents concede to ₹28,800. Before this fix, round one fit immediately and the negotiation was invisible.
+- Also confirmed Jeswin's producer note in practice: round 2 emitted `split_update` **twice** (₹26,800 then ₹28,800). The reducer takes the most recent rather than keying by round, so the dashboard settles on ₹28,800 — the exact hazard that note warned about, handled.
+- New scope assigned to me by Preethesh's audit: an **interactive goal/budget/approval flow**. The command bar is deliberately read-only today, because the earlier instruction was to change visuals without touching logic. This is now explicitly wanted and is a real feature, not a re-theme, so it needs its own phase.
+- Team execution order now locked (Preethesh's `278b3bf`): Prava production-access form → sandbox access → one genuine sandbox transaction with cap-rejection proof → interactive UX and deployment → demo video and submission package last. This supersedes my earlier recommendation to start the submission writeup immediately.
+- On his note that my `116ecf6` sits outside `main`: that is deliberate, not drift. My standing instruction is to push to my own branch and merge to `main` only when explicitly told.
+- Blocked on: the interactive approval flow needs a real approval boundary from Jeswin — approval is auto-granted today, so there is nothing for a UI control to gate yet.
+- Needs from Jeswin: expose the non-auto approval boundary Preethesh's audit asks for, and tell me how the dashboard should signal approval back — a plain POST endpoint, per the `INTERFACES.md` §2 note that the SSE stream stays one-directional.
+- Commit: `0478aad` (pushed to `deepthi/frontend-demo`)

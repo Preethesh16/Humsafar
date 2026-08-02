@@ -151,3 +151,28 @@ Reordering exposed a modelling flaw in my own offline stub: it inferred the mand
 - Interface note for **Preethesh**: no contract changed. `ScopedCardClient` now calls your resolver; the stub grew an `authorize(merchant, cap)` hook that is a no-op against live Prava, where mandates are provisioned out of band.
 - Blocked on: nothing in code. Item 10 and `LiveCheckout` both wait on genuine Prava sandbox evidence, which is the team's current gate.
 - Commit: `7dd56c7` (pushed to `jeswin/agent-core`)
+
+### [2026-08-02 15:15 IST] — FIRST REAL PRAVA SANDBOX EVIDENCE — cap decline and credential issuance
+- Prompt: worked through the hosted mandate approval with the user, then exercised the mandate.
+- Files changed: `agents/humsafar/guardian.py`, `agents/tests/test_approval_and_cards.py`.
+
+**The gate is open.** A mandate was approved end to end on Prava sandbox: hosted page → team test card → issuer OTP → Visa payment passkey → **"Mandate created"**. `npm run prava:verify` now returns `{"authentication":"ok","customer":"found","mandateCount":1}`. Mandate `mdt_01KZ0X8XKE04P027TTDB6X5MEK`, scope `listed` → Duffel, approved ₹100, `status: active`.
+
+**Both proof shots are now real, not simulated:**
+
+| Attempt | Observed result |
+|---|---|
+| ₹160 against a ₹100 mandate | `status: failed`, `fetchStatus: FAILURE`, `errorCode: DECLINED`, message *"Total amount 160.00 exceeds ..."* — a genuine Visa decline |
+| ₹100 against the same mandate | `status: awaiting_result`, `fetchStatus: SUCCESS`, real single-use credentials (`token`, `dynamicCvv`, `expiryMonth`, `expiryYear`), `transactionId: txn_01KZ0XD9RDRXGDP2JHFV47BTKK` |
+
+**Three findings that only a live run could produce:**
+1. **The cap decline code is `DECLINED`, not `THRESHOLD_EXCEEDED`.** My classifier accepted only the documented code, so it would have described a real card-network cap decline as *"not evidence of card-level overspend protection"* — failing closed, but wrongly, and throwing away the demo's central proof. `is_cap_decline()` now accepts either the documented code or a generic `DECLINED` whose message states the amount was exceeded. A bare `DECLINED` with no amount reason still does not count, because that code alone could mean insufficient funds.
+2. **Prava returns HTTP 200 for a declined charge**, with the outcome in the body. Reading the status code alone would report a decline as a success. My first probe printed "AUTHORISED (!!)" for exactly this reason before I read the body.
+3. **A refused over-cap attempt does not consume the mandate** — `status` stayed `active`, `remaining` stayed `100.00`, `lastCharge` recorded `declined`. This confirms the ordering decision in `7dd56c7`: running the cap proof *before* the purchase lets both fit on one `max_charges: 1` mandate. It was reasoned from the docs; it is now observed.
+
+- Validation: 156 Python tests pass (5 new, locking the observed decline shape so a future change cannot silently narrow it back). Credential values were never printed, logged or committed — only field *names* and identifiers.
+- Correction to my earlier note: I flagged Preethesh's `authorizeOnly === true` assertion as a bug, then retracted it when a shipping form appeared, then his `7ba86fa` confirmed the original call was right — the sandbox does not return that field. I should have trusted the observed response the first time instead of reversing on one ambiguous screenshot.
+- **Flag for Preethesh:** `backend/scripts/createPravaMandateSession.js:55` prints `authorizeOnly: true` as a **hardcoded literal**, not read from the Prava response. The script asserts a property it never observed. Given how carefully this project labels evidence, that line should either read the real field or be dropped.
+- Blocked on: nothing for the cap proof. A *completed merchant checkout* still requires a checkout target; the charge sits at `awaiting_result` and must not be reported `APPROVED` without a genuine processor result.
+- Needs from Deepthi: the receipt can now show a genuine `sandbox` line for the stay category. Everything else in a default run remains `fixture`, so the run is mixed-mode and must be labelled per line.
+- Commit: `5bceb6a` (pushed to `jeswin/agent-core`)

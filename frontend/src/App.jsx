@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Choose from "./pages/Choose.jsx";
+import PravaCheckout from "./components/PravaCheckout.jsx";
 import Intake from "./pages/Intake.jsx";
 
 import { ApprovalPanel } from "./components/ApprovalPanel.jsx";
@@ -334,15 +335,39 @@ function ApprovalPage({ state, source }) {
 function ReceiptPage({ state, source, navigate }) {
   const summary = useMemo(() => summarize(state), [state]);
   if (!state.receipt) return <div className="page-empty"><h2>Waiting for the agents to settle…</h2></div>;
+
+  // The largest line the agents actually settled. Checkout is offered against
+  // a real purchase from this run rather than a figure chosen here — the
+  // amount and the merchant both come from what the agents agreed.
+  const payable = (state.receipt.purchases ?? [])
+    .filter((p) => p.status === "success" && Number(p.amount) > 0)
+    .sort((a, b) => Number(b.amount) - Number(a.amount))[0];
+
   return (
-    <FinalReceipt
-      receipt={state.receipt}
-      summary={summary}
-      blockedAttempts={state.blockedAttempts}
-      renegotiations={state.renegotiations}
-      isMock={source === SOURCE.MOCK}
-      onDismiss={() => navigate("/deliberate")}
-    />
+    <>
+      <FinalReceipt
+        receipt={state.receipt}
+        summary={summary}
+        blockedAttempts={state.blockedAttempts}
+        renegotiations={state.renegotiations}
+        isMock={source === SOURCE.MOCK}
+        onDismiss={() => navigate("/deliberate")}
+      />
+      {payable && source !== SOURCE.MOCK && (
+        <PravaCheckout
+          merchant={{
+            name: payable.merchant,
+            // Sandbox merchant details may be arbitrary; Prava states this,
+            // because no real storefront is contacted. Derived from the
+            // merchant the agent chose rather than invented per vendor.
+            url: `https://example.com/${encodeURIComponent(String(payable.merchant).toLowerCase().replace(/\s+/g, "-"))}`,
+            countryCode: "IN",
+          }}
+          amount={Number(payable.amount)}
+          description={payable.description ?? payable.agent}
+        />
+      )}
+    </>
   );
 }
 

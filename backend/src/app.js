@@ -14,7 +14,7 @@ import {
   verifySessionToken,
 } from "./session.js";
 
-export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret, pravaCustomerId, pravaCustomerEmail } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -161,6 +161,53 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
   app.post("/api/itineraries/preview", browserOrAgent, async (request, response) => {
     if (!itineraryService) return response.status(503).json({ error: { code: "ITINERARY_UNAVAILABLE" } });
     return itineraryResponse(response, () => itineraryService.plan(request.body ?? {}));
+  });
+
+  // Redirect-to-Prava checkout, driven by the person paying.
+  //
+  // Browser-reachable because it is the human's own payment: they leave for
+  // Prava's hosted page, authenticate with their passkey, and come back. It
+  // grants the browser nothing extra — no credential is returned here, and
+  // minting a scoped card for an agent remains agent-only.
+  //
+  // The identity is fixed server-side; a caller-supplied user id would let one
+  // browser open a checkout against another person's Prava customer.
+  app.post("/api/prava/checkout-sessions", browserOrAgent, async (request, response) => {
+    if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
+    try {
+      const session = await mandateService.createCheckoutSession({
+        ...request.body,
+        userId: pravaCustomerId,
+        userEmail: pravaCustomerEmail,
+        callbackUrl: `${publicBaseUrl}/receipt`,
+      });
+      return response.status(201).json(session);
+    } catch (error) {
+      // 502, not 500: the request reached us fine and failed upstream. A bare
+      // "Unexpected server error" hides which field Prava rejected.
+      return response.status(error.status ?? 502).json({
+        error: {
+          code: error.code ?? "PRAVA_CHECKOUT_FAILED",
+          message: error.message ?? "Prava could not create the checkout session",
+        },
+      });
+    }
+  });
+
+  // Polled after the redirect returns. Reports whether a credential was issued
+  // and, when it was not, why — never the credential itself.
+  app.get("/api/prava/checkout-sessions/:sessionId", browserOrAgent, async (request, response) => {
+    if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
+    try {
+      return response.json(await mandateService.sessionStatus(request.params.sessionId));
+    } catch (error) {
+      return response.status(error.status ?? 502).json({
+        error: {
+          code: error.code ?? "PRAVA_SESSION_STATUS_FAILED",
+          message: error.message ?? "Could not read the payment status",
+        },
+      });
+    }
   });
 
   app.post("/api/trust/check", agentOnly, async (request, response) => {

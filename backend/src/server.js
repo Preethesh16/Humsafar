@@ -76,6 +76,10 @@ const app = createApp({
   publicBaseUrl: process.env.PUBLIC_BASE_URL,
   frontendDist,
   sessionSecret,
+  // Fixed server-side so a browser cannot open a checkout against somebody
+  // else's Prava customer.
+  pravaCustomerId: process.env.PRAVA_TEST_CUSTOMER_ID,
+  pravaCustomerEmail: process.env.PRAVA_TEST_CUSTOMER_EMAIL,
 });
 
 app.listen(port, host, () => {

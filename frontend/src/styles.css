@@ -1127,3 +1127,23 @@ footer p { max-width: 760px; margin: 0; }
     transform: none;
   }
 }
+
+/* ---------------------------- Prava checkout ------------------------------ */
+.prava-checkout {
+  border: 1px solid #d9cfc2; border-radius: 14px;
+  background: rgba(255, 253, 248, 0.96); padding: 1.1rem 1.25rem; margin: 1rem 0;
+}
+.prava-checkout h4 { margin: 0 0 0.4rem; font-size: 1rem; }
+.prava-checkout p { margin: 0; font-size: 0.88rem; line-height: 1.55; }
+.prava-checkout__pay {
+  border: 0; border-radius: 10px; padding: 0.7rem 1.3rem;
+  background: #1a1a2e; color: #fff; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+}
+.prava-checkout__pay:hover:not(:disabled) { background: #2b2b4a; }
+.prava-checkout__pay:disabled { opacity: 0.6; cursor: progress; }
+.prava-checkout__note { margin-top: 0.6rem !important; opacity: 0.8; }
+.prava-checkout__error { margin-top: 0.6rem !important; color: #a4402c; font-weight: 600; }
+.prava-checkout.is-paid { border-color: #9ec9ae; background: linear-gradient(135deg, #e9f7ef, rgba(255,253,248,0.96)); }
+.prava-checkout.is-failed { border-color: #e6afa3; background: #fff6f2; }
+.prava-checkout.is-waiting { border-color: #c9bdae; }
+.prava-checkout code { font-size: 0.82em; background: rgba(0,0,0,0.05); padding: 0.1em 0.35em; border-radius: 4px; }

@@ -55,6 +55,27 @@ export class PravaClient {
     return { data: session, source: "live" };
   }
 
+  /** Poll a hosted session — how the app learns the cardholder finished. */
+  async sessionStatus(sessionId) {
+    const payload = await this.request(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/payment-result`,
+    );
+    const data = payload.data ?? {};
+    const txn = Array.isArray(data.transactions) ? data.transactions[0] : undefined;
+    return {
+      data: {
+        sessionId,
+        status: data.status ?? "pending",
+        // Never the credential itself — only whether one exists, plus the
+        // reason when it does not. Tokens, CVVs and expiries stay server-side.
+        credentialIssued: Boolean(txn?.line_items?.[0]?.token),
+        errorCode: txn?.error?.code ?? null,
+        errorMessage: txn?.error?.message ?? null,
+      },
+      source: "live",
+    };
+  }
+
   async listMandates({ customerId, standingOnly = true }) {
     const query = new URLSearchParams({
       customer_id: customerId,

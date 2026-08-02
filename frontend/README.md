@@ -52,8 +52,8 @@ npm run test:e2e  # full browser rehearsal; requires Chrome/Brave debugging on :
 | `src/pages/Intake.jsx` | One-question-at-a-time destination, origin, journey mode, dates/flexibility, party, budget and vibe intake. Provider codes and coordinates are deliberately absent from the user flow. |
 | `src/pages/Choose.jsx` | Affordable option selection with honest ranking and timeout labels. |
 | `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, truthful receipt, full-size Milo guide and 3D trip quest. |
-| `src/lib/journeyGame.js` | Pure itinerary-to-station mapping, board coordinates, real-coordinate distances and run-isolated progress keys. |
-| `e2e/browser-rehearsal.mjs` | Dependency-free Chrome DevTools rehearsal from intake through receipt, geolocation and the first virtual station. It captures desktop intake, mid-ride, completion and 390px mobile evidence under `/tmp`. Set `HUMSAFAR_E2E_PAYMENT=true` only for a deliberate Prava proof run. |
+| `src/lib/journeyGame.js` | Pure itinerary-to-station mapping, active-day level selection, collision-free board coordinates, real-coordinate distances and run-isolated progress keys. |
+| `e2e/browser-rehearsal.mjs` | Dependency-free Chrome DevTools rehearsal from intake through receipt, geolocation and mid-quest progress. It asserts active-day station counts and marker separation, then captures desktop intake, mid-ride, mid-quest, completion and 390px mobile evidence under `/tmp`. Set `HUMSAFAR_E2E_PAYMENT=true` only for a deliberate Prava proof run. |
 | `src/lib/icons.jsx` | Inline SVG glyphs. Presentation only. |
 | `src/styles.css` | The warm "paper" theme — canvas `#f3efe5`, forest `#1d3b2d`, coral `#e56b52`, mint `#c9f2dd`. |
 

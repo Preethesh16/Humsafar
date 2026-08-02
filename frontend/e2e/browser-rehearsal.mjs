@@ -13,6 +13,7 @@ const appUrl = process.env.HUMSAFAR_APP_URL ?? "http://127.0.0.1:5173/?source=li
 const screenshotPath = process.env.HUMSAFAR_E2E_SCREENSHOT ?? "/tmp/humsafar-e2e-final.png";
 const intakeScreenshotPath = process.env.HUMSAFAR_E2E_INTAKE_SCREENSHOT ?? "/tmp/humsafar-e2e-intake.png";
 const ridingScreenshotPath = process.env.HUMSAFAR_E2E_RIDING_SCREENSHOT ?? "/tmp/humsafar-e2e-riding.png";
+const midQuestScreenshotPath = process.env.HUMSAFAR_E2E_MID_QUEST_SCREENSHOT ?? "/tmp/humsafar-e2e-mid-quest.png";
 const mobileIntakeScreenshotPath = process.env.HUMSAFAR_E2E_MOBILE_INTAKE_SCREENSHOT ?? "/tmp/humsafar-e2e-mobile-intake.png";
 const mobileReceiptScreenshotPath = process.env.HUMSAFAR_E2E_MOBILE_RECEIPT_SCREENSHOT ?? "/tmp/humsafar-e2e-mobile-receipt.png";
 const paymentProof = process.env.HUMSAFAR_E2E_PAYMENT === "true";
@@ -120,7 +121,7 @@ assert.ok(!receipt.options.some((url) => /api[_-]?key|duffel_test_|sk_test_/i.te
 
 await clickText("button", "Use my location");
 await waitFor(() => evaluate("document.body.innerText.includes('Refresh my location')"), 10_000, "browser geolocation");
-await clickText("button", "Virtual ride to stop 1");
+await evaluate("document.querySelector('.quest-drive')?.click(); true");
 await new Promise((resolve) => setTimeout(resolve, 850));
 const rideAnimation = await evaluate(`({
   vehicle: getComputedStyle(document.querySelector('.quest-vehicle.moving')).animationName,
@@ -132,6 +133,43 @@ assert.match(rideAnimation.paint, /quest-paint/, "the route must paint behind th
 assert.ok(rideAnimation.boardWidth >= 450, "desktop trip game must be a large board, not a map thumbnail");
 await capture(ridingScreenshotPath);
 await waitFor(() => evaluate("document.querySelector('.quest-xp')?.textContent.includes('120 XP')"), 10_000, "virtual route progress");
+
+// Reproduce the formerly broken mid-quest state. Live place discovery can
+// return fewer stations on a given day, so advance to five or the last station
+// available rather than making this visual regression depend on provider row
+// count. The board must remain a clean day-sized level either way.
+const questTotal = await evaluate("Number(document.querySelector('.quest-xp')?.textContent.match(/\\/(\\d+) stops/)?.[1] ?? 1)");
+const targetProgress = Math.min(5, questTotal);
+for (let progress = 2; progress <= targetProgress; progress += 1) {
+  const xp = progress * 120;
+  await waitFor(() => evaluate("Boolean(document.querySelector('.quest-drive:not(:disabled)'))"), 10_000, `ride button before ${xp} XP`);
+  await evaluate("document.querySelector('.quest-drive')?.click(); true");
+  await waitFor(() => evaluate(`document.querySelector('.quest-xp')?.textContent.includes('${xp} XP')`), 10_000, `${xp} XP route progress`);
+}
+const midQuest = await evaluate(`(() => {
+  const board = document.querySelector('.quest-map--3d');
+  const positions = [...document.querySelectorAll('.quest-stop circle:not(.quest-stop-shadow)')]
+    .map((node) => [node.getAttribute('cx'), node.getAttribute('cy')].join(','));
+  return {
+    day: Number(board.dataset.levelDay),
+    levelStops: Number(board.dataset.levelStops),
+    renderedStops: positions.length,
+    uniqueStops: new Set(positions).size,
+    minimumGap: positions.reduce((minimum, position, index) => {
+      const [x, y] = position.split(',').map(Number);
+      return Math.min(minimum, ...positions.slice(0, index).map((other) => {
+        const [otherX, otherY] = other.split(',').map(Number);
+        return Math.hypot(x - otherX, y - otherY);
+      }));
+    }, Infinity),
+    total: document.querySelector('.quest-xp')?.textContent,
+  };
+})()`);
+assert.equal(midQuest.renderedStops, midQuest.levelStops, "the board must render only the active day's stations");
+assert.equal(midQuest.uniqueStops, midQuest.renderedStops, "active-day station markers must not stack into blobs");
+assert.ok(midQuest.minimumGap >= 8, `active-day station markers are only ${midQuest.minimumGap} board units apart`);
+assert.match(midQuest.total, new RegExp(`${targetProgress}\\/${questTotal} stops`), "the regression capture must reach its target progress");
+await capture(midQuestScreenshotPath);
 
 await capture(screenshotPath);
 await mobileCapture(mobileReceiptScreenshotPath);
@@ -148,6 +186,7 @@ console.log(JSON.stringify({
   intakeScreenshot: intakeScreenshotPath,
   mobileIntakeScreenshot: mobileIntakeScreenshotPath,
   ridingScreenshot: ridingScreenshotPath,
+  midQuestScreenshot: midQuestScreenshotPath,
   mobileReceiptScreenshot: mobileReceiptScreenshotPath,
   screenshot: screenshotPath,
 }));

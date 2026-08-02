@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { distanceKm, mapPoints, questStops, questStorageKey } from "../lib/journeyGame.js";
+import { distanceKm, mapPoints, questLevel, questStops, questStorageKey } from "../lib/journeyGame.js";
 import { MascotGuide } from "./MascotGuide.jsx";
 
 export function TripQuest({ plan }) {
@@ -19,15 +19,20 @@ export function TripQuest({ plan }) {
     if (typeof sessionStorage !== "undefined") sessionStorage.setItem(storageKey, String(completed));
   }, [completed, storageKey]);
 
-  const points = useMemo(() => mapPoints(stops, location ?? plan?.base), [stops, location, plan?.base]);
+  const level = useMemo(() => questLevel(stops, completed), [stops, completed]);
+  const points = useMemo(
+    () => mapPoints(level.stops, location ?? plan?.base),
+    [level.stops, location, plan?.base],
+  );
   const stopPoints = points.filter((point) => point.id !== "you");
   const originPoint = points.find((point) => point.id === "you") ?? stopPoints[0];
   const routePoints = originPoint ? [originPoint, ...stopPoints] : stopPoints;
   const next = stops[completed] ?? null;
-  const previousPoint = routePoints[Math.min(completed, Math.max(routePoints.length - 1, 0))] ?? null;
-  const nextPoint = routePoints[completed + 1] ?? null;
+  const previousPoint = routePoints[Math.min(level.completed, Math.max(routePoints.length - 1, 0))] ?? null;
+  const nextPoint = routePoints[level.completed + 1] ?? null;
   const distance = next ? distanceKm(location ?? previousPoint, next) : null;
   const xp = Math.min(completed, stops.length) * 120;
+  const days = useMemo(() => [...new Set(stops.map((stop) => stop.day))], [stops]);
 
   function locate() {
     if (!globalThis.navigator?.geolocation) {
@@ -79,7 +84,22 @@ export function TripQuest({ plan }) {
           <span style={{ width: `${stops.length ? (completed / stops.length) * 100 : 0}%` }} />
         </div>
 
-        <div className="quest-map quest-map--3d" aria-label="3D game board of planned stops">
+        <div className="quest-days" aria-label="Trip day progress">
+          {days.map((day) => {
+            const dayStops = stops.filter((stop) => stop.day === day);
+            const dayStart = stops.findIndex((stop) => stop.day === day);
+            const dayDone = Math.min(Math.max(completed - dayStart, 0), dayStops.length);
+            const state = dayDone >= dayStops.length ? "done" : day === level.day ? "active" : "upcoming";
+            return (
+              <span key={day} className={`quest-day ${state}`}>
+                <b>{state === "done" ? "✓" : day}</b>
+                <span>Day {day}<small>{dayDone}/{dayStops.length} stops</small></span>
+              </span>
+            );
+          })}
+        </div>
+
+        <div className="quest-map quest-map--3d" data-level-day={level.day} data-level-stops={level.total} aria-label={`3D game board for day ${level.day}`}>
           <svg viewBox="0 0 100 80" role="img" aria-label="Raised route connecting your itinerary stops">
             <defs>
               <linearGradient id="quest-ground" x1="0" y1="0" x2="1" y2="1">
@@ -104,14 +124,14 @@ export function TripQuest({ plan }) {
             <polyline className="quest-track-guide" points={routePoints.map(pointPair).join(" ")} />
             {routePoints.slice(0, -1).map((point, index) => {
               const end = routePoints[index + 1];
-              const state = index < completed ? "painted" : index === completed ? `active ${riding ? "painting" : ""}` : "";
+              const state = index < level.completed ? "painted" : index === level.completed ? `active ${riding ? "painting" : ""}` : "";
               return <line key={`${point.id}:${end.id}`} className={`quest-painted-segment ${state}`} pathLength="1" x1={point.x} y1={point.y} x2={end.x} y2={end.y} />;
             })}
             {stopPoints.map((point, index) => (
-              <g key={point.id} className={`quest-stop ${index < completed ? "done" : index === completed ? "next" : ""}`}>
+              <g key={point.id} className={`quest-stop ${index < level.completed ? "done" : index === level.completed ? "next" : ""}`}>
                 <ellipse className="quest-stop-shadow" cx={point.x} cy={point.y + 1.8} rx="3.3" ry="1.5" />
                 <circle cx={point.x} cy={point.y} r="3" />
-                <text x={point.x} y={point.y + 1} textAnchor="middle">{index < completed ? "✓" : index + 1}</text>
+                <text x={point.x} y={point.y + 1} textAnchor="middle">{index < level.completed ? "✓" : index + 1}</text>
               </g>
             ))}
             {location && originPoint ? (
@@ -129,7 +149,7 @@ export function TripQuest({ plan }) {
               aria-hidden="true"
             ><span>{vehicleFor(plan.localTransportMode)}</span></span>
           ) : null}
-          <span className="quest-map-label">3D itinerary game · real stop order, playful map</span>
+          <span className="quest-map-label">Day {level.day} · {level.completed}/{level.total} stations cleared</span>
         </div>
 
         <div className="quest-current" aria-live="polite">
@@ -141,7 +161,7 @@ export function TripQuest({ plan }) {
         </div>
 
         <div className="quest-actions">
-          {!complete ? <button type="button" className="run-btn quest-drive" onClick={ride} disabled={riding}>{riding ? "Painting the route…" : `Virtual ride to stop ${completed + 1}`}</button> : null}
+          {!complete ? <button type="button" className="run-btn quest-drive" onClick={ride} disabled={riding}>{riding ? "Painting the route…" : `Virtual ride · day ${level.day} · stop ${level.completed + 1}`}</button> : null}
           <button type="button" className="secondary-action" onClick={locate} disabled={locationState === "finding"}>
             {locationState === "finding" ? "Finding you…" : locationState === "ready" ? "Refresh my location" : "Use my location"}
           </button>

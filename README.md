@@ -66,9 +66,10 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Human option choice | **Working.** Only offered affordable options are accepted, once; selections are bound into approval. |
 | Run-scoped approval protocol | **Working** and verified end to end. |
 | Prava sandbox authentication | **Verified.** `npm run prava:verify` returns authentication OK. |
-| Prava mandates | **Created.** Five approved through the hosted passkey ceremony, `active`/`available`. |
+| Prava mandates | **Historically created.** Five approvals are preserved in the evidence record; the current read-only standing-mandate check on 3 Aug shows one Duffel mandate, `active` / `available`, capped at ₹100. |
 | Scoped credential issuance | **Verified on real rails.** Four credentials issued in a single run, one per agent, each capped at its own slice. |
 | Browser-to-Prava refusal path | **Verified.** A full Journey-only browser run reused the phone-approved Duffel mandate and asked Prava for a ₹10,300 credential against its ₹100 cap. Prava refused credential issuance, no merchant checkout ran, and the receipt reported ₹0 charged. |
+| One-shot ₹100 completion attempt | **Blocked upstream on 3 Aug.** Humsafar made exactly one in-cap charge request after a read-only dry-run; Prava returned `FETCH_AGENTIC_CREDS_ERROR` before issuing credentials. No checkout/report ran, the mandate remains available with ₹100 remaining, and no retry loop was used. |
 | Network cap enforcement | **Verified.** Visa declined ₹160 against a ₹100 mandate — *"Total amount 160.00 exceeds …"*. |
 | Merchant order | **Not performed.** No goods were bought; the charge is deliberately left unreconciled. |
 | Duffel flights/stays | **Flights verified against provider test search; no order creation.** Ordinary city names resolve through Duffel Places, with coordinate-based airport fallback. Foreign-currency totals are converted into labelled INR planning estimates while preserving the provider amount. This account still needs Duffel Stays access, so hotels currently fall back to disclosed estimates. |

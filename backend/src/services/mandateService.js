@@ -84,11 +84,17 @@ export class MandateService {
   }
 
   async reportCharge(input) {
+    const txnStatus = input.txn_status ?? input.status;
+    if (!new Set(["APPROVED", "DECLINED"]).has(txnStatus)) {
+      throw new TypeError("txn_status must be APPROVED or DECLINED");
+    }
+    const rawAmount = input.amount_paid ?? input.amountPaid;
+    const amountPaid = rawAmount === undefined ? undefined : Number(rawAmount);
     return this.pravaClient.reportMandateCharge({
       ...input,
-      txn_status: input.status,
+      txn_status: txnStatus,
       txn_type: "PURCHASE",
-      amount_paid: input.amountPaid === undefined ? undefined : money(input.amountPaid),
+      amount_paid: amountPaid === undefined ? undefined : money(amountPaid),
       status: undefined,
       amountPaid: undefined,
     });

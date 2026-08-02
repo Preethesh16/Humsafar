@@ -35,7 +35,7 @@ external APIs; it is no longer a handoff checklist.
 | Keyless destination geocoding | Preethesh | **Done** — policy-compliant cached Nominatim fallback; Google is optional |
 | Preference-driven local itinerary | Preethesh | **Done** — choose mapped places or “decide for me”; Geoapify clusters nearby stops, routes each day and finds meal possibilities; Open-Meteo adds exact-date weather |
 | Hotel-based daily routing | Preethesh | **Done** — preview starts from the destination centre, then every day is recalculated to start/end at the selected stay |
-| Mascot-guided trip quest | Preethesh + Deepthi | **Done** — Milo owns a full-size left rail from intake onward; receipt includes browser-only location, next-station distance, a raised 3D route that paints as the transport runner moves, and persistent XP |
+| Mascot-guided trip quest | Preethesh + Deepthi | **Done** — Milo owns a full-size left rail from intake onward; receipt includes browser-only location, next-station distance, day-sized raised 3D levels, separated station markers, a route that paints as the transport runner moves, and persistent XP |
 | Real merchant order creation | External/provider boundary | **Not done** — needs Duffel booking credentials, traveller details and processor integration |
 | Food and activity booking providers | External/provider boundary | **Not connected** — mapped suggestions and cost bands are advisory; no card, reservation or payment is created |
 
@@ -120,8 +120,11 @@ chose this"* vs *"auto-selected on timeout"*. Fixture runs say **planned value**
 never spent. Above it, the trip quest turns the mapped itinerary into a raised
 3D course with numbered stations, the next stop, distance from an optional
 browser-only location, a transport-aware runner that paints each completed
-segment, and session-persistent XP. The course preserves the real itinerary
-order but is a game visualization rather than road geometry; opening directions
+segment, and session-persistent XP. Only the active day is drawn as a level;
+completed and upcoming days stay in a compact day strip so shared return-to-base
+coordinates cannot stack into marker blobs or crossing multi-day tracks. Nearby
+stations are separated visually while preserving their real visit order. The
+course is a game visualization rather than road geometry; opening directions
 explicitly hands the real coordinates to Google Maps.
 
 ## 4. Structured trip context — landed

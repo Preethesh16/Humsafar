@@ -145,6 +145,13 @@ an unanswered Discord question into an implementation assumption.
   that message and label its result as simulated/sandbox—not a merchant order.
 - [ ] A one-time mandate reported `APPROVED` becomes consumed. Do not schedule
   another charge against it.
+- [ ] Before a deliberate charge, test the local report adapter with Prava's
+  exact wire names (`txn_status`, `txn_type`, `amount_paid`). A legacy alias
+  mismatch once caused the backend to overwrite those fields with `undefined`;
+  regression tests now lock the documented contract.
+- [ ] `FETCH_AGENTIC_CREDS_ERROR` happens before credentials exist. Record it as
+  a credential-generation failure, leave checkout/report untouched, and do not
+  hide it with an automatic retry—sandbox attempts are scarce.
 
 ## Approval and multi-process precautions
 

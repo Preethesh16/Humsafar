@@ -223,7 +223,7 @@ const questHtml = renderToStaticMarkup(<TripQuest plan={{
 }} />);
 assert.ok(questHtml.includes("Your next station"), "the completed plan becomes a trip quest");
 assert.ok(questHtml.includes("Use my location"), "the quest offers browser-local geolocation");
-assert.ok(questHtml.includes("Virtual ride to stop 1"), "the quest offers a virtual vehicle progression");
+assert.ok(questHtml.includes("Virtual ride · day 1 · stop 1"), "the quest offers a day-scoped virtual vehicle progression");
 assert.ok(questHtml.includes("not turn-by-turn navigation"), "the game never claims to replace navigation");
 assert.ok(questHtml.includes("quest-track-depth"), "the route has a raised 3D track layer");
 assert.ok(questHtml.includes("quest-painted-segment active"), "the next real itinerary segment is ready to paint");

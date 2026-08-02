@@ -315,4 +315,4 @@
 - Why: hosted mode is Prava's documented fastest/lowest-maintenance path and matches the backend already implemented. The global skill/CLI is a different agent-owned-interface product, while embedded SDK work would add frontend risk before one genuine sandbox proof exists.
 - Blocked on: the user adding `PRAVA_TEST_CUSTOMER_EMAIL` locally and being physically ready to open the short-lived hosted page, enter the team test card, and complete real WebAuthn/passkey approval.
 - Needs from Jeswin/Deepthi: none until the mandate is active; they must continue to treat mandate approval as authorization, not a purchase.
-- Commit: pending (safe hosted-session operator on `preethesh/integrations-backend`)
+- Commit: `186a715` (safe hosted-session operator committed on `preethesh/integrations-backend`)

@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
  * is reported over the channel the dashboard is already reading.
  */
 export class RunService {
-  constructor({ cwd = "agents", python, spawnImpl = spawn, logger = console, env = process.env, backendUrl } = {}) {
+  constructor({ cwd = "agents", python, spawnImpl = spawn, logger = console, env = process.env, backendUrl, maxConcurrentRuns } = {}) {
     this.cwd = cwd;
     // A project venv is preferable on PEP 668 distributions such as Arch.
     // Keep python3 as the portable fallback so the deterministic path still
@@ -24,6 +24,19 @@ export class RunService {
     this.logger = logger;
     this.active = new Map();
     this.runs = new Map();
+
+    // More than one person can have a run in flight. The event hub already
+    // filters by runId and the dashboard subscribes with its own, so two runs
+    // never bleed into each other's stream — the previous hard limit of one
+    // was stricter than the plumbing required, and meant the second judge to
+    // click Start got a 409.
+    //
+    // Still bounded, because every run spawns a Python process: unbounded, a
+    // handful of clicks would exhaust memory on a small instance. Two fits a
+    // 512MB free tier alongside Node; raise HUMSAFAR_MAX_CONCURRENT_RUNS on
+    // anything larger.
+    const configured = Number(maxConcurrentRuns ?? env.HUMSAFAR_MAX_CONCURRENT_RUNS ?? 2);
+    this.maxConcurrentRuns = Number.isInteger(configured) && configured > 0 ? configured : 2;
 
     // The agent posts its events back over HTTP, and its own default is
     // `http://127.0.0.1:3000`. Every managed host assigns the port instead of
@@ -66,8 +79,12 @@ export class RunService {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new RunError("budget must be a positive number", "INVALID_BUDGET");
     }
-    if (this.active.size > 0) {
-      throw new RunError("Another browser run is active; wait for it to settle", "RUN_ALREADY_ACTIVE", 409);
+    if (this.active.size >= this.maxConcurrentRuns) {
+      throw new RunError(
+        `${this.maxConcurrentRuns} runs are already in flight; wait for one to settle`,
+        "RUN_CAPACITY_REACHED",
+        429,
+      );
     }
 
     const trip = validateTrip({

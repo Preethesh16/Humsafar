@@ -229,11 +229,20 @@ def build_inventory(
             rupees=rupees,
             stay_unit=stay_unit,
         ),
+        # Every name here is derived from the destination, like `guide` below.
+        # It used to carry "Local shacks", "Gunpowder" and "Thalassa" — real Goa
+        # restaurants, hardcoded, returned for *every* city. A Udaipur trip
+        # recommended Gunpowder and a Shillong trip offered beach shacks, which
+        # reads as a demo scripted for one destination and quietly asserts that
+        # a specific real restaurant exists 2,000km from where it does.
+        #
+        # Goa itself is unaffected: it returns GOA_INVENTORY verbatim above,
+        # with the real venue names the live Prava mandates are scoped to.
         "food": [
-            ("Local shacks", f"{days} days, street and cafe meal budget for {party} travellers", "Local Shacks", rupees(food_unit * 2.0), 3.9),
+            (f"{city} Street Eats", f"{days} days, street and cafe meal budget for {party} travellers", f"{city} Street Eats", rupees(food_unit * 2.0), 3.9),
             (f"{city} Kitchen", f"meal budget for {party} travellers", f"{city} Kitchen", rupees(food_unit * 2.7), 4.1),
-            ("Gunpowder", f"restaurant meal budget for {party} travellers", "Gunpowder", rupees(food_unit * 3.5), 4.5),
-            ("Thalassa", f"sunset meal estimate for {party} travellers", "Thalassa", rupees(food_unit * 4.3), 4.4),
+            (f"{city} Table", f"restaurant meal budget for {party} travellers", f"{city} Table", rupees(food_unit * 3.5), 4.5),
+            (f"{city} Rooftop", f"sunset meal estimate for {party} travellers", f"{city} Rooftop", rupees(food_unit * 4.3), 4.4),
         ],
         "guide": [
             (f"{city} Bikes", f"{days}-day scooter rental + fuel", f"{city} Bikes", rupees(1800), 4.0),

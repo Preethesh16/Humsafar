@@ -334,3 +334,41 @@ class NonTravelGoalTest(unittest.TestCase):
 
     def test_an_empty_goal_does_not_crash(self):
         self.assertTrue(self._run("").purchases)
+
+
+class NoDestinationLeakTest(unittest.TestCase):
+    """No real venue from one city may be offered in another.
+
+    A Shillong trip used to recommend Gunpowder and Thalassa — real Goa
+    restaurants, hardcoded into the generated inventory for every destination.
+    Beyond looking like a demo scripted for one city, it asserts to the user
+    that a specific real restaurant exists somewhere it does not, which is the
+    same class of claim as inventing a rating.
+
+    Goa is exempt: it returns the pinned GOA_INVENTORY, whose venues are real
+    Goa places and are what the live Prava mandates are scoped to.
+    """
+
+    GOA_ONLY = ("Gunpowder", "Thalassa", "Local shacks", "Anjuna", "Vagator", "Zostel")
+
+    def test_goa_venues_do_not_appear_in_other_cities(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        for goal in ("trip to Shillong", "trip to Udaipur", "trip to Jaipur", "trip to Ziro"):
+            for category in ("flights", "stay", "food", "guide"):
+                for option in FixtureDiscovery().discover(category, goal):
+                    for leaked in self.GOA_ONLY:
+                        with self.subTest(goal=goal, category=category, venue=option.vendor):
+                            self.assertNotIn(
+                                leaked.lower(),
+                                f"{option.vendor} {option.merchant}".lower(),
+                                f"{goal}: {option.vendor!r} leaks a Goa-specific name",
+                            )
+
+    def test_goa_itself_still_returns_its_real_venues(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        provider = FixtureDiscovery(travel_mode="flight", stay_style="hotel")
+        food = {o.vendor for o in provider.discover("food", "Plan my Goa trip")}
+
+        self.assertIn("Gunpowder Assagao", food)

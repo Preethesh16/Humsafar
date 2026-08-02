@@ -15,6 +15,7 @@ export const AGENTS = ["flights", "stay", "food", "guide"];
 export const PHASES = {
   IDLE: "idle",
   NEGOTIATING: "negotiating",
+  CHOOSING: "choosing",
   AWAITING_APPROVAL: "awaiting_approval",
   PURCHASING: "purchasing",
   COMPLETE: "complete",
@@ -40,6 +41,10 @@ export function initialState() {
       digest: null,
       expiresAt: null,
     },
+    // INTERFACES.md §6. `requested` is keyed by agent; `made` records who
+    // decided, because a timed-out auto-pick must never render as a human
+    // choice.
+    choice: { requested: {}, made: {} },
     cards: {},
     purchases: [],
     blockedAttempts: [],
@@ -92,6 +97,46 @@ export function reduce(state, envelope) {
         allocations: { ...event.allocations },
         totalBudget: event.totalBudget ?? next.totalBudget,
         round: event.round ?? next.round,
+      };
+
+    case "choice_requested":
+      return {
+        ...next,
+        phase: next.phase === PHASES.COMPLETE ? next.phase : PHASES.CHOOSING,
+        runId: event.runId ?? next.runId ?? null,
+        choice: {
+          ...next.choice,
+          requested: {
+            ...next.choice.requested,
+            [event.agent]: {
+              agent: event.agent,
+              slice: event.slice,
+              options: Array.isArray(event.options) ? event.options : [],
+              // "Top rated" over a list with no ratings is a false claim, so
+              // the basis travels with the list and the UI must render it.
+              ranking: event.ranking === "rating" ? "rating" : "price",
+              timeoutSeconds: event.timeoutSeconds ?? null,
+            },
+          },
+        },
+      };
+
+    case "choice_made":
+      return {
+        ...next,
+        choice: {
+          ...next.choice,
+          made: {
+            ...next.choice.made,
+            [event.agent]: {
+              optionId: event.optionId,
+              vendor: event.vendor,
+              price: event.price,
+              // "user" or "agent-timeout" — never collapse the two.
+              chosenBy: event.chosenBy === "user" ? "user" : "agent-timeout",
+            },
+          },
+        },
       };
 
     case "approval_requested":

@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import App from "../src/App.jsx";
+import { Dashboard } from "../src/App.jsx";
 import { ApprovalPanel } from "../src/components/ApprovalPanel.jsx";
 import { AuditLog } from "../src/components/AuditLog.jsx";
 import { BudgetSplit } from "../src/components/BudgetSplit.jsx";
@@ -197,7 +197,17 @@ for (const [name, html] of [["receipt", liveReceipt], ["approval", pendingHtml]]
 
 // The app shell itself must render — it carries the hero, the journey stepper
 // and the simulated-stream notice, none of which the panel renders above cover.
-const shell = renderToStaticMarkup(<App />);
+// Dashboard rather than App: App now wraps everything in a BrowserRouter,
+// which needs a DOM history and cannot be server-rendered. The shell markup
+// under test is identical either way.
+const shell = renderToStaticMarkup(
+  <Dashboard
+    state={initialState()}
+    connection={{ status: "idle" }}
+    source={"mock"}
+    setSource={() => {}}
+  />,
+);
 for (const [needle, description] of [
   ["One goal. One budget.", "hero headline"],
   ["Zero overspend.", "hero headline accent"],

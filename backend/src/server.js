@@ -5,6 +5,7 @@ import { PravaClient } from "./integrations/pravaClient.js";
 import { DiscoveryService } from "./services/discoveryService.js";
 import { ApprovalService } from "./services/approvalService.js";
 import { MandateService } from "./services/mandateService.js";
+import { RunService } from "./services/runService.js";
 import { ScopedCardService } from "./services/scopedCardService.js";
 import { TrustService } from "./services/trustService.js";
 
@@ -31,6 +32,7 @@ const app = createApp({
   mandateService: new MandateService({ pravaClient, mandateMerchants }),
   approvalService: new ApprovalService(),
   trustService: new TrustService(),
+  runService: new RunService(),
   internalApiToken,
   publicBaseUrl: process.env.PUBLIC_BASE_URL,
 });

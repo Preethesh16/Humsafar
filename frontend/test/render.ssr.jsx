@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { Dashboard } from "../src/App.jsx";
+import Intake from "../src/pages/Intake.jsx";
 import { ApprovalPanel } from "../src/components/ApprovalPanel.jsx";
 import { AuditLog } from "../src/components/AuditLog.jsx";
 import { BudgetSplit } from "../src/components/BudgetSplit.jsx";
@@ -219,6 +220,17 @@ for (const [needle, description] of [
   ["Truth layer", "footer disclosure"],
 ]) {
   assert.ok(shell.includes(needle), `app shell should contain ${description}: "${needle}"`);
+}
+
+const intake = renderToStaticMarkup(<Intake navigate={() => {}} />);
+for (const [needle, description] of [
+  ["Where do you want to disappear to?", "first conversational question"],
+  ["A city, state, beach, mountains", "plain-language destination prompt"],
+  ["Question 1 of 8", "question progress"],
+  ["trip concierge", "concierge mode label"],
+  ["Planning and negotiation are live", "honest capability boundary"],
+]) {
+  assert.ok(intake.includes(needle), `intake should contain ${description}: "${needle}"`);
 }
 
 // Nothing rendered may imply a live transaction while on the mocked stream.

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { metaFor } from "../lib/agents.js";
+
 /**
  * Step 3 — the user picks the taste.
  *
@@ -139,7 +141,7 @@ export default function Choose({ state, runId }) {
           <section className="choose-block" key={row.agent}>
             <header className="choose-head">
               <div>
-                <h3 className="choose-agent">{row.agent}</h3>
+                <h3 className="choose-agent">{metaFor(row.agent).label}</h3>
                 <RankingHeading ranking={row.ranking} />
               </div>
               <div className="choose-right">

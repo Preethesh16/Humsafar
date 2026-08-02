@@ -1,82 +1,92 @@
-# Humsafar — Production Integration Matrix
+# Humsafar — keys, free data and real-booking boundaries
 
-Last reviewed: 2026-08-02. This file separates credentials we can configure
-today from commercial access that cannot be replaced by code or an API key.
+Last reviewed: 2026-08-02. This is the answer to “which API keys do we actually
+need?” A planning result, a provider search result and a confirmed booking are
+three different claims; Humsafar keeps them separate.
 
-## Agent and money architecture
+## Exact answer
 
-Humsafar uses **one server-side `OPENAI_API_KEY`** for all logical OpenAI Agents
-SDK agents. Separate keys per agent do not create isolation; distinct agent
-definitions, instructions, schemas, permissions, and traces do. The current
-roster is:
+The project can run end to end with **zero API keys** using deterministic agent
+dialogue and disclosed synthetic inventory. For the intended OpenAI multi-agent
+experience, the only additional key required is the existing server-side
+`OPENAI_API_KEY`.
 
-1. Budget Strategy Agent — interprets intent and recommends category weights.
-2. Flights Agent — argues from discovered flight options.
-3. Stay Agent — argues from discovered accommodation options.
-4. Food Agent — argues from meal options.
-5. Guide Agent — argues from experiences and local-ground-transport options.
-6. Mediator — explains the deterministic settlement.
+| Variable | Required? | What it unlocks |
+|---|---:|---|
+| `OPENAI_API_KEY` | **Yes for real model reasoning; no for offline mode** | One key serves the Budget Strategy, Journey, Stay, Food, Guide and Mediator agents. It stays server-side. Organizer credits are useful, but OpenAI usage is not promised to be free forever. |
+| `PRAVA_SECRET_KEY` | Only for the existing sandbox payment proof | Server-to-server Prava sandbox access, mandate lookup and capped credentials. It does not supply travel inventory. |
+| `PRAVA_PUBLISHABLE_KEY` | No, not in the current REST flow | Reserved for a future Prava browser SDK integration. Never substitute it for the secret key. |
+| `INTERNAL_API_TOKEN` | Only when deployed off localhost | Protects state-changing backend routes. Generate this ourselves; it is not a third-party API key. |
+| `DUFFEL_ACCESS_TOKEN` | **Optional** | Live/test flight and stay search. Current code does not place Duffel orders. Free/no-key mode uses disclosed estimates and checkout handoffs. |
+| `GOOGLE_MAPS_API_KEY` | **Optional** | Paid geocoder override. The default is now keyless OpenStreetMap Nominatim. |
 
-The model never generates or finalizes rupee amounts. Provider prices enter as
-integer paise; the deterministic negotiation engine allocates the exact budget,
-and the server binds chosen option IDs into a one-shot human approval. This is
-the production safety boundary: an OpenAI timeout can remove personality, but
-cannot overspend or authorize a different option.
+Do **not** create a separate OpenAI key per agent. Agent isolation comes from
+different instructions, schemas, tools and permissions—not from copying the
+same billing credential six times.
 
-## Credentials to configure now
+## Free/no-key stack
 
-Put these values only in the gitignored root `.env`. Never paste them into chat,
-Markdown, frontend variables, screenshots, or commits.
+These services improve planning without pretending to be booking APIs:
 
-| Variable | Needed for | Current implementation |
+| Need | Free path | Current state and constraint |
 |---|---|---|
-| `OPENAI_API_KEY` | Budget interpretation, specialist negotiation dialogue, mediator explanation, SDK traces | Implemented. One key serves all six logical agents. |
-| `DUFFEL_ACCESS_TOKEN` | Live/test flight and accommodation discovery | Implemented for round-trip offer search and Duffel Stays search. Order creation is not yet implemented. |
-| `GOOGLE_MAPS_API_KEY` | Resolve `Goa`, `Jaipur`, etc. to coordinates for Duffel Stays | Implemented server-side. Enable the Geocoding API and restrict the key to the backend. |
-| `PRAVA_SECRET_KEY` | Server-to-server sandbox authorization and scoped credentials | Implemented and sandbox evidence captured. This is not a merchant booking API. |
-| `PRAVA_PUBLISHABLE_KEY` | Future Prava browser SDK use | Stored locally only; not required by the current hosted REST ceremony. |
-| `INTERNAL_API_TOKEN` | Protect state-changing routes outside loopback | Implemented. Required before any non-local deployment. |
+| Destination coordinates | OpenStreetMap Nominatim | **Implemented.** User-triggered only, server-cached, identified with a custom User-Agent, serialised and limited to one request/second. Public Nominatim is suitable for this hackathon/low-volume use, not an SLA-backed commercial launch. Set `HUMSAFAR_NOMINATIM_URL` to a self-hosted instance when scaling. |
+| Weather | Open-Meteo | Recommended next adapter. No key for non-commercial use; attribution, usage limits and no uptime guarantee apply. Self-hosting is available. |
+| Restaurants, sights and essentials | OpenStreetMap/Overpass | Recommended discovery source. Public instances are best-effort and rate-limited; cache or self-host. Results prove a place exists, not that a table/ticket is available. |
+| Road distance and duration | Self-hosted OSRM or public demo for development | Open source and no proprietary key when self-hosted. The public demo is not a production SLA. |
+| Rail/bus planning | Operator-published GTFS/static schedules where available, otherwise an honest search handoff | No single complete, reliable, free India-wide transactional feed exists. Never scrape IRCTC. Exact availability and ticketing remain on the official/authorized checkout surface. |
+| Destination knowledge | Wikivoyage/Wikimedia APIs | Useful for itinerary context with attribution; not pricing or availability. |
 
-The local `.env` currently has Prava credentials, but the OpenAI, Duffel, and
-Google values must be added by the operator before those paths can be live. A
-missing provider never becomes an unlabeled fake: the UI reports a disclosed
-fixture/test mode.
+Public Nominatim policy: <https://operations.osmfoundation.org/policies/nominatim/>
 
-## Access that requires a provider agreement
+Open-Meteo documentation and terms: <https://open-meteo.com/en/docs>,
+<https://open-meteo.com/en/terms>
 
-| Need | Recommended boundary | Why a normal API key is insufficient |
-|---|---|---|
-| Activities and guides | Viator Partner API (`VIATOR_API_KEY`) | Search access is available by partner tier; holds and bookings require Full + Booking Affiliate or Merchant access. |
-| Indian rail | IRCTC-authorized B2B Principal Service Provider or a contracted authorized partner | IRCTC ticketing uses authorized service-provider/web-service arrangements. Do not scrape IRCTC or ship an unofficial consumer endpoint. |
-| Restaurant reservation | Contracted reservation provider such as EazyDiner/Dineout/OpenTable where supported | Google Places can discover restaurants but does not supply a bookable total or complete the reservation. |
-| Local vehicle booking | Official deep link or contracted Uber/Ola/local fleet integration | General map/search credentials do not authorize ride creation or payment. |
-| Production payment | Prava production approval plus a merchant/provider checkout that accepts the credential | A Prava sandbox credential cannot purchase real production inventory. |
+## What “free booking” can honestly mean
 
-Until one of these commercial boundaries is granted, its adapter must return a
-clearly labelled discovery/deep-link result or fixture. It must never emit
-`checkout_completed` or claim an order.
+There is no legitimate, unlimited, no-key API that can create real flight,
+train, bus and hotel orders across India. Humsafar therefore has two execution
+levels:
 
-## Data required before an actual booking
+1. **Free concierge mode:** understand the trip conversationally, compare
+   modes, build an itinerary, negotiate the budget, let the user choose, then
+   open the exact provider search/checkout handoff. The user completes payment
+   on the official surface.
+2. **Transactional partner mode:** after a provider grants booking access,
+   Humsafar can hold/create/cancel an order and then use a production payment
+   credential. Only that provider-confirmed response may be called a booking.
 
-Provider access is only half the work. The final checkout boundary must collect
-the following through a secure user form after option choice and before the
-final approval: passenger legal name, date of birth and gender where required;
-passport/nationality for applicable routes; contact email and phone; room
-occupancy; cancellation/refund acceptance; and any provider booking questions.
-Do not put this personal data into model prompts or traces.
+This is still valuable for a lazy traveller: they answer eight simple prompts
+instead of comparing twenty tabs. The system does the thinking, budgeting and
+shortlisting; the final external checkout remains honest until partner access
+exists.
 
-## Recommended acquisition order
+## Current agent and money architecture
 
-1. Add `OPENAI_API_KEY` and run one real SDK-agent smoke test.
-2. Add Duffel test access and Google Geocoding; verify Goa flight/stay results.
-3. Apply for Viator search access, then booking access if actual activity orders
-   are in scope.
-4. Choose and contract an IRCTC-authorized rail provider; do not build against
-   an unofficial API while waiting.
-5. Choose reservation and local-transport partners based on the launch cities.
-6. Implement provider hold/order/cancel/refund adapters and only then request
-   Prava production access for real-money bookings.
+1. Budget Strategy Agent interprets intent and bounded category priorities.
+2. Journey Agent handles flight, train, bus, road, or cross-mode comparison.
+3. Stay Agent handles accommodation.
+4. Food Agent handles meals and restaurant priorities.
+5. Guide Agent handles activities and local transport.
+6. Mediator explains the deterministic settlement.
 
-Official references: Google Geocoding and Places documentation, Duffel Stays
-guide, Viator Partner API access tiers, and IRCTC's authorized service-provider
-list. Re-check each contract and endpoint before production launch.
+The model never creates rupee amounts. Provider prices/estimates enter as
+integer paise; the deterministic engine allocates the exact shared ceiling.
+The user chooses offered option IDs and approves the exact plan once. An OpenAI
+timeout may remove personality, but cannot overspend or authorize a different
+option.
+
+## External access still required for actual orders
+
+| Need | Required boundary |
+|---|---|
+| Air/stay order | Duffel or another accredited booking provider with order credentials, traveller/contact fields and cancellation handling |
+| Indian rail ticket | IRCTC-authorized B2B provider agreement; no scraping or unofficial consumer endpoint |
+| Activity ticket | Viator/another operator’s booking tier, not only search access |
+| Restaurant reservation | A supported reservation partner or direct restaurant handoff |
+| Cab/vehicle order | Official deep link or contracted fleet API |
+| Real payment | Prava production approval plus a merchant checkout that accepts/reconciles the credential |
+
+Until those boundaries are granted, adapters return a clearly labelled
+estimate, public-data result or checkout handoff. They must not emit a completed
+merchant checkout.

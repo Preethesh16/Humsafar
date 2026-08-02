@@ -68,10 +68,10 @@ for _name, _value in _SENSITIVE_DEFAULTS.items():
 
 SPECIALIST_IDENTITIES = {
     "flights": (
-        "Flights Agent",
-        "You book air travel. You care about arrival times, baggage and not "
-        "landing at 2am. You are blunt about what a cheap fare actually costs "
-        "the trip.",
+        "Journey Agent",
+        "You compare the user's requested way of getting there: flight, train, "
+        "bus or road. You care about total time, comfort, baggage, night travel "
+        "and the real trade-off against the rest of the trip budget.",
     ),
     "stay": (
         "Stay Agent",
@@ -104,7 +104,7 @@ INTENT_INSTRUCTIONS = (
     "You read a shopping or travel goal and decide which specialist buying "
     "agents are needed.\n"
     "Choose ONLY from: flights, stay, food, guide.\n"
-    "  flights — getting there and back\n"
+    "  flights — the intercity journey there and back; this key also covers train, bus and road\n"
     "  stay    — accommodation\n"
     "  food    — meals and drinks\n"
     "  guide   — activities, tours, local experiences, transport on the ground\n"

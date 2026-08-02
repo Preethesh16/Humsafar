@@ -45,7 +45,7 @@ NARRATED_ROUNDS = int(os.environ.get("HUMSAFAR_NARRATED_ROUNDS", "1"))
 CONCESSION_SCHEDULE: tuple[float, ...] = (0.6, 0.8, 1.0, 1.0, 1.0)
 
 DISPLAY_NAMES = {
-    "flights": "Flights Agent",
+    "flights": "Journey Agent",
     "stay": "Stay Agent",
     "food": "Food Agent",
     "guide": "Guide Agent",

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { DuffelClient } from "../src/integrations/duffelClient.js";
 import { GoogleMapsClient } from "../src/integrations/googleMapsClient.js";
+import { NominatimClient } from "../src/integrations/nominatimClient.js";
 import { withFixtureFallback } from "../src/integrations/withFixtureFallback.js";
 import { DiscoveryService } from "../src/services/discoveryService.js";
 import {
@@ -85,6 +86,48 @@ test("stay discovery geocodes the destination before calling Duffel", async () =
   assert.equal(result.source, "live");
   assert.equal(duffelInput.latitude, 15.2993);
   assert.equal(duffelInput.longitude, 74.124);
+});
+
+test("Nominatim provides cached, identified, keyless geocoding", async () => {
+  let calls = 0;
+  let request;
+  const client = new NominatimClient({
+    userAgent: "Humsafar test suite",
+    fetchImpl: async (url, options) => {
+      calls += 1;
+      request = { url, options };
+      return new Response(JSON.stringify([{ lat: "15.2993", lon: "74.1240" }]), { status: 200 });
+    },
+  });
+  assert.deepEqual(await client.geocode("Goa"), { latitude: 15.2993, longitude: 74.124 });
+  assert.deepEqual(await client.geocode("goa"), { latitude: 15.2993, longitude: 74.124 });
+  assert.equal(calls, 1);
+  assert.equal(request.options.headers["User-Agent"], "Humsafar test suite");
+  assert.equal(request.url.searchParams.has("countrycodes"), false);
+  assert.equal(request.url.searchParams.has("key"), false);
+});
+
+test("non-flight journey requests never call an air-only provider", async () => {
+  let called = false;
+  const service = new DiscoveryService({
+    duffelClient: { searchFlights: async () => { called = true; } },
+    logger,
+  });
+  const result = await service.search("flights", { travelMode: "train" });
+  assert.equal(result.source, "fixture");
+  assert.equal(called, false);
+});
+
+test("missing Duffel access falls back before consuming public geocoding", async () => {
+  let geocoded = false;
+  const service = new DiscoveryService({
+    duffelClient: new DuffelClient({ token: "" }),
+    googleMapsClient: { geocode: async () => { geocoded = true; } },
+    logger,
+  });
+  const result = await service.search("stay", { destination: "Goa" });
+  assert.equal(result.source, "fixture");
+  assert.equal(geocoded, false);
 });
 
 test("food and guide results always disclose fixture source", async () => {

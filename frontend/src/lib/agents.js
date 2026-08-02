@@ -4,7 +4,7 @@
  * an ink colour and a soft tint used for its glyph plate and bar segment.
  */
 export const AGENT_META = {
-  flights: { label: "Flights", color: "#547ca8", soft: "#e6eef8", key: "flights" },
+  flights: { label: "Journey", color: "#547ca8", soft: "#e6eef8", key: "flights" },
   stay: { label: "Stay", color: "#765b92", soft: "#eee6f6", key: "stay" },
   food: { label: "Food", color: "#a16b18", soft: "#fff0cc", key: "food" },
   guide: { label: "Guide", color: "#2e5a42", soft: "#c9f2dd", key: "guide" },

@@ -153,7 +153,10 @@ GOA_INVENTORY: dict[str, list[tuple]] = {
 
 
 def build_inventory(
-    destination: str, days: int = 3, origin_city: str = "Bengaluru"
+    destination: str,
+    days: int = 3,
+    origin_city: str = "Bengaluru",
+    travel_mode: str = "flight",
 ) -> dict[str, list[tuple]]:
     """Fixture options shaped for one destination.
 
@@ -164,7 +167,12 @@ def build_inventory(
 
     # Goa is the pinned demo destination — see GOA_INVENTORY above. Returned
     # verbatim so the live mandates and the tuned negotiation stay valid.
-    if city.lower() == "goa" and days == 3 and origin_city.strip().lower() in {"bengaluru", "bangalore"}:
+    if (
+        travel_mode == "flight"
+        and city.lower() == "goa"
+        and days == 3
+        and origin_city.strip().lower() in {"bengaluru", "bangalore"}
+    ):
         return GOA_INVENTORY
 
     code = airport_code(city)
@@ -181,7 +189,7 @@ def build_inventory(
     stay_unit = 2700 * nights / 2  # the tuned ladder assumed 2 nights
     food_unit = 1200 * days / 2
 
-    return {
+    inventory = {
         "flights": [
             ("IndiGo", f"6E-6423 {route} return, 1 checked bag", "IndiGo", rupees(6500), 4.1),
             ("SpiceJet", f"SG-482 {route} return, late arrival", "SpiceJet", rupees(7400), 3.8),
@@ -209,3 +217,67 @@ def build_inventory(
             (f"{city} Private Tour", "private guide, half day", f"{city} Private Tour", rupees(4500), 4.5),
         ],
     }
+    inventory["flights"] = journey_inventory(
+        mode=travel_mode,
+        origin_city=origin_city,
+        destination=city,
+        route=route,
+        rupees=rupees,
+        flight_rows=inventory["flights"],
+    )
+    return inventory
+
+
+def journey_inventory(
+    mode: str,
+    origin_city: str,
+    destination: str,
+    route: str,
+    rupees,
+    flight_rows: list[tuple],
+) -> list[tuple]:
+    """Synthetic, disclosed transport choices matching the user's mode.
+
+    The locked event key remains ``flights`` for compatibility, but this is the
+    Journey Agent's inventory. Rail/bus/road rows are planning estimates and
+    handoffs, never claims that an operator API was searched or a seat exists.
+    """
+    mode = mode if mode in {"compare", "flight", "train", "bus", "drive"} else "compare"
+    route_words = f"{origin_city.strip().title()} to {destination}"
+    if mode == "flight":
+        return flight_rows
+
+    trains = [
+        ("Rail search handoff", f"{route_words} return, sleeper estimate", "Rail search handoff", rupees(1800), 3.7),
+        ("Rail search handoff", f"{route_words} return, AC 3-tier estimate", "Rail search handoff", rupees(2800), 4.1),
+        ("Rail search handoff", f"{route_words} return, AC 2-tier estimate", "Rail search handoff", rupees(4300), 4.3),
+        ("Rail search handoff", f"{route_words} return, first AC estimate", "Rail search handoff", rupees(6500), 4.5),
+    ]
+    buses = [
+        ("Intercity bus handoff", f"{route_words} return, non-AC seater estimate", "Intercity bus handoff", rupees(1600), 3.5),
+        ("Intercity bus handoff", f"{route_words} return, AC sleeper estimate", "Intercity bus handoff", rupees(2600), 4.0),
+        ("Intercity bus handoff", f"{route_words} return, premium sleeper estimate", "Intercity bus handoff", rupees(3800), 4.3),
+        ("Intercity bus handoff", f"{route_words} return, flexible cancellation estimate", "Intercity bus handoff", rupees(4700), 4.4),
+    ]
+    road = [
+        ("Own vehicle estimate", f"{route_words} return, fuel and toll estimate", "Road trip handoff", rupees(3200), 4.0),
+        ("Bike rental estimate", f"{route_words} return, rental, fuel and tolls", "Road trip handoff", rupees(4200), 4.1),
+        ("Self-drive rental estimate", f"{route_words} return, compact car, fuel and tolls", "Road trip handoff", rupees(6800), 4.3),
+        ("Cab handoff", f"{route_words} return, private cab estimate", "Road trip handoff", rupees(9800), 4.4),
+    ]
+    if mode == "train":
+        return trains
+    if mode == "bus":
+        return buses
+    if mode == "drive":
+        return road
+
+    # A cross-mode shortlist makes "compare for me" a real input to discovery,
+    # not just decorative copy in the prompt.
+    return [
+        trains[1],
+        buses[1],
+        road[0],
+        flight_rows[0],
+        flight_rows[-1],
+    ]

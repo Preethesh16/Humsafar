@@ -191,6 +191,19 @@ receipt inherit a success/source label from another line.
 - [ ] Describe what worked, what failed and what was simulated without changing
   terminology between the UI, video, README and Devfolio write-up.
 
+## Free public-data services
+
+- Public/free does not mean unlimited or production-backed. Nominatim calls
+  must remain directly user-triggered, identified, cached, serialized and below
+  one request per second. Never build browser autocomplete against the public
+  endpoint. Keep `HUMSAFAR_NOMINATIM_URL` switchable and self-host before scale.
+- Open-Meteo's no-key API is non-commercial, attributed and rate-limited, with
+  no uptime guarantee. Do not describe it as a free production SLA.
+- OpenStreetMap/Overpass, GTFS and routing data can inform a plan; they do not
+  prove ticket/room/table availability. A provider handoff is not a booking.
+- Never scrape IRCTC or automate around a provider's access controls. Rail
+  ticketing stays on an official or authorized surface until a contract exists.
+
 ## Open questions requiring written Prava confirmation
 
 1. Does a failed over-cap mandate charge consume any one-time use/attempt limit,

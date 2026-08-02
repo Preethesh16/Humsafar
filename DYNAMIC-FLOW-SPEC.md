@@ -3,7 +3,7 @@
 Target flow, as requested:
 
 ```
-1. /            user enters destination, budget, days
+1. /            concierge asks one simple trip question at a time
 2. /deliberate  agents discover and negotiate, live
 3. /choose      top recommendations per category, user picks
 4. /approve     the exact plan, one approval
@@ -28,7 +28,9 @@ external APIs; it is no longer a handoff checklist.
 | **`POST` / `GET /api/choices`** | **Preethesh** | **Done** — offered-option validation, one-shot settlement, timeout conflicts |
 | Duffel real inventory | Preethesh | Needs `DUFFEL_ACCESS_TOKEN` |
 | Five-page journey | Deepthi + Preethesh | **Done** — native History API, no router dependency |
-| Origin, destination, IATA codes, dates, travellers, rooms, optional stay coordinates | Preethesh | **Done** |
+| Conversational destination, origin, transport, flexible/exact dates, party, budget and vibe | Preethesh | **Done** — eight prompts, no IATA/coordinate knowledge required |
+| Cross-mode journey preference | Preethesh + Jeswin | **Done** — flight/train/bus/road/compare reaches the Journey Agent and mode-aware fallback |
+| Keyless destination geocoding | Preethesh | **Done** — policy-compliant cached Nominatim fallback; Google is optional |
 | Real merchant order creation | External/provider boundary | **Not done** — needs Duffel booking credentials, traveller details and processor integration |
 | Food and guide providers | External/provider boundary | **Fixtures, explicitly labelled** |
 
@@ -43,8 +45,9 @@ mandate.
 
 ```
 POST /api/runs
-{ goal, budget, days, origin, destination, originCode, destinationCode,
-  departureDate, returnDate, travelers, rooms, latitude?, longitude? }
+{ goal, budget, days, origin, destination, travelMode, dateFlexibility,
+  departureDate?, returnDate?, travelers, rooms,
+  originCode?, destinationCode?, latitude?, longitude? }
 -> 202 { runId, status, trip, modes }
 
 GET /api/runs/:runId
@@ -78,9 +81,10 @@ The five screens use the browser History API directly. This avoids a router
 dependency and its unresolved 2026 advisory chain while preserving back/forward
 navigation and direct URLs.
 
-**`/` — intake.** Destination, budget, days. `POST /api/runs`, then navigate to
-`/deliberate?runId=…`. This is the moment that makes the demo feel like a
-product rather than a script — a judge can type their own trip.
+**`/` — concierge intake.** Humsafar asks destination, origin, travel mode,
+dates/flexibility, party, hard budget and trip vibe one at a time. The user never
+needs IATA codes or coordinates. A final plain-language brief is shown before
+`POST /api/runs`, then the UI navigates to `/deliberate?runId=…`.
 
 **`/deliberate`** — the current dashboard, unchanged. Auto-advance to `/choose`
 on the first `choice_requested`.
@@ -104,10 +108,11 @@ this"* vs *"auto-selected on timeout"*.
 ## 4. Structured trip context — landed
 
 The goal remains available to the Intent Agent, while provider-critical values
-also travel as validated structured fields: origin/destination IATA codes,
-departure/return dates, travellers, rooms, and optional destination coordinates
-for Duffel Stays. The local fallback uses the requested origin, destination and
-trip length instead of returning Goa inventory for every goal.
+also travel as validated structured fields: origin/destination names,
+travel-mode preference, exact or flexible dates, travellers and rooms. Airport
+codes are optional provider details, never user requirements. The local fallback
+uses requested origin, destination, duration and journey mode instead of
+returning Bengaluru–Goa flights for every goal.
 
 ---
 

@@ -53,3 +53,32 @@ test("MandateService refuses an ambiguous merchant resolution", () => {
 
   assert.throws(() => service.resolveMandate("Duffel"), /Multiple active mandates/);
 });
+
+test("MandateService drops consumed and cancelled mandates from the registry", async () => {
+  // Regression: `status` and `state` are separate. A consumed or cancelled
+  // mandate still reports status "active", so filtering on status alone left
+  // dead mandates in the registry. Every re-approval for the same merchant then
+  // added another entry and resolveMandate() failed closed with "Multiple
+  // active mandates are registered for this merchant" — which blocked every
+  // live run on 2026-08-02 until it was found.
+  const mandateMerchants = new Map([["mdt_old", "Duffel"]]);
+  const service = new MandateService({
+    pravaClient: {
+      listMandates: async () => ({
+        data: {
+          mandates: [
+            { id: "mdt_old", status: "active", merchantScope: "listed", state: "consumed", merchantName: "Duffel" },
+            { id: "mdt_dead", status: "active", merchantScope: "listed", state: "cancelled", merchantName: "Duffel" },
+            { id: "mdt_live", status: "active", merchantScope: "listed", state: "available", merchantName: "Duffel" },
+          ],
+        },
+      }),
+    },
+    mandateMerchants,
+  });
+
+  await service.syncCustomerMandates("cus_1");
+
+  assert.deepEqual([...mandateMerchants.entries()], [["mdt_live", "Duffel"]]);
+  assert.equal(service.resolveMandate("Duffel").data.mandateId, "mdt_live");
+});

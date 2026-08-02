@@ -397,3 +397,46 @@ class ApprovalRecordTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ObservedCapDeclineTest(unittest.TestCase):
+    """Locked against what the sandbox actually returned on 2026-08-02.
+
+    Charging Rs 160 against a Rs 100 mandate produced errorCode "DECLINED"
+    with "Total amount 160.00 exceeds ..." in the message — not the
+    THRESHOLD_EXCEEDED the docs name. A classifier that only accepted the
+    documented code would have called a real cap decline "not cap enforcement".
+    """
+
+    REAL_MESSAGE = (
+        "Visa did not return COMPLETED (status DECLINED): "
+        "Total amount 160.00 exceeds the approved amount 100.00"
+    )
+
+    def test_the_real_sandbox_decline_counts_as_cap_enforcement(self):
+        from humsafar.guardian import is_cap_decline
+
+        self.assertTrue(is_cap_decline("DECLINED", self.REAL_MESSAGE))
+
+    def test_the_documented_code_still_counts(self):
+        from humsafar.guardian import is_cap_decline
+
+        self.assertTrue(is_cap_decline("THRESHOLD_EXCEEDED", None))
+
+    def test_a_bare_decline_without_an_amount_reason_does_not_count(self):
+        from humsafar.guardian import is_cap_decline
+
+        self.assertFalse(is_cap_decline("DECLINED", "Visa declined: insufficient funds"))
+        self.assertFalse(is_cap_decline("DECLINED", None))
+
+    def test_unrelated_failures_never_count(self):
+        from humsafar.guardian import is_cap_decline
+
+        for code in ("MANDATE_NOT_ACTIVE", "MANDATE_MERCHANT_NOT_ALLOWED", "TRIES_EXHAUSTED", ""):
+            self.assertFalse(is_cap_decline(code, "some message"))
+
+    def test_the_reason_text_reflects_the_real_decline(self):
+        reason = Guardian.describe_card_block(
+            "Stay Agent", to_paise("160"), to_paise("100"), "DECLINED", self.REAL_MESSAGE
+        )
+        self.assertIn("Blocked at the card level", reason)

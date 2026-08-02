@@ -22,7 +22,7 @@ from .events import EventEmitter
 from .llm import Narrator
 from .money import format_inr
 from .orchestrator import run_goal
-from .processor import DeclinedByTestCard
+from .processor import DeclinedByTestCard, SimulatedMerchant
 from .reporting import ChargeReporter
 from .trust import TrustClient
 
@@ -119,6 +119,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="MESSAGE",
         help="Verbatim decline message the merchant's checkout showed",
     )
+    parser.add_argument(
+        "--simulate-merchant",
+        action="store_true",
+        help="Simulate the merchant checkout step (Prava's sanctioned route; always DECLINED)",
+    )
     parser.add_argument("--llm", action="store_true", help="Use OpenAI for agent dialogue")
     parser.add_argument("--overspend", metavar="AGENT", help="Have this agent attempt an over-slice charge")
     parser.add_argument("--fail", metavar="AGENT", help="Fail this agent's booking once, then recover")
@@ -201,11 +206,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.await_approval
         else AutoApproval()
     )
-    processor = (
-        DeclinedByTestCard(args.merchant, args.merchant_declined)
-        if args.merchant and args.merchant_declined
-        else None
-    )
+    # A real observed decline is stronger evidence, so it wins when present.
+    # Otherwise --simulate-merchant uses Prava's sanctioned simulated step,
+    # which always reports DECLINED and labels itself as simulated.
+    if args.merchant and args.merchant_declined:
+        processor = DeclinedByTestCard(args.merchant, args.merchant_declined)
+    elif args.simulate_merchant:
+        processor = SimulatedMerchant(args.merchant or "Example Store")
+    else:
+        processor = None
     checkout = (
         LiveCheckout(reporter=ChargeReporter(base_url=args.backend, token=token), processor=processor)
         if args.live_checkout

@@ -95,6 +95,51 @@ class ManualProcessor:
         return attempt.outcome, detail
 
 
+class SimulatedMerchant:
+    """Prava's own sanctioned route for steps 4 and 5.
+
+    Prava confirmed on 2026-08-02: *"Prava does not provide a dummy merchant
+    checkout. Because the sandbox card network runs in test mode and no real
+    money moves, you simply simulate the final merchant checkout step yourself
+    for the demo."* Merchant name, URL and amount may be arbitrary.
+
+    So this is not a shortcut around a missing integration — it is the
+    documented path. The parts either side of it are real: a genuine Prava
+    credential goes in, and the outcome is reported to Prava's real API.
+
+    It still refuses to launder itself into something stronger:
+
+    * The outcome is fixed at `DECLINED`, because a sandbox card cannot be
+      approved by any real processor. There is no way to ask this class for an
+      `APPROVED` — that would be inventing a merchant result, which is the
+      "mocked payment presented as a transaction" the handbook treats as a
+      disqualifier.
+    * Every detail string says **simulated** and names the merchant, so a
+      receipt or a video frame carrying this line cannot be read as a live
+      merchant order.
+
+    Use `ManualProcessor` instead when a human genuinely presented the card at
+    a real checkout and read the response — that is stronger evidence, and it
+    is what `--merchant-declined` records.
+    """
+
+    def __init__(self, merchant: str = "Example Store") -> None:
+        if not merchant.strip():
+            raise ValueError("merchant is required, even simulated")
+        self.merchant = merchant.strip()
+        self.attempts: list[str] = []
+
+    def charge(self, option: Option, card: ScopedCard) -> tuple[str, str]:
+        self.attempts.append(option.category)
+        return (
+            "DECLINED",
+            f"SIMULATED merchant checkout at {self.merchant}: the Prava sandbox credential was "
+            f"presented for {option.vendor} and declined as a test card. Per Prava's guidance, "
+            f"the merchant step is simulated because sandbox provides no merchant checkout — "
+            f"the credential and the reported outcome are real, the storefront is not.",
+        )
+
+
 class DeclinedByTestCard(ManualProcessor):
     """The expected sandbox result, per Prava's step 5.
 

@@ -209,6 +209,15 @@ assert.ok(
 assert.ok(intakeHtml.includes("Latitude override"), "latitude input is labelled");
 assert.ok(intakeHtml.includes("Longitude override"), "longitude input is labelled");
 
+// Place suggestions: all four location fields must offer a picker, so a judge
+// never has to know an IATA code or guess a spelling.
+for (const listId of ["places-origin", "places-destination", "codes-origin", "codes-destination"]) {
+  assert.ok(intakeHtml.includes(`id="${listId}"`), `field offers suggestions: ${listId}`);
+  assert.ok(intakeHtml.includes(`list="${listId}"`), `input is wired to ${listId}`);
+}
+assert.ok(intakeHtml.includes("Bengaluru"), "suggestions are populated");
+assert.ok(intakeHtml.includes("BLR"), "airport codes are offered");
+
 const chooseState = {
   choice: {
     requested: {

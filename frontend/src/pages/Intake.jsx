@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 
+import { resolvePlace, suggestPlaces } from "../lib/places.js";
+
 /**
  * Step 1 — the user states the goal.
  *
@@ -13,11 +15,48 @@ import { useMemo, useState } from "react";
  * event contract unchanged.
  */
 
+/**
+ * Suggestion list for a place or code field.
+ *
+ * A native <datalist> rather than a custom combobox: the browser gives correct
+ * keyboard handling, screen-reader semantics and mobile behaviour for free, and
+ * a hand-rolled listbox is a well-known source of accessibility bugs. The
+ * trade-off is that we cannot style the popup — worth it here.
+ *
+ * Options are recomputed from what has been typed so the list narrows as you go.
+ */
+function PlaceOptions({ id, query, codesOnly = false }) {
+  const matches = suggestPlaces(query);
+  return (
+    <datalist id={id}>
+      {matches.map((place) => (
+        <option
+          key={place.code}
+          value={codesOnly ? place.code : place.city}
+          label={codesOnly ? `${place.city} · ${place.region}` : `${place.code} · ${place.region}`}
+        />
+      ))}
+    </datalist>
+  );
+}
+
 export default function Intake({ onStarted, navigate }) {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [originCode, setOriginCode] = useState("");
   const [destinationCode, setDestinationCode] = useState("");
+
+  /**
+   * Sets a city and fills its airport code, but only once the typed text
+   * unambiguously names a place. Guessing from a partial name could quietly
+   * point the flight search at the wrong airport, which is worse than leaving
+   * the field for the user. A code already typed by hand is never overwritten.
+   */
+  const pickCity = (value, setCity, setCode) => {
+    setCity(value);
+    const place = resolvePlace(value);
+    if (place) setCode(place.code);
+  };
   const [budget, setBudget] = useState(30000);
   const [departureDate, setDepartureDate] = useState(() => futureDate(7));
   const [returnDate, setReturnDate] = useState(() => futureDate(10));
@@ -90,7 +129,17 @@ export default function Intake({ onStarted, navigate }) {
       <div className="intake-grid">
         <label className="field">
           <span className="field-label">Leaving from</span>
-          <input className="field-input" value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="Bengaluru" required />
+          <input
+            className="field-input"
+            value={origin}
+            onChange={(e) => pickCity(e.target.value, setOrigin, setOriginCode)}
+            placeholder="Bengaluru"
+            list="places-origin"
+            autoComplete="off"
+            required
+          />
+          <PlaceOptions id="places-origin" query={origin} />
+          <span className="field-hint">Start typing — the airport code fills itself.</span>
         </label>
 
         <label className="field">
@@ -98,21 +147,26 @@ export default function Intake({ onStarted, navigate }) {
           <input
             className="field-input"
             value={destination}
-            onChange={(e) => setDestination(e.target.value)}
+            onChange={(e) => pickCity(e.target.value, setDestination, setDestinationCode)}
             placeholder="Goa"
+            list="places-destination"
+            autoComplete="off"
             required
           />
+          <PlaceOptions id="places-destination" query={destination} />
         </label>
 
         <label className="field">
           <span className="field-label">Origin airport code</span>
-          <input className="field-input" value={originCode} onChange={(e) => setOriginCode(e.target.value)} placeholder="BLR" minLength="3" maxLength="3" pattern="[A-Za-z]{3}" required />
+          <input className="field-input" value={originCode} onChange={(e) => setOriginCode(e.target.value.toUpperCase())} placeholder="BLR" list="codes-origin" autoComplete="off" minLength="3" maxLength="3" pattern="[A-Za-z]{3}" required />
+          <PlaceOptions id="codes-origin" query={originCode} codesOnly />
           <span className="field-hint">IATA code used for live flight search.</span>
         </label>
 
         <label className="field">
           <span className="field-label">Destination airport code</span>
-          <input className="field-input" value={destinationCode} onChange={(e) => setDestinationCode(e.target.value)} placeholder="GOI" minLength="3" maxLength="3" pattern="[A-Za-z]{3}" required />
+          <input className="field-input" value={destinationCode} onChange={(e) => setDestinationCode(e.target.value.toUpperCase())} placeholder="GOI" list="codes-destination" autoComplete="off" minLength="3" maxLength="3" pattern="[A-Za-z]{3}" required />
+          <PlaceOptions id="codes-destination" query={destinationCode} codesOnly />
         </label>
 
         <label className="field">

@@ -261,10 +261,23 @@ function AutoAdvance({ state, pathname, navigate }) {
     const pending = Object.values(state.choice?.requested ?? {}).some(
       (row) => !state.choice?.made?.[row.agent],
     );
-    if (state.receipt && pathname !== "/receipt") navigate("/receipt");
-    else if (state.approval?.requested && !state.approval?.given && pathname !== "/approve") navigate("/approve");
-    else if (pending && pathname !== "/choose") navigate("/choose");
-    else if (!pending && ["/choose", "/approve"].includes(pathname)) navigate("/deliberate");
+    const awaitingApproval = Boolean(state.approval?.requested && !state.approval?.given);
+
+    // Stage precedence, each stage owning exactly one page: "if this stage is
+    // active, be on its page". The previous chain of forward/backward rules
+    // contained two loops — /approve <-> /deliberate whenever an approval was
+    // outstanding, and /approve <-> /choose whenever both a choice and an
+    // approval were. Both render as a flickering page. `test/autoAdvance.test.js`
+    // asserts no state and starting route can navigate forever.
+    let target = null;
+    if (state.receipt) target = "/receipt";
+    else if (pending) target = "/choose";           // choose options first,
+    else if (awaitingApproval) target = "/approve"; // then approve the plan
+    else if (["/choose", "/approve"].includes(pathname)) target = "/deliberate";
+
+    // `replace`: these are automatic moves the user did not ask for, so they
+    // must not pile up entries the back button has to chew through.
+    if (target && target !== pathname) navigate(target, { replace: true });
   }, [state.choice, state.approval, state.receipt, pathname, navigate]);
 
   return null;

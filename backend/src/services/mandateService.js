@@ -4,8 +4,14 @@ export class MandateService {
     this.mandateMerchants = mandateMerchants;
   }
 
-  async createSetupSession({ userId, userEmail, amountCap, currency = "INR", merchant, product }) {
+  async createSetupSession({ userId, userEmail, amountCap, currency = "INR", merchant, product, callbackUrl }) {
     return this.pravaClient.createMandateSession({
+      // Documented in Prava's REST checkout walkthrough: the hosted page
+      // redirects here once the cardholder is done, which is what returns them
+      // to our app instead of stranding them on Prava's domain. `return_url`
+      // and `redirect_url` are accepted and silently ignored — the field is
+      // `callback_url`.
+      ...(callbackUrl ? { callback_url: callbackUrl } : {}),
       user_id: userId,
       user_email: userEmail,
       total_amount: money(amountCap),

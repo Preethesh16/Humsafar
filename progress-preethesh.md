@@ -326,4 +326,4 @@
 - Why: actual Prava response envelopes differ slightly from the current example, but the two security-critical identifiers are stable. Accepting only those required fields preserves fail-closed behavior without rejecting a valid sandbox session.
 - Blocked on: human completion of sandbox card entry, any test OTP, and WebAuthn/passkey approval before session expiry.
 - Needs from Jeswin/Deepthi: none until mandate activation is confirmed; do not represent this created session as a purchase.
-- Commit: pending (live response compatibility fix on `preethesh/integrations-backend`)
+- Commit: `7ba86fa` (live response compatibility fix committed on `preethesh/integrations-backend`)

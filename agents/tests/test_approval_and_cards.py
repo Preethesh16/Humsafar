@@ -214,7 +214,7 @@ class MandateResolverTest(ServerCase):
     table = {
         "/api/prava/mandates/resolve": (
             200,
-            {"data": {"mandateId": "mandate_live_1", "merchant": "duffel-taj"}, "source": "sandbox"},
+            {"data": {"mandateId": "mandate_live_1", "merchant": "Taj Holiday Village"}, "source": "sandbox"},
         ),
         "/api/scoped-cards": (
             201,
@@ -225,7 +225,7 @@ class MandateResolverTest(ServerCase):
                 "dynamicCvv": "123",
                 "expiryMonth": "12",
                 "expiryYear": "30",
-                "merchant": "duffel-taj",
+                "merchant": "Taj Holiday Village",
                 "amountCap": 100.0,
                 "status": "issued",
                 "source": "sandbox",
@@ -236,7 +236,7 @@ class MandateResolverTest(ServerCase):
     def test_the_backend_resolver_is_used_before_the_local_registry(self):
         client = ScopedCardClient(base_url=self.url, registry={})
 
-        card = client.mint("duffel-taj", to_paise(100))
+        card = client.mint("Taj Holiday Village", to_paise(100))
 
         self.assertTrue(card.issued)
         self.assertTrue(any("resolve" in path for _, path in self.handler.seen))
@@ -245,9 +245,9 @@ class MandateResolverTest(ServerCase):
 class MandateResolverFallbackTest(unittest.TestCase):
     def test_an_unreachable_backend_falls_back_to_the_local_registry(self):
         client = ScopedCardClient(
-            base_url=DEAD_URL, registry={"duffel-taj": "mandate_local"}, timeout=0.5
+            base_url=DEAD_URL, registry={"taj holiday village": "mandate_local"}, timeout=0.5
         )
-        self.assertEqual(client._resolve_mandate("duffel-taj"), "mandate_local")
+        self.assertEqual(client._resolve_mandate("Taj Holiday Village"), "mandate_local")
 
     def test_an_unknown_merchant_refuses_to_mint(self):
         client = ScopedCardClient(base_url=DEAD_URL, registry={}, timeout=0.5)
@@ -397,3 +397,46 @@ class ApprovalRecordTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ObservedCapDeclineTest(unittest.TestCase):
+    """Locked against what the sandbox actually returned on 2026-08-02.
+
+    Charging Rs 160 against a Rs 100 mandate produced errorCode "DECLINED"
+    with "Total amount 160.00 exceeds ..." in the message — not the
+    THRESHOLD_EXCEEDED the docs name. A classifier that only accepted the
+    documented code would have called a real cap decline "not cap enforcement".
+    """
+
+    REAL_MESSAGE = (
+        "Visa did not return COMPLETED (status DECLINED): "
+        "Total amount 160.00 exceeds the approved amount 100.00"
+    )
+
+    def test_the_real_sandbox_decline_counts_as_cap_enforcement(self):
+        from humsafar.guardian import is_cap_decline
+
+        self.assertTrue(is_cap_decline("DECLINED", self.REAL_MESSAGE))
+
+    def test_the_documented_code_still_counts(self):
+        from humsafar.guardian import is_cap_decline
+
+        self.assertTrue(is_cap_decline("THRESHOLD_EXCEEDED", None))
+
+    def test_a_bare_decline_without_an_amount_reason_does_not_count(self):
+        from humsafar.guardian import is_cap_decline
+
+        self.assertFalse(is_cap_decline("DECLINED", "Visa declined: insufficient funds"))
+        self.assertFalse(is_cap_decline("DECLINED", None))
+
+    def test_unrelated_failures_never_count(self):
+        from humsafar.guardian import is_cap_decline
+
+        for code in ("MANDATE_NOT_ACTIVE", "MANDATE_MERCHANT_NOT_ALLOWED", "TRIES_EXHAUSTED", ""):
+            self.assertFalse(is_cap_decline(code, "some message"))
+
+    def test_the_reason_text_reflects_the_real_decline(self):
+        reason = Guardian.describe_card_block(
+            "Stay Agent", to_paise("160"), to_paise("100"), "DECLINED", self.REAL_MESSAGE
+        )
+        self.assertIn("Blocked at the card level", reason)

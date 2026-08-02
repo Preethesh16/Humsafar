@@ -28,6 +28,35 @@ from .models import Option
 from .money import format_inr
 
 
+# Codes that mean the amount cap did the blocking, as opposed to the mandate
+# being unusable for some other reason.
+#
+# `THRESHOLD_EXCEEDED` is what the docs name. What the sandbox actually returned
+# on 2026-08-02, charging Rs 160 against a Rs 100 mandate, was:
+#
+#   errorCode:    "DECLINED"
+#   errorMessage: "Visa did not return COMPLETED (status DECLINED):
+#                  Total amount 160.00 exceeds ..."
+#
+# So a bare `DECLINED` is ambiguous — it is the generic Visa decline and could
+# mean several things. It only counts as cap enforcement when the message says
+# the amount was exceeded. Both are accepted because the documented code may
+# well be what production returns; neither is assumed.
+CAP_DECLINE_CODES = frozenset({"THRESHOLD_EXCEEDED"})
+_AMBIGUOUS_DECLINE_CODES = frozenset({"DECLINED", "CHARGE_DECLINED"})
+_EXCEEDED_PHRASES = ("exceeds", "exceeded", "over the approved", "above the approved")
+
+
+def is_cap_decline(error_code: str, message: Optional[str] = None) -> bool:
+    """True only when the refusal was demonstrably about the amount cap."""
+    if error_code in CAP_DECLINE_CODES:
+        return True
+    if error_code in _AMBIGUOUS_DECLINE_CODES and message:
+        lowered = message.lower()
+        return any(phrase in lowered for phrase in _EXCEEDED_PHRASES)
+    return False
+
+
 @dataclass
 class GuardianVerdict:
     allowed: bool
@@ -88,7 +117,7 @@ class Guardian:
         attempted = format_inr(attempted_paise)
         cap = format_inr(cap_paise)
 
-        if error_code == "THRESHOLD_EXCEEDED":
+        if is_cap_decline(error_code, backend_error):
             return (
                 f"Blocked at the card level: {agent} attempted {attempted} against a card capped "
                 f"at {cap}. The credential is merchant-locked and amount-capped, so the network "

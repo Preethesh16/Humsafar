@@ -14,12 +14,14 @@ import sys
 
 from .approval import AutoApproval, PolledApproval
 from .cards import ScopedCardClient, StubScopedCardClient
+from .checkout import LiveCheckout
 from .config import load_env
 from .discovery import BackendDiscovery
 from .events import EventEmitter
 from .llm import Narrator
 from .money import format_inr
 from .orchestrator import run_goal
+from .reporting import ChargeReporter
 from .trust import TrustClient
 
 # Load the shared gitignored .env before anything reads os.environ. An explicit
@@ -56,6 +58,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--approval-ttl", type=int, default=120, help="Approval request lifetime in seconds"
     )
+    parser.add_argument(
+        "--live-checkout",
+        action="store_true",
+        help="Use the real Prava credential and reconcile the outcome via mandate-report",
+    )
     parser.add_argument("--llm", action="store_true", help="Use OpenAI for agent dialogue")
     parser.add_argument("--overspend", metavar="AGENT", help="Have this agent attempt an over-slice charge")
     parser.add_argument("--fail", metavar="AGENT", help="Fail this agent's booking once, then recover")
@@ -88,6 +95,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.await_approval
         else AutoApproval()
     )
+    checkout = (
+        LiveCheckout(reporter=ChargeReporter(base_url=args.backend, token=token))
+        if args.live_checkout
+        else None
+    )
 
     print(
         f"\n  HUMSAFAR — {args.goal}\n"
@@ -96,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
         f"  discovery   : {'backend route' if args.live_discovery else 'local FIXTURE data'}\n"
         f"  trust check : {'on' if args.trust else 'off'}\n"
         f"  approval    : {'HUMAN via approval API' if args.await_approval else 'auto (no human decision)'}\n"
+        f"  checkout    : {'LIVE Prava credential + reconciliation' if args.live_checkout else 'SIMULATED (fixture)'}\n"
         f"  reasoning   : {'OpenAI Agents SDK' if narrator.available else 'deterministic templates'}\n"
         f"  streaming   : {'off' if args.no_stream else args.backend}\n",
         file=sys.stderr,
@@ -110,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         provider=provider,
         trust=trust,
         approval=approval,
+        checkout=checkout,
         overspend_agent=overspend,
         fail_agent=fail,
     )
@@ -123,10 +137,16 @@ def main(argv: list[str] | None = None) -> int:
         )
     for block in report.blocked:
         print(f"  BLK  {block['agent']:<8} {block['attempted']:>13,.2f}  cap {block['cap']:,.2f}")
+    authorized_only = any(
+        p.status == "success" and "NO merchant order" in p.detail for p in report.purchases
+    )
+    verb = "authorized" if authorized_only else "spent"
     print(
-        f"\n  spent {format_inr(report.total_spent_paise)} of {format_inr(report.budget_paise)}"
+        f"\n  {verb} {format_inr(report.total_spent_paise)} of {format_inr(report.budget_paise)}"
         f"  |  within budget: {report.within_budget}"
     )
+    if authorized_only:
+        print("  note: Prava sandbox credentials issued and merchant-locked; no merchant order placed")
     if provider is not None and provider.sources:
         # Print what each category actually resolved to, not what was asked
         # for — a live route that fell back to fixtures must not read as live.

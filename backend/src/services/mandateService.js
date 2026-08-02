@@ -35,8 +35,28 @@ export class MandateService {
   async syncCustomerMandates(customerId) {
     const result = await this.pravaClient.listMandates({ customerId, standingOnly: true });
     for (const mandate of result.data.mandates) {
-      if (mandate.status === "active" && mandate.merchantScope === "listed") {
+      // `status` and `state` are separate: a consumed or cancelled mandate
+      // still reports status "active", so filtering on status alone kept dead
+      // mandates in the registry. Every re-approval for the same merchant then
+      // added another entry, and resolveMandate() failed closed with
+      // "Multiple active mandates are registered for this merchant" — which is
+      // exactly what it should do given a registry full of stale ids.
+      //
+      // A mandate is only usable when it is still available to charge, so
+      // unusable ones are actively removed rather than merely skipped.
+      // `state` is excluded only when it is explicitly unusable, rather than
+      // required to be present. Live Prava always sends it, but a response
+      // without one should keep the original behaviour instead of silently
+      // dropping every mandate.
+      const unusableState =
+        typeof mandate.state === "string" && mandate.state !== "available";
+      const usable =
+        mandate.status === "active" && mandate.merchantScope === "listed" && !unusableState;
+
+      if (usable) {
         this.mandateMerchants.set(mandate.id, mandate.merchantName);
+      } else {
+        this.mandateMerchants.delete(mandate.id);
       }
     }
     return result;

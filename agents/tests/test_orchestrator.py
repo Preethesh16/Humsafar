@@ -155,9 +155,9 @@ class StubCardTest(unittest.TestCase):
     def test_the_first_cap_becomes_the_ceiling_for_that_merchant(self):
         client = StubScopedCardClient()
 
-        first = client.mint("duffel-taj", to_paise("5000"))
-        over = client.mint("duffel-taj", to_paise("8000"))
-        under = client.mint("duffel-taj", to_paise("4000"))
+        first = client.mint("Taj Holiday Village", to_paise("5000"))
+        over = client.mint("Taj Holiday Village", to_paise("8000"))
+        under = client.mint("Taj Holiday Village", to_paise("4000"))
 
         self.assertTrue(first.issued)
         self.assertFalse(over.issued)
@@ -175,10 +175,10 @@ class StubCardTest(unittest.TestCase):
 
 class MandateRegistryTest(unittest.TestCase):
     def test_inverts_the_backend_mapping(self):
-        registry = load_mandate_registry('{"mandate_1": "duffel-taj", "mandate_2": "Viator-GoGoa"}')
+        registry = load_mandate_registry('{"mandate_1": "Taj Holiday Village", "mandate_2": "GoGoa Bikes"}')
 
-        self.assertEqual(registry["duffel-taj"], "mandate_1")
-        self.assertEqual(registry["viator-gogoa"], "mandate_2")
+        self.assertEqual(registry["taj holiday village"], "mandate_1")
+        self.assertEqual(registry["gogoa bikes"], "mandate_2")
 
     def test_bad_json_degrades_to_empty(self):
         self.assertEqual(load_mandate_registry("{not json"), {})

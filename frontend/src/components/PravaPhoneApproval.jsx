@@ -46,14 +46,14 @@ export function PravaPhoneApproval({
       <div className="prava-phone__intro">
         <span className="prava-phone__mark" aria-hidden="true">P</span>
         <div>
-          <strong id="prava-phone-title">Continue with Prava sandbox</strong>
-          <span>The exact planned total is verified by the server; status updates here automatically.</span>
+          <strong id="prava-phone-title">Authorize your trip budget with Prava sandbox</strong>
+          <span>The server verifies the exact planned total. This creates a capped permission, not a payment.</span>
         </div>
         {status !== "ready" && (
           <button type="button" className="prava-phone__button" onClick={begin} disabled={status === "loading"}>
             {status === "loading"
               ? "Creating secure link…"
-              : `Pay ${formatMoney(plannedAmount, "INR")} on phone`}
+              : `Authorize ${formatMoney(plannedAmount, "INR")} on phone`}
           </button>
         )}
       </div>
@@ -86,16 +86,13 @@ export function PravaPhoneApproval({
               <ol>
                 <li>Scan this QR with your phone camera.</li>
                 <li>Enter the assigned sandbox card on Prava.</li>
-                <li>Approve the passkey; Humsafar checks Prava automatically.</li>
+                <li>Approve the passkey; Humsafar checks for the new mandate automatically.</li>
               </ol>
               {approval.stage === "waiting_for_cardholder" && (
                 <span className="prava-phone__expiry">Link expires {formatExpiry(approval.expiresAt)}.</span>
               )}
-              {approval.stage === "checkout_ready" && (
-                <span className="prava-phone__truth">Card approved and credentials prepared; no merchant checkout has completed yet.</span>
-              )}
-              {approval.stage === "completed" && approval.paid && (
-                <span className="prava-phone__truth prava-phone__truth--success">Prava confirms the sandbox checkout is completed.</span>
+              {approval.stage === "authorized" && (
+                <span className="prava-phone__truth prava-phone__truth--success">Trip budget authorized. No payment or booking has occurred.</span>
               )}
               <button type="button" className="prava-phone__refresh" onClick={refresh}>Check Prava now</button>
               <a href={approval.iframeUrl} target="_blank" rel="noreferrer">
@@ -113,9 +110,7 @@ function stageLabel(stage) {
   return {
     waiting_for_cardholder: "Waiting for phone approval",
     checking: "Checking Prava…",
-    checkout_ready: "Prava approved · merchant checkout pending",
-    completed: "Sandbox payment completed",
-    failed: "Sandbox checkout failed",
+    authorized: "Trip budget authorized",
     expired: "Approval link expired",
   }[stage] ?? "Checking Prava…";
 }

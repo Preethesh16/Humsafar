@@ -112,16 +112,16 @@ Rules it enforces:
   the receipt states how many lines genuinely exercised a payment path, so one
   real line can never stand for the whole run.
 
-The embedded receipt also offers **Pay the planned total on phone** when the
-stream is not the mock lab. The browser sends only the run ID; the backend finds
-that run's final receipt, rejects unknown runs, and creates a Humsafar sandbox
-checkout for the exact planned value. The page receives only a short-lived
+The embedded receipt also offers **Authorize the planned trip budget on phone** when
+the stream is not the mock lab. The browser sends only the run ID; the backend finds
+that run's final receipt, rejects unknown runs, and creates an authorize-only Humsafar
+sandbox mandate capped at the exact planned value. The page receives only a short-lived
 `sandbox.collect.prava.space` URL, generates the QR locally and keeps card,
 OTP and passkey entry on Prava's phone surface. It polls a sanitized status
-route every three seconds: `pending` waits for the phone, `awaiting_result`
-means credentials are ready but merchant checkout is still pending, and only
-Prava's `completed` state may render “Sandbox payment completed.” No token,
-CVV, expiry, session ID or raw result reaches React. Ordinary browser rehearsals
+route every three seconds and recognizes success only when Prava lists an exact
+active/available mandate for the merchant and cap. The resulting state is
+“Trip budget authorized,” never paid. No mandate ID, token, CVV, expiry, session
+ID or raw result reaches React. Ordinary browser rehearsals
 assert the button is present but never click it, so tests do not consume
 sandbox sessions.
 

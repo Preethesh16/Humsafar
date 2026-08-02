@@ -12,6 +12,7 @@ const approval = {
   iframeUrl: "https://sandbox.collect.prava.space/session/phone-safe-token",
   expiresAt: "2026-08-03T01:00:00.000Z",
   stage: "waiting_for_cardholder",
+  authorizeOnly: true,
   reused: false,
 };
 
@@ -62,7 +63,7 @@ test("rejects the right hostname on a nonstandard origin", async () => {
   );
 });
 
-test("checks sanitized Prava status without receiving credentials", async () => {
+test("checks sanitized Prava mandate status without claiming payment", async () => {
   const calls = [];
   const result = await checkPravaPhoneApproval("run_1", {
     fetchImpl: async (...args) => {
@@ -73,15 +74,16 @@ test("checks sanitized Prava status without receiving credentials", async () => 
         merchant: "Humsafar",
         amountCap: 13800,
         currency: "INR",
-        stage: "checkout_ready",
-        terminal: false,
+        stage: "authorized",
+        authorizeOnly: true,
+        terminal: true,
         paid: false,
         checkedAt: "2026-08-03T00:55:00.000Z",
       }) };
     },
   });
   assert.equal(calls[0][0], "/api/prava/phone-approval?runId=run_1");
-  assert.equal(result.stage, "checkout_ready");
+  assert.equal(result.stage, "authorized");
   assert.equal(result.paid, false);
 });
 

@@ -19,37 +19,20 @@ test("MandateService creates a one-time listed merchant setup session", async ()
   assert.equal(body.mandate_setup.recurring_frequency, "one_time");
 });
 
-test("MandateService creates a trip-total checkout without inventing a mandate policy", async () => {
-  let body;
-  const service = new MandateService({
-    pravaClient: { async createMandateSession(input) { body = input; return { data: {}, source: "live" }; } },
-    mandateMerchants: new Map(),
-  });
-  await service.createCheckoutSession({
-    userId: "user_1", userEmail: "user@example.com", amountCap: 13800,
-    merchant: { name: "Humsafar", url: "https://github.com/Preethesh16/Humsafar", countryCode: "IN" },
-    product: { description: "Trip plan", unitPrice: 13800 },
-  });
-  assert.equal(body.total_amount, "13800.00");
-  assert.equal(body.purchase_context[0].product_details[0].unit_price, "13800.00");
-  assert.equal(body.integration_type, "full_checkout");
-  assert.equal(body.mandate_setup, undefined);
-});
-
-test("MandateService forwards only the private session reference to the status client", async () => {
-  let sessionId;
+test("MandateService lists standing mandates for authorization status", async () => {
+  let query;
   const service = new MandateService({
     pravaClient: {
-      async getSessionPaymentResult(value) {
-        sessionId = value;
-        return { data: { status: "pending" }, source: "live" };
+      async listMandates(input) {
+        query = input;
+        return { data: { mandates: [] }, source: "live" };
       },
     },
     mandateMerchants: new Map(),
   });
-  const result = await service.getCheckoutStatus("sess_private");
-  assert.equal(sessionId, "sess_private");
-  assert.equal(result.data.status, "pending");
+  const result = await service.listCustomerMandates("customer_1");
+  assert.deepEqual(query, { customerId: "customer_1", standingOnly: true });
+  assert.deepEqual(result.data.mandates, []);
 });
 
 test("MandateService syncs only active listed mandates into the registry", async () => {

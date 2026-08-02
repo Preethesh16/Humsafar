@@ -47,6 +47,13 @@ Locked backend endpoints:
 - `POST /api/discovery/:category` — discovery for `flights`, `stay`, `food`, or `guide`; always returns the Section 4 `{ data, source }` envelope.
 - `POST /api/trust/check` — pre-purchase trust decision. Body: `{ merchant: string, rating?: number }`; response is `{ data: { merchant, score, decision, reason }, source }`. Fixture trust is labeled and does not qualify as live Senso evidence.
 - `POST /api/prava/mandate-sessions` — create one merchant-specific mandate approval session.
+- `POST /api/prava/phone-approval` — browser-session route accepting only `{ runId }`.
+  The backend resolves the final receipt total and creates an authorize-only sandbox
+  mandate; no browser-supplied amount, merchant, customer or product is accepted.
+- `GET /api/prava/phone-approval?runId=<id>` — returns only the sanitized mandate
+  ceremony state. `authorized` requires an exact active/available listed mandate for
+  the server-pinned merchant and approved amount. It never returns a mandate/session
+  id or treats authorization as payment.
 - `POST /api/prava/mandates/sync` — refresh the active mandate-to-merchant registry for a customer after approval.
 - `GET /api/prava/mandates/resolve?merchant=<name>` — internal merchant-to-mandate lookup. Returns `{ data: { mandateId, merchant }, source: "sandbox" }`, `404 MANDATE_NOT_FOUND`, or fails closed on ambiguity. Python uses this source of truth instead of copying backend state into environment variables.
 - `POST /api/prava/mandates/:mandateId/charges/:transactionId/report` — report checkout success/failure to Prava.

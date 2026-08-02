@@ -146,7 +146,7 @@ const embeddedReceipt = renderToStaticMarkup(
   />,
 );
 assert.ok(
-  embeddedReceipt.includes("Pay ₹21,000 on phone"),
+  embeddedReceipt.includes("Authorize ₹21,000 on phone"),
   "a non-mock embedded receipt should offer the explicit Prava phone handoff",
 );
 assert.ok(

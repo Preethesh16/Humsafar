@@ -127,16 +127,16 @@ stations are separated visually while preserving their real visit order. The
 course is a game visualization rather than road geometry; opening directions
 explicitly hands the real coordinates to Google Maps.
 
-The same receipt contains an opt-in **Pay the planned total on phone** handoff
-for Prava sandbox. It performs no request on page load. A click sends only the
-run ID; the backend resolves that run's `final_receipt.totalSpent`, pins the
-Humsafar merchant/product terms, and rejects any invented or missing run. The
+The same receipt contains an opt-in **Authorize the planned trip budget on phone**
+handoff for Prava sandbox. It performs no request on page load. A click sends only
+the run ID; the backend resolves that run's `final_receipt.totalSpent`, pins the
+Humsafar merchant/product terms, creates an authorize-only mandate, and rejects any invented or missing run. The
 browser accepts only an HTTPS URL on `sandbox.collect.prava.space` and generates
 the QR locally. An unexpired ceremony is reused to prevent double-click waste.
-Afterward the UI polls a sanitized server-side payment result: `pending`,
-`checkout_ready`, `completed`, `failed` or `expired`. Credentials never cross
-the API boundary, and `awaiting_result` is rendered as merchant-checkout pending,
-not paid.
+Afterward the UI polls a sanitized mandate check: `waiting_for_cardholder`,
+`authorized` or `expired`. Only an active, available, listed mandate whose merchant
+and approved amount match this run counts as authorized. Mandate IDs and credentials
+never cross the API boundary, and authorization is never rendered as paid.
 
 ## 4. Structured trip context — landed
 

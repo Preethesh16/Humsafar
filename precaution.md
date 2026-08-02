@@ -100,14 +100,19 @@ an unanswered Discord question into an implementation assumption.
 - [ ] Keep `HUMSAFAR_ENABLE_PRAVA_PHONE_APPROVAL=false` except during an
   attended sandbox ceremony. The receipt button is an operator opt-in, not a
   background startup action.
-- [ ] The browser may request the server-pinned ceremony but must never submit
-  its own customer, merchant, cap or product terms. Reject any returned URL
+- [ ] The browser may submit only its run ID. Resolve the amount from that
+  run's authoritative final receipt and pin customer, merchant and product on
+  the server; never accept a browser-supplied amount. Reject any returned URL
   outside the exact HTTPS `sandbox.collect.prava.space` origin.
 - [ ] Generate the QR in memory from the short-lived hosted URL. Do not persist,
   log, commit, analytics-track or include that URL in a screenshot intended for
   publication.
 - [ ] Reuse an unexpired hosted session after a double-click. Do not turn a UI
   retry into a session-creation loop.
+- [ ] Poll payment status only from the backend and return a sanitized stage.
+  Never send the session ID, token, CVV, expiry or raw payment result to React.
+  `awaiting_result` means credentials are ready for merchant checkout; it does
+  not mean the payment completed.
 - [ ] For this workstation, treat Linux as the operator/backend surface and a
   passkey-capable phone as the Prava hosted-approval surface. Do not burn
   sessions repeatedly trying to force WebAuthn through the Linux browser.

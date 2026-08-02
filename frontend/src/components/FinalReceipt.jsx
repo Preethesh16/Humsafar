@@ -11,7 +11,7 @@ import { PravaPhoneApproval } from "./PravaPhoneApproval.jsx";
  * external channel. The fan-out button is deliberately inert until a channel is
  * wired — it copies the summary rather than pretending a message was sent.
  */
-export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations, isMock, onDismiss, embedded = false }) {
+export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations, isMock, onDismiss, embedded = false, runId = null }) {
   const closeRef = useRef(null);
 
   // A modal that can only be dismissed with the mouse is a keyboard trap. Escape
@@ -77,14 +77,16 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
           </p>
         )}
 
-        <div className={`runmode runmode--${modeLabel.tone}`}>
-          <b>{modeLabel.text}</b>
-          {modeLabel.detail && <span>{modeLabel.detail}</span>}
-          <span className="runmode__count">
-            {proven} of {lines.length} purchase{lines.length === 1 ? "" : "s"} exercised a
-            payment path.
-          </span>
-        </div>
+        {(!embedded || isMock) && (
+          <div className={`runmode runmode--${modeLabel.tone}`}>
+            <b>{modeLabel.text}</b>
+            {modeLabel.detail && <span>{modeLabel.detail}</span>}
+            <span className="runmode__count">
+              {proven} of {lines.length} purchase{lines.length === 1 ? "" : "s"} exercised a
+              payment path.
+            </span>
+          </div>
+        )}
 
         <ul className="outcome-lines">
           {lines.map((line, index) => {
@@ -142,7 +144,9 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
           </div>
         </div>
 
-        {embedded && !isMock && <PravaPhoneApproval />}
+        {embedded && !isMock && runId && (
+          <PravaPhoneApproval runId={runId} plannedAmount={receipt.totalSpent} />
+        )}
 
         <button type="button" className="run-btn" onClick={copySummary}>
           Copy confirmation summary

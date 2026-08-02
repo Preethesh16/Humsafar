@@ -546,8 +546,34 @@ h1 em {
 .prava-phone__steps { display: grid; align-content: start; gap: 7px; }
 .prava-phone__eyebrow { color: var(--forest-2); font: 750 9px/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; }
 .prava-phone__steps > strong { color: var(--forest); font-size: 14px; }
+.prava-phone__state {
+  width: fit-content;
+  padding: 5px 8px;
+  border: 1px solid #d9bd75;
+  border-radius: 999px;
+  color: var(--amber-ink);
+  background: #fff4d7;
+  font: 750 9px/1.2 var(--mono);
+}
+.prava-phone__state--checkout_ready { color: #18554a; border-color: #83c8b8; background: #e6f7f1; }
+.prava-phone__state--completed { color: #fff; border-color: var(--forest); background: var(--forest); }
+.prava-phone__state--failed,
+.prava-phone__state--expired { color: var(--coral-ink); border-color: #e6afa3; background: #fff0ec; }
 .prava-phone__steps ol { margin: 2px 0; padding-left: 17px; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .prava-phone__expiry { color: var(--muted-2); font: 650 9px/1.35 var(--mono); }
+.prava-phone__truth { color: var(--coral-ink); font-size: 10px; line-height: 1.4; }
+.prava-phone__truth--success { color: var(--forest-2); font-weight: 750; }
+.prava-phone__refresh {
+  width: fit-content;
+  padding: 6px 9px;
+  border: 1px solid rgba(29, 59, 45, .32);
+  border-radius: 9px;
+  color: var(--forest);
+  background: rgba(255, 253, 248, .8);
+  font: 700 10px/1 var(--sans);
+  cursor: pointer;
+}
+.prava-phone__refresh:hover { background: #fffdf8; }
 .prava-phone__steps a { width: fit-content; color: var(--forest); font-size: 11px; font-weight: 750; text-underline-offset: 3px; }
 .prava-phone__error {
   display: flex;

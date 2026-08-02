@@ -112,13 +112,18 @@ Rules it enforces:
   the receipt states how many lines genuinely exercised a payment path, so one
   real line can never stand for the whole run.
 
-The embedded receipt also offers **Set up on phone** when the stream is not the
-mock lab. This is a separate, explicit authorization ceremony—not an automatic
-checkout. The backend pins the customer, Duffel merchant and ₹100 cap; the page
-receives only a short-lived `sandbox.collect.prava.space` URL, generates the QR
-locally and keeps card/OTP/passkey entry on Prava's phone surface. Ordinary
-browser rehearsals assert the button is present but never click it, so tests do
-not consume sandbox sessions.
+The embedded receipt also offers **Pay the planned total on phone** when the
+stream is not the mock lab. The browser sends only the run ID; the backend finds
+that run's final receipt, rejects unknown runs, and creates a Humsafar sandbox
+checkout for the exact planned value. The page receives only a short-lived
+`sandbox.collect.prava.space` URL, generates the QR locally and keeps card,
+OTP and passkey entry on Prava's phone surface. It polls a sanitized status
+route every three seconds: `pending` waits for the phone, `awaiting_result`
+means credentials are ready but merchant checkout is still pending, and only
+Prava's `completed` state may render “Sandbox payment completed.” No token,
+CVV, expiry, session ID or raw result reaches React. Ordinary browser rehearsals
+assert the button is present but never click it, so tests do not consume
+sandbox sessions.
 
 ## Dev proxy
 

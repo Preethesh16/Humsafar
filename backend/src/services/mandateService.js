@@ -38,22 +38,17 @@ export class MandateService {
     });
   }
 
-  /**
-   * A standard hosted checkout — the cardholder pays on Prava's page.
-   *
-   * Distinct from `createSetupSession`: there is no `mandate_setup` block, so
-   * this authorises nothing for later. It is one payment, made by the human,
-   * which is what a redirect-to-Prava checkout is.
-   */
-  async createCheckoutSession({ userId, userEmail, amount, currency = "INR", merchant, product, callbackUrl }) {
+  async createCheckoutSession({ userId, userEmail, amountCap, currency = "INR", merchant, product, callbackUrl }) {
     return this.pravaClient.createMandateSession({
       user_id: userId,
       user_email: userEmail,
-      total_amount: money(amount),
+      total_amount: money(amountCap),
       currency,
-      integration_type: "full_checkout",
-      // Prava rejects a non-https callback outright, so an http origin (any
-      // local dev server) must omit it rather than send one and get a 400.
+      // Documented in Prava's REST checkout walkthrough as the field that
+      // returns the cardholder to us once the hosted page is done —
+      // `return_url` and `redirect_url` are accepted and silently ignored.
+      // Prava rejects a non-https value outright, so an http origin omits it
+      // rather than sending one and taking a 400.
       ...(typeof callbackUrl === "string" && callbackUrl.startsWith("https://")
         ? { callback_url: callbackUrl }
         : {}),
@@ -69,14 +64,12 @@ export class MandateService {
           quantity: product.quantity ?? 1,
         }],
       }],
+      integration_type: "full_checkout",
     });
   }
 
-  async sessionStatus(sessionId) {
-    if (typeof sessionId !== "string" || sessionId.trim() === "") {
-      throw new TypeError("sessionId must be a non-empty string");
-    }
-    return this.pravaClient.sessionStatus(sessionId.trim());
+  async getCheckoutStatus(sessionId) {
+    return this.pravaClient.getSessionPaymentResult(sessionId);
   }
 
   async syncCustomerMandates(customerId) {

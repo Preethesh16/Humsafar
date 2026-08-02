@@ -142,11 +142,16 @@ const embeddedReceipt = renderToStaticMarkup(
     isMock={false}
     onDismiss={() => {}}
     embedded
+    runId="run_1"
   />,
 );
 assert.ok(
-  embeddedReceipt.includes("Set up on phone"),
+  embeddedReceipt.includes("Pay ₹21,000 on phone"),
   "a non-mock embedded receipt should offer the explicit Prava phone handoff",
+);
+assert.ok(
+  !embeddedReceipt.includes("Fixture-only run — no payment was attempted"),
+  "the embedded receipt should not repeat the large run-level fixture banner",
 );
 assert.equal(
   (liveReceipt.match(/completed sandbox checkout/g) ?? []).length,

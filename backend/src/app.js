@@ -163,53 +163,6 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     return itineraryResponse(response, () => itineraryService.plan(request.body ?? {}));
   });
 
-  // Redirect-to-Prava checkout, driven by the person paying.
-  //
-  // Browser-reachable because it is the human's own payment: they leave for
-  // Prava's hosted page, authenticate with their passkey, and come back. It
-  // grants the browser nothing extra — no credential is returned here, and
-  // minting a scoped card for an agent remains agent-only.
-  //
-  // The identity is fixed server-side; a caller-supplied user id would let one
-  // browser open a checkout against another person's Prava customer.
-  app.post("/api/prava/checkout-sessions", browserOrAgent, async (request, response) => {
-    if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
-    try {
-      const session = await mandateService.createCheckoutSession({
-        ...request.body,
-        userId: pravaCustomerId,
-        userEmail: pravaCustomerEmail,
-        callbackUrl: `${publicBaseUrl}/receipt`,
-      });
-      return response.status(201).json(session);
-    } catch (error) {
-      // 502, not 500: the request reached us fine and failed upstream. A bare
-      // "Unexpected server error" hides which field Prava rejected.
-      return response.status(error.status ?? 502).json({
-        error: {
-          code: error.code ?? "PRAVA_CHECKOUT_FAILED",
-          message: error.message ?? "Prava could not create the checkout session",
-        },
-      });
-    }
-  });
-
-  // Polled after the redirect returns. Reports whether a credential was issued
-  // and, when it was not, why — never the credential itself.
-  app.get("/api/prava/checkout-sessions/:sessionId", browserOrAgent, async (request, response) => {
-    if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
-    try {
-      return response.json(await mandateService.sessionStatus(request.params.sessionId));
-    } catch (error) {
-      return response.status(error.status ?? 502).json({
-        error: {
-          code: error.code ?? "PRAVA_SESSION_STATUS_FAILED",
-          message: error.message ?? "Could not read the payment status",
-        },
-      });
-    }
-  });
-
   app.post("/api/trust/check", agentOnly, async (request, response) => {
     if (!trustService) return response.status(503).json({ error: { code: "TRUST_UNAVAILABLE" } });
     try {
@@ -224,24 +177,46 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     return response.status(201).json(await mandateService.createSetupSession(request.body));
   });
 
-  // Human-driven and explicitly opt-in. The browser supplies no customer,
-  // merchant or amount: those terms are pinned in server configuration. It
-  // receives only Prava's short-lived hosted URL so it can render a phone QR;
+  // Human-driven and explicitly opt-in. The browser supplies only a run id;
+  // the amount comes from that run's final receipt and the remaining terms are
+  // server configuration. It receives only Prava's short-lived hosted URL so
   // card entry and passkey approval stay entirely on Prava's origin.
-  app.post("/api/prava/phone-approval", browserOrAgent, async (_request, response) => {
+  app.post("/api/prava/phone-approval", browserOrAgent, async (request, response) => {
     if (!pravaApprovalService) {
       return response.status(503).json({
         error: { code: "PRAVA_PHONE_APPROVAL_UNAVAILABLE", message: "Phone approval is unavailable" },
       });
     }
     try {
-      return response.status(201).json(await pravaApprovalService.create());
+      return response.status(201).json(await pravaApprovalService.create({ runId: request.body?.runId }));
     } catch (error) {
       const disabled = error?.code === "PRAVA_PHONE_APPROVAL_DISABLED";
-      return response.status(disabled ? 503 : 502).json({
+      const invalidPlan = new Set(["PRAVA_PLAN_NOT_FOUND", "PRAVA_INVALID_PLAN_TOTAL"]).has(error?.code);
+      return response.status(disabled ? 503 : invalidPlan ? 422 : 502).json({
         error: {
           code: error?.code ?? "PRAVA_PHONE_APPROVAL_FAILED",
           message: error instanceof Error ? error.message : "Prava phone approval failed",
+          responseId: error?.responseId,
+        },
+      });
+    }
+  });
+
+  app.get("/api/prava/phone-approval", browserOrAgent, async (request, response) => {
+    if (!pravaApprovalService) {
+      return response.status(503).json({
+        error: { code: "PRAVA_PHONE_APPROVAL_UNAVAILABLE", message: "Phone approval is unavailable" },
+      });
+    }
+    try {
+      return response.json(await pravaApprovalService.status({ runId: request.query.runId }));
+    } catch (error) {
+      const missing = error?.code === "PRAVA_APPROVAL_NOT_FOUND";
+      const disabled = error?.code === "PRAVA_PHONE_APPROVAL_DISABLED";
+      return response.status(missing ? 404 : disabled ? 503 : 502).json({
+        error: {
+          code: error?.code ?? "PRAVA_PHONE_STATUS_FAILED",
+          message: error instanceof Error ? error.message : "Prava phone status check failed",
           responseId: error?.responseId,
         },
       });

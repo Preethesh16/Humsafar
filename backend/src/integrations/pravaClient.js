@@ -55,25 +55,21 @@ export class PravaClient {
     return { data: session, source: "live" };
   }
 
-  /** Poll a hosted session — how the app learns the cardholder finished. */
-  async sessionStatus(sessionId) {
+  async getSessionPaymentResult(sessionId) {
+    if (typeof sessionId !== "string" || !sessionId.trim()) {
+      throw new TypeError("sessionId is required");
+    }
     const payload = await this.request(
       `/v1/sessions/${encodeURIComponent(sessionId)}/payment-result`,
     );
-    const data = payload.data ?? {};
-    const txn = Array.isArray(data.transactions) ? data.transactions[0] : undefined;
-    return {
-      data: {
-        sessionId,
-        status: data.status ?? "pending",
-        // Never the credential itself — only whether one exists, plus the
-        // reason when it does not. Tokens, CVVs and expiries stay server-side.
-        credentialIssued: Boolean(txn?.line_items?.[0]?.token),
-        errorCode: txn?.error?.code ?? null,
-        errorMessage: txn?.error?.message ?? null,
-      },
-      source: "live",
-    };
+    const result = payload.data?.data?.status ? payload.data.data : payload.data;
+    if (typeof result?.status !== "string") {
+      throw new PravaApiError("Prava returned an invalid payment result", {
+        code: "PRAVA_INVALID_PAYMENT_RESULT",
+        responseId: payload.responseId,
+      });
+    }
+    return { data: result, source: "live" };
   }
 
   async listMandates({ customerId, standingOnly = true }) {

@@ -43,6 +43,7 @@ const frontendDist =
   process.env.FRONTEND_DIST ??
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../frontend/dist");
 
+const eventHub = new EventHub();
 const mandateMerchants = parseMandateMerchants(
   process.env.PRAVA_MANDATE_MERCHANTS_JSON ?? "{}",
 );
@@ -54,18 +55,25 @@ const pravaClient = scopedCardService.pravaClient;
 const mandateService = new MandateService({ pravaClient, mandateMerchants });
 const pravaApprovalService = new PravaApprovalService({
   mandateService,
+  resolvePlan: (runId) => [...eventHub.snapshot()]
+    .reverse()
+    .find(({ event }) => event.type === "final_receipt" && event.runId === runId)
+    ?.event,
   enabled: process.env.HUMSAFAR_ENABLE_PRAVA_PHONE_APPROVAL === "true",
   config: {
     customerId: process.env.PRAVA_TEST_CUSTOMER_ID,
     customerEmail: process.env.PRAVA_TEST_CUSTOMER_EMAIL,
-    amountCap: process.env.PRAVA_TEST_MANDATE_AMOUNT_CAP ?? "100",
+    // Where Prava sends the cardholder afterwards. Dropped unless https, so
+    // this does nothing locally and takes effect once PUBLIC_BASE_URL is the
+    // deployed origin.
+    callbackUrl: process.env.PUBLIC_BASE_URL ? `${process.env.PUBLIC_BASE_URL}/receipt` : undefined,
     merchant: {
-      name: process.env.PRAVA_TEST_MERCHANT_NAME ?? "Duffel",
-      url: process.env.PRAVA_TEST_MERCHANT_URL ?? "https://duffel.com",
-      countryCode: process.env.PRAVA_TEST_MERCHANT_COUNTRY ?? "GB",
+      name: process.env.PRAVA_PHONE_MERCHANT_NAME ?? "Humsafar",
+      url: process.env.PRAVA_PHONE_MERCHANT_URL ?? "https://github.com/Preethesh16/Humsafar",
+      countryCode: process.env.PRAVA_PHONE_MERCHANT_COUNTRY ?? "IN",
     },
     product: {
-      description: process.env.PRAVA_TEST_PRODUCT_DESCRIPTION ?? "Humsafar sandbox approval",
+      description: process.env.PRAVA_PHONE_PRODUCT_DESCRIPTION ?? "Humsafar sandbox trip plan",
     },
   },
 });
@@ -73,7 +81,7 @@ const geocoder = process.env.GOOGLE_MAPS_API_KEY
   ? new GoogleMapsClient()
   : new NominatimClient();
 const app = createApp({
-  eventHub: new EventHub(),
+  eventHub,
   scopedCardService,
   discoveryService: new DiscoveryService({
     duffelClient: new DuffelClient(),

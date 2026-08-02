@@ -64,14 +64,26 @@ class LiveCheckout:
             )
 
         if self.processor is None:
-            outcome, detail = "DECLINED", (
-                f"Prava sandbox credential issued for {option.vendor} and capped at this "
-                f"agent's slice. No merchant checkout was attempted, so the charge is "
-                f"reported DECLINED rather than claimed as an order."
+            # No merchant was attempted, so there is no processor result to
+            # report. Reporting DECLINED would state that a checkout happened
+            # and failed — which is not true, and it consumes the mandate:
+            # measured on 2026-08-02, a reported decline drove `remaining` to
+            # 0.00 and the mandate to `consumed` on all four merchants.
+            #
+            # The charge stays at `awaiting_result`, which is the accurate
+            # state: authority was delegated and locked, nothing was bought.
+            return CheckoutResult(
+                status="success",
+                source="sandbox",
+                authorized=True,
+                detail=(
+                    f"Prava sandbox credential issued for {option.vendor}, merchant-locked and "
+                    f"capped at this agent's slice. Authority delegated — NO merchant order was "
+                    f"placed, and the charge is intentionally left unreconciled."
+                ),
             )
-        else:
-            outcome, detail = self.processor.charge(option, card)
 
+        outcome, detail = self.processor.charge(option, card)
         settled = self.reporter.report(
             mandate_id=card.get("mandateId", ""),
             transaction_id=card.get("transactionId", ""),
@@ -83,6 +95,7 @@ class LiveCheckout:
         return CheckoutResult(
             status="success" if outcome == "APPROVED" else "failed",
             source="sandbox",
+            authorized=True,
             detail=f"{detail}{'' if settled else ' (reconciliation call failed)'}",
         )
 

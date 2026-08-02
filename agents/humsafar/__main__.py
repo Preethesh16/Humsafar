@@ -137,10 +137,16 @@ def main(argv: list[str] | None = None) -> int:
         )
     for block in report.blocked:
         print(f"  BLK  {block['agent']:<8} {block['attempted']:>13,.2f}  cap {block['cap']:,.2f}")
+    authorized_only = any(
+        p.status == "success" and "NO merchant order" in p.detail for p in report.purchases
+    )
+    verb = "authorized" if authorized_only else "spent"
     print(
-        f"\n  spent {format_inr(report.total_spent_paise)} of {format_inr(report.budget_paise)}"
+        f"\n  {verb} {format_inr(report.total_spent_paise)} of {format_inr(report.budget_paise)}"
         f"  |  within budget: {report.within_budget}"
     )
+    if authorized_only:
+        print("  note: Prava sandbox credentials issued and merchant-locked; no merchant order placed")
     if provider is not None and provider.sources:
         # Print what each category actually resolved to, not what was asked
         # for — a live route that fell back to fixtures must not read as live.

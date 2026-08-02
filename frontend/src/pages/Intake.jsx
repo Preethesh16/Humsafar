@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 
+import { suggestPlaces } from "../lib/places.js";
+
 import {
   buildTripGoal,
   suggestedRooms,
@@ -152,6 +154,7 @@ export default function Intake({ onStarted, navigate }) {
               onChange={(value) => update("destination", value)}
               placeholder="Goa, Jaipur, somewhere quiet near the sea…"
               label="Trip destination"
+              suggestId="places-destination"
               autoFocus
             />
           )}
@@ -162,6 +165,7 @@ export default function Intake({ onStarted, navigate }) {
               onChange={(value) => update("origin", value)}
               placeholder="Mangaluru"
               label="Leaving from"
+              suggestId="places-origin"
               autoFocus
             />
           )}
@@ -257,8 +261,44 @@ export default function Intake({ onStarted, navigate }) {
   );
 }
 
-function TextAnswer({ value, onChange, placeholder, label, autoFocus = false }) {
-  return <input className="big-answer" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} autoFocus={autoFocus} />;
+function TextAnswer({ value, onChange, placeholder, label, autoFocus = false, suggestId }) {
+  return (
+    <>
+      <input
+        className="big-answer"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+        autoFocus={autoFocus}
+        list={suggestId}
+        autoComplete="off"
+      />
+      {suggestId ? <PlaceSuggestions id={suggestId} query={value} /> : null}
+    </>
+  );
+}
+
+/**
+ * Type-ahead for the two place questions.
+ *
+ * A native <datalist> rather than a custom combobox: the browser gives correct
+ * keyboard handling, screen-reader semantics and mobile behaviour for free, and
+ * a hand-rolled listbox is a well-known source of accessibility bugs. We lose
+ * control of the popup's styling, which is the right trade here.
+ *
+ * The list narrows as you type and never blocks free text — this flow is
+ * deliberately free-first, so "somewhere quiet near the sea" must still be a
+ * valid answer. Suggestions are a shortcut, not a constraint.
+ */
+function PlaceSuggestions({ id, query }) {
+  return (
+    <datalist id={id}>
+      {suggestPlaces(query).map((place) => (
+        <option key={place.code} value={place.city} label={`${place.code} · ${place.region}`} />
+      ))}
+    </datalist>
+  );
 }
 
 function TripReview({ answers, days, goal, onEdit }) {

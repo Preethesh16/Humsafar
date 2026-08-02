@@ -205,6 +205,19 @@ assert.ok(intakeHtml.includes("<form"), "the intake page renders a form");
 assert.ok(intakeHtml.includes('aria-label="Trip destination"'), "the current text answer has an accessible name");
 assert.ok(intakeHtml.includes('role="progressbar"'), "question progress is programmatic, not just visual");
 
+// Place suggestions. Only one question renders at a time, so the first render
+// carries the destination list; the origin list appears on its own step. The
+// suggestions are a shortcut, never a constraint — this flow is free-first, so
+// "somewhere quiet near the sea" has to stay a valid answer.
+assert.ok(intakeHtml.includes('id="places-destination"'), "the destination question offers suggestions");
+assert.ok(intakeHtml.includes('list="places-destination"'), "the destination input is wired to them");
+assert.ok(intakeHtml.includes("Bengaluru"), "suggestions are populated");
+assert.ok(intakeHtml.includes("BLR"), "each suggestion shows its airport code");
+assert.ok(
+  !intakeHtml.includes("required"),
+  "the free-first flow must not hard-require a suggestion match",
+);
+
 const chooseState = {
   choice: {
     requested: {

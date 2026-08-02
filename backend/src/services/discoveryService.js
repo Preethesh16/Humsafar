@@ -1,5 +1,6 @@
 import { flightFixtures, foodFixtures, guideFixtures, stayFixtures } from "../fixtures/discovery.js";
 import { withFixtureFallback } from "../integrations/withFixtureFallback.js";
+import { scaleFixtures } from "./tripScope.js";
 
 export class DiscoveryService {
   constructor({ duffelClient, googleMapsClient, logger = console }) {
@@ -9,20 +10,24 @@ export class DiscoveryService {
   }
 
   async search(category, input = {}) {
-    if (category === "food") return { data: foodFixtures, source: "fixture" };
-    if (category === "guide") return { data: guideFixtures, source: "fixture" };
+    // Offline rows are written for a baseline 3-day, one-traveller, one-room
+    // trip. Scale them to what was actually asked, or an 8-day trip for four is
+    // quoted the price of a 3-day trip for one. Live provider responses are
+    // already priced for the real request and must never be scaled again.
+    if (category === "food") return { data: scaleFixtures(foodFixtures, "food", input), source: "fixture" };
+    if (category === "guide") return { data: scaleFixtures(guideFixtures, "guide", input), source: "fixture" };
     if (category === "flights") {
       // Duffel only searches air inventory. A train/bus/road/compare request
       // must fall through to the mode-aware local provider rather than quietly
       // returning flights for a different user choice.
       if (input.travelMode && input.travelMode !== "flight") {
-        return { data: flightFixtures, source: "fixture" };
+        return { data: scaleFixtures(flightFixtures, "flights", input), source: "fixture" };
       }
       return withFixtureFallback({
         integration: "duffel-flights",
         logger: this.logger,
         live: async () => normalizeFlights(await this.duffelClient.searchFlights(input)),
-        fixture: async () => flightFixtures,
+        fixture: async () => scaleFixtures(flightFixtures, "flights", input),
       });
     }
     if (category === "stay") {
@@ -39,7 +44,7 @@ export class DiscoveryService {
           const coordinates = await this.#stayCoordinates(input);
           return normalizeStays(await this.duffelClient.searchStays({ ...input, ...coordinates }));
         },
-        fixture: async () => stayFixtures,
+        fixture: async () => scaleFixtures(stayFixtures, "stay", input),
       });
     }
     throw new TypeError("category must be flights, stay, food, or guide");

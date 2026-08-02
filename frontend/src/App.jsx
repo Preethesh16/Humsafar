@@ -239,7 +239,7 @@ export default function App() {
   if (pathname === "/deliberate") {
     page = <Dashboard state={state} connection={connection} source={source} setSource={setSource} goal={goal} />;
   } else if (pathname === "/choose") {
-    page = <Choose state={state} runId={runId ?? state.runId} />;
+    page = <Choose state={state} runId={runId ?? state.runId} goal={goal} />;
   } else if (pathname === "/approve") {
     page = <ApprovalPage state={state} source={source} />;
   } else if (pathname === "/receipt") {

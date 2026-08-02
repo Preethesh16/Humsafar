@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { metaFor } from "../lib/agents.js";
+import { destinationFromGoal, mapsUrl } from "../lib/maps.js";
 
 /**
  * Step 3 — the user picks the taste.
@@ -55,45 +56,70 @@ function Countdown({ seconds, onExpire }) {
   );
 }
 
-function OptionCard({ option, chosen, disabled, onPick }) {
+function OptionCard({ option, chosen, disabled, onPick, place }) {
   const rated = option.rating !== null && option.rating !== undefined;
+  const map = mapsUrl(option.vendor, place);
+
+  // The map link sits OUTSIDE the button, not inside it. An <a> nested in a
+  // <button> is invalid HTML and gives assistive tech two conflicting controls
+  // in one stop; it also means every attempt to look a place up would have
+  // selected it. Wrapper div, button to choose, separate link to look.
   return (
-    <button
-      type="button"
-      className={`option-card ${chosen ? "chosen" : ""}`}
-      onClick={() => onPick(option.optionId)}
-      disabled={disabled}
-      // Selection was carried only by a CSS class, so a screen reader had no
-      // way to tell which option was picked. aria-pressed makes the toggle
-      // state programmatic rather than purely visual.
-      aria-pressed={chosen}
-    >
-      <div className="option-head">
-        <span className="option-vendor">{option.vendor}</span>
-        <span className="option-price">₹{Number(option.price).toLocaleString("en-IN")}</span>
-      </div>
-      <p className="option-desc">{option.description}</p>
-      <div className="option-meta">
-        {rated ? (
-          <span className="option-rating">
-            {option.rating.toFixed(1)}/5
-            {option.ratingBasis === "fixture-score" ? " · fixture score" : ""}
+    <div className={`option-card-shell ${chosen ? "chosen" : ""}`}>
+      <button
+        type="button"
+        className={`option-card ${chosen ? "chosen" : ""}`}
+        onClick={() => onPick(option.optionId)}
+        disabled={disabled}
+        // Selection was carried only by a CSS class, so a screen reader had no
+        // way to tell which option was picked. aria-pressed makes the toggle
+        // state programmatic rather than purely visual.
+        aria-pressed={chosen}
+      >
+        <div className="option-head">
+          <span className="option-vendor">{option.vendor}</span>
+          <span className="option-price">₹{Number(option.price).toLocaleString("en-IN")}</span>
+        </div>
+        <p className="option-desc">{option.description}</p>
+        <div className="option-meta">
+          {rated ? (
+            <span className="option-rating">
+              {option.rating.toFixed(1)}/5
+              {option.ratingBasis === "fixture-score" ? " · fixture score" : ""}
+            </span>
+          ) : (
+            <span className="option-rating none">no rating available</span>
+          )}
+          <span className={`prov ${option.source}`}>
+            {option.source === "live"
+              ? `live${option.environment === "test" ? " · test inventory" : ""}`
+              : "fixture / simulated"}
           </span>
-        ) : (
-          <span className="option-rating none">no rating available</span>
-        )}
-        <span className={`prov ${option.source}`}>
-          {option.source === "live"
-            ? `live${option.environment === "test" ? " · test inventory" : ""}`
-            : "fixture / simulated"}
-        </span>
-      </div>
-    </button>
+        </div>
+      </button>
+
+      {map && (
+        <a
+          className="option-map"
+          href={map}
+          target="_blank"
+          rel="noopener noreferrer"
+          // The vendor is named so a screen reader hears which place this
+          // opens, rather than a page full of identical "View on map" links.
+          aria-label={`View ${option.vendor} on Google Maps (opens in a new tab)`}
+        >
+          View on map ↗
+        </a>
+      )}
+    </div>
   );
 }
 
-export default function Choose({ state, runId }) {
+export default function Choose({ state, runId, goal }) {
   const [sending, setSending] = useState(null);
+  // Disambiguates the map search: "Gunpowder" could be anywhere, but
+  // "Gunpowder Assagao Goa" is the restaurant the agent actually picked.
+  const place = destinationFromGoal(goal);
   const requested = state.choice?.requested ?? {};
   const made = state.choice?.made ?? {};
 
@@ -178,6 +204,7 @@ export default function Choose({ state, runId }) {
                     chosen={decided?.optionId === option.optionId}
                     disabled={Boolean(sending)}
                     onPick={(id) => pick(row.agent, id)}
+                    place={place}
                   />
                 ))}
               </div>

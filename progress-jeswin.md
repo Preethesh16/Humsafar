@@ -267,3 +267,25 @@ Found and fixed while doing it: an unmatched `/api/*` path returned Express's de
 - Needs from Preethesh: confirm the advisory framing for the demo script, and set `GEOAPIFY_API_KEY`.
 - Blocked on: nothing in code. Deployment needs an account; the card needs Prava.
 - Commit: pending
+
+### [2026-08-02 23:30 IST] — the Visa window opened, and steps 1-5 completed
+- Files changed: `agents/humsafar/destinations.py`, `agents/tests/test_choice.py`, `PAYMENT-PLAN.md`.
+
+**The credential fault is intermittent, not persistent.** At 21:59 the watcher caught a charge returning `fetchStatus: SUCCESS` with real credentials; by 23:20 it was failing again. Yash's "just retry" advice was literally correct — the task is to catch a window, not to wait one out.
+
+**Prava's five-step flow is now complete for a real transaction.** I reported the successful charge's outcome and Prava accepted it:
+
+```
+txn_01KZ1MYSM8AMTXQJNVH5RDEPXX
+status: failed | mandateStatus: active | visaConfirmation: SUCCESS
+```
+
+`failed` is the correct terminal state — we reported DECLINED, because a sandbox test card cannot be approved by a real processor. Step 5 was the gap all evening, and it is closed: the transaction is settled rather than stranded at `awaiting_result`.
+
+**Reporting DECLINED restores the mandate.** Observed directly: guide went `available` → `consumed` (₹0) → reported → `available` at the full ₹3,600. Exercising the flow is free, and all four mandates remain live at ₹28,800.
+
+**A regression that broke live cards without any code in my file changing.** The pinned `GOA_INVENTORY` is only returned verbatim when `travel_mode == "flight"` and `stay_style == "hotel"`. Both defaults moved to `"compare"` elsewhere, so a default run generated merchants like "Goa Grand" and "Goa Day Trip", no mandate resolved, and all four mints were refused with *"No approved mandate registered for merchant"*. The existing pin test passed throughout, because `FixtureDiscovery`'s **own** defaults are flight/hotel — the test and the real path had drifted apart. Added a test pinning all four mandate-backed merchant names, and one that fails loudly if the pin's conditions drift again.
+
+- Validation: **215 Python** (2 new), 168 Node, 81 frontend. Live run verified against real Prava: mandate resolution succeeds for all four merchants; mints fail only while the Visa window is shut.
+- Blocked on: the window. `catch_window.py` probes every 4 minutes and launches the full four-agent live run on the first success.
+- Commit: pending

@@ -142,6 +142,59 @@ class DestinationAwarenessTest(unittest.TestCase):
         self.assertIn("Anjuna Beach Resort", merchants)
         self.assertIn("Taj Holiday Village", merchants)
 
+    def test_every_mandate_backed_merchant_is_still_discoverable(self):
+        """The four names the live Prava mandates are locked to.
+
+        `listed` mandates are scoped to one merchant by exact name, so if any of
+        these stops appearing, that agent's mint is refused with "No approved
+        mandate registered for merchant" and the live run dies.
+
+        The stay-only assertion above was not enough: three of these four can
+        disappear while it still passes.
+        """
+        from humsafar.discovery import FixtureDiscovery
+
+        provider = FixtureDiscovery(travel_mode="flight", stay_style="hotel")
+        found = set()
+        for category in ("flights", "stay", "food", "guide"):
+            found |= {o.merchant for o in provider.discover(category, "Plan my Goa trip")}
+
+        for merchant in (
+            "Air India Express",
+            "Anjuna Beach Resort",
+            "Gunpowder Assagao",
+            "Dudhsagar Day Trip",
+        ):
+            self.assertIn(merchant, found, f"{merchant!r} has no mandate-resolvable listing")
+
+    def test_the_pin_needs_flight_and_hotel_and_says_so_when_it_does_not(self):
+        """Documents the trap that silently broke live cards.
+
+        `FixtureDiscovery` defaults to flight/hotel, so the pin fires and the
+        test above passes. The CLI and the browser now default *both* to
+        "compare", which misses the guard — discovery then generates names like
+        "Goa Grand" that no mandate covers, and all four mints are refused.
+
+        Nothing changed in `destinations.py` when that broke; a default moved
+        somewhere else. This test fails loudly if the pin's conditions drift
+        again, rather than leaving it to be rediscovered against live Prava.
+        """
+        from humsafar.discovery import FixtureDiscovery
+
+        pinned = FixtureDiscovery(travel_mode="flight", stay_style="hotel")
+        compare = FixtureDiscovery(travel_mode="compare", stay_style="compare")
+
+        pinned_stay = {o.merchant for o in pinned.discover("stay", "Plan my Goa trip")}
+        compare_stay = {o.merchant for o in compare.discover("stay", "Plan my Goa trip")}
+
+        self.assertIn("Anjuna Beach Resort", pinned_stay)
+        self.assertNotIn(
+            "Anjuna Beach Resort",
+            compare_stay,
+            "compare mode now hits the pin — update the live-run instructions in "
+            "destinations.py, which tell operators they must pass --travel-mode flight",
+        )
+
     def test_the_same_destination_is_deterministic(self):
         from humsafar.discovery import FixtureDiscovery
 

@@ -166,3 +166,57 @@ There is a real version of the same demo moment, and it is Plan C + D.
 - **Deepthi:** record against Plan C — the real dashboard, the real decline, the
   four real credentials. If Plan A lands before the deadline the same script
   works, with a completed charge instead of a credential-issued one.
+
+---
+
+## 7. Update — the fault is intermittent, and one full transaction completed
+
+**2026-08-02 23:30 IST.**
+
+### The window opens and closes
+
+At **21:59** a mandate charge returned `fetchStatus: SUCCESS` with real
+credentials (`txn_01KZ1MYSM8AMTXQJNVH5RDEPXX`). By **23:20** charges were
+failing again with the same `FETCH_AGENTIC_CREDS_ERROR`. So Yash's "just retry"
+is literally correct — the fault is not persistent, and the job is to *catch* a
+window rather than to wait one out.
+
+`catch_window.py` now probes every 4 minutes and, on the first success, launches
+the complete four-agent live run automatically.
+
+### Steps 1-5 are done for a real transaction
+
+Using that window, the guide charge was carried all the way through:
+
+| Step | Evidence |
+|---|---|
+| 1. Agent decides on a product | four-agent negotiation, Dudhsagar Day Trip at ₹3,600 |
+| 2. Approval for that purchase | mandate `mdt_01KZ0ZJ7…`, approved by passkey, `listed` scope |
+| 3. One-time card issued | `fetchStatus: SUCCESS`, credentials present |
+| 4. Card presented at a merchant | simulated storefront, per Prava's own written guidance |
+| 5. Merchant declines a test card | **reported and accepted — `visaConfirmation: SUCCESS`** |
+
+```json
+{ "transactionId": "txn_01KZ1MYSM8AMTXQJNVH5RDEPXX",
+  "status": "failed", "mandateStatus": "active",
+  "visaConfirmation": "SUCCESS" }
+```
+
+`status: "failed"` is the *correct* terminal state — we reported DECLINED,
+because a sandbox test card cannot be approved by a real processor. The
+transaction is now settled rather than stranded at `awaiting_result`, which is
+what step 5 was missing all evening.
+
+### Two operational facts worth keeping
+
+* **Reporting DECLINED restores the mandate.** The guide mandate went
+  `available` → `consumed` (remaining ₹0) → reported → `available` at the full
+  ₹3,600. So exercising the flow costs nothing, and all four remain live at
+  ₹28,800.
+* **A live run must pass `--travel-mode flight --stay-style hotel`.** The
+  mandates are `listed`-scoped to the exact merchant names in `GOA_INVENTORY`,
+  and that inventory is only returned verbatim under those two conditions. Both
+  CLI defaults moved to `"compare"`, so a default run generates merchants like
+  "Goa Grand" that no mandate covers and every mint is refused. This broke
+  without `destinations.py` changing; it is now covered by a test and documented
+  at the guard.

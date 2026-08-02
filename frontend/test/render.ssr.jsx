@@ -239,6 +239,21 @@ const chooseHtml = renderToStaticMarkup(<Choose state={chooseState} runId="run_1
 assert.ok(chooseHtml.includes("Anjuna Beach Resort"), "options render");
 assert.ok(chooseHtml.includes("no rating available"), "an unrated option says so rather than showing a fake score");
 assert.ok(chooseHtml.includes('aria-pressed'), "option selection state is programmatic, not just visual");
+
+// Map links: every option is lookupable, and the link must never sit inside the
+// choose button — nesting an <a> in a <button> is invalid HTML, traps the
+// keyboard, and would make "look this place up" select it.
+assert.ok(chooseHtml.includes("google.com/maps/search/"), "options link out to Google Maps");
+assert.ok(chooseHtml.includes("View on map"), "the map link is visible");
+assert.ok(
+  chooseHtml.includes('rel="noopener noreferrer"'),
+  "external links must not hand the opener to another origin",
+);
+assert.ok(
+  !/<button[^>]*>(?:(?!<\/button>)[\s\S])*?<a\s/.test(chooseHtml),
+  "no anchor may be nested inside a button",
+);
+assert.ok(!/[?&]key=/.test(chooseHtml), "no Maps API key may reach client markup");
 assert.ok(!chooseHtml.includes("live order"), "a fixture option must never read as a live order");
 
 // The app shell itself must render — it carries the hero, the journey stepper

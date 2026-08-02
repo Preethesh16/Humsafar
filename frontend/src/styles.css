@@ -894,6 +894,28 @@ footer p { max-width: 760px; margin: 0; }
   gap: 14px;
 }
 
+/* Wrapper so the map link can sit beside the choose button rather than inside
+   it — an <a> nested in a <button> is invalid and traps the keyboard. */
+.option-card-shell { display: flex; flex-direction: column; }
+.option-card-shell .option-card { flex: 1; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+
+.option-map {
+  display: block;
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 18px 18px;
+  background: var(--paper-2);
+  color: var(--forest-2);
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-align: center;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.option-map:hover { background: var(--mint); color: var(--forest); }
+.option-card-shell.chosen .option-map { border-color: var(--coral); }
+
 .option-card {
   text-align: left;
   background: var(--paper);

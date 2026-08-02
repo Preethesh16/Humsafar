@@ -360,3 +360,11 @@
 - Remaining: complete the passkey ceremony; verify and sync the active mandate; run one isolated over-cap sandbox proof and capture the structured decline without claiming checkout success; use a separate suitable mandate for an eventual successful checkout if required; implement the missing honest `LiveCheckout`/merchant boundary and `POST /api/runs`; finish frontend agent identity/stage wiring; perform one opt-in real OpenAI Agents SDK smoke run after configuring the local OpenAI key; then deploy, record the demo, reconcile README/submission claims with evidence, and submit to Devfolio. The taste-choice flow remains deferred until the Prava proof gate is complete.
 - Needs from Jeswin/Deepthi: Jeswin should help validate the first real OpenAI/Prava orchestration trace after mandate activation. Deepthi should connect the goal/budget form once `POST /api/runs` exists and finish agent-stage rendering against Jeswin's event data.
 - Commit: `87d0c8c` (Prava handoff audit committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 15:05 IST] — Directed the final human passkey action
+- Prompt: asked what to do next after the teammate fix and remaining-work audit.
+- Files changed: `progress-preethesh.md` only.
+- Changed: identified the single immediate action: on the already-open Prava hosted page, tap **Create passkey now**, approve the Android fingerprint/PIN prompt, and wait for Prava's success confirmation.
+- Decision: do not create another session, run a charge, or close the current hosted page. After the human approval, rerun only the read-only verifier; `mandateCount: 1` is the required activation evidence before continuing.
+- Blocked on: human-presence WebAuthn approval on the user's phone.
+- Commit: recorded by the commit containing this entry.

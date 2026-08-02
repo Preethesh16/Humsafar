@@ -85,3 +85,69 @@
 - Needs from Preethesh: (a) a decision on the fixture-contention finding above; (b) a `Checkout` implementation for Duffel — `agents/humsafar/checkout.py` is the seam, swapping `SimulatedCheckout` changes nothing else; (c) mandate IDs registered for the merchants we actually buy from, or the real card-level proof shot cannot run live.
 - Needs from Deepthi: `python3 -m humsafar --demo --trust` with the backend up now gives a complete realistic stream, including trust annotations in `purchase_result.details`. The §2 rendering notes from my previous entry still apply — especially that `split_update` can repeat for a round.
 - Commit: `9b2dbd7` (pushed to `jeswin/agent-core`; pull request into `main` follows this log entry)
+
+### [2026-08-02 02:10 IST] — OpenAI Agents SDK reasoning layer (Priority 0, items 1–5)
+- Prompt: pull `main`, read `execution-plan.md` and `precaution.md`, and begin the OpenAI Agents SDK work.
+- Files changed: added `agents/humsafar/{ai,intent,schemas,config}.py`, `agents/requirements.txt`, `agents/tests/test_ai.py`; edited `agents/humsafar/{llm,negotiation,mediator,orchestrator,__main__}.py` and `.env.example`.
+- Changed: replaced the Chat Completions narrator with Agents SDK `Agent` + `Runner` and structured outputs. Five agent identities — four specialists, Intent, Mediator — separated by name/instructions/output schema rather than by key, per the one-server-side-credential rule. Added goal parsing, the mediator explainer, per-`runId` tracing, a pinned dependency file, and a stdlib `.env` loader for the Python layer.
+
+**Two safety properties made structural rather than instructed:**
+1. **No model-facing schema contains a money field.** A model cannot state an allocation, price, floor or cap as structured data because there is nowhere to put one. Stronger than instructing it not to — an instruction can be ignored, a missing field cannot be filled.
+2. **`mentions_only()` rejects any agent line containing a rupee figure that was not supplied to it.** Telling a model not to invent numbers is not a guarantee; checking its output is. A rejected line silently falls back to the deterministic sentence, so a wrong figure never reaches the screen with an agent's name on it. The audience gets duller prose, never a false number.
+
+**Parsed priorities are material, not decorative.** An emphasised category concedes less of its slack and wins surplus upgrades sooner. Priorities enter the engine as bounded multipliers alongside slack, never as amounts, and concession caps stay at raw slack so a priority can never push an agent below its floor. Verified empirically across budgets rather than assumed: the split changes at ₹20,000–₹28,000 where the budget is contested, and is **correctly inert at ₹34,000**, where every agent already holds its best affordable option and there is nothing left to trade. Both behaviours are locked by tests — the saturation test exists to stop a future change making emphasis buy a *worse* option just to look responsive.
+
+- Bug caught by my own test: my first assertion used the ₹30,000 demo budget and failed. Investigating showed the budget is saturated there, so priority genuinely cannot move anything. I probed budgets from ₹18,000–₹34,000 before concluding the mechanism worked and the test was wrong, rather than weakening the assertion to make it pass.
+- Also fixed: I pinned `openai==2.9.1` from memory; the installed and tested version is `2.52.0`. A pin that does not match what was tested is worse than no pin.
+- Validation: 115 Python tests pass (35 new), every one injecting a fake runtime so the routine suite makes **no paid network calls**. Zero-key run is byte-identical to before this change — ₹28,800 of ₹30,000, same four purchases, same blocked attempt. `openai-agents 0.19.2` installed and its API surface verified directly (`Agent`, `Runner`, `trace(group_id=…)`, `output_type`); confirmed a missing key raises at call time and is caught. Secret scan over the staged diff found no credential values.
+- Decision: `HUMSAFAR_REASONING_MODEL` defaults to `gpt-4.1`, not the newer target named in `execution-plan.md`. The plan itself requires an account/model smoke check before that becomes the demo default, and no key was present to run one. It is env-configurable, so switching is a one-line change once verified.
+- Interface note for **Preethesh**: `.env.example` gained an agent-layer block. Purely additive; no backend variable was changed or reordered. The Python layer now reads the same shared `.env` the backend loads via `--env-file`.
+- Interface note for **Deepthi**: `RunConfig` now carries a `run_id` (auto-generated when absent) to correlate the run across the approval protocol in §7 and the OpenAI trace group. Orchestrator messages now include an `[intent: openai|keyword]` tag and per-category emphasis, which is worth surfacing as agent-identity/stage information in the deliberation view.
+- Blocked on: nothing in code. A live smoke run needs `OPENAI_API_KEY` in the gitignored `.env`; the key exists but the file has not been created yet.
+- Needs from Preethesh: nothing new for this phase. Priority 1 items 6–9 consume his mandate resolver, structured `THRESHOLD_EXCEEDED`, and the extended card contract — all merged, all next on my list.
+- Needs from Deepthi: nothing blocking.
+- Commit: `3da620f` (pushed to `jeswin/agent-core`)
+
+### [2026-08-02 03:05 IST] — Live OpenAI testing: four defects only a real key could expose
+- Prompt: added the OpenAI API key to `.env` and asked for the live smoke test.
+- Files changed: `agents/humsafar/{ai,llm,intent,negotiation,discovery}.py`, `agents/tests/test_ai.py`, `.env.example`.
+- Changed: made the Agents SDK path fast, reliable and quota-aware after running it for real. Unit tests with a fake runtime could not have caught any of the four.
+
+**1. Latency.** A full run took **25.9s across 10 sequential model calls**, against a negotiation beat meant to last 45s. Specialists in a round argue independently, so they now run concurrently via `ask_many` behind a semaphore. **25.9s → ~7s.**
+
+**2. Wrong model class.** `gpt-5-nano` spent **31.8s of extended reasoning** to produce one two-sentence negotiating line, blowing the timeout so all four specialists fell back. Reasoning models are the wrong tool for short in-character dialogue. `gpt-4.1-nano` does it in **2.2s**.
+
+**3. Event-loop churn.** `asyncio.run` creates and destroys a loop per call, and the OpenAI client's connection pool binds to the loop it first used. The mediator failed *every single run* with what looked like a network fault. The runtime now owns one persistent loop for its lifetime. This one cost the most time to find because the symptom named the wrong thing.
+
+**4. Quota — and this needs the team's attention.** Rate limits are **per-model**, and this account is on a free/unverified tier: `gpt-4.1-mini` allows **50 requests per DAY** and was already exhausted during development, with an RPM low enough that three back-to-back runs trip it. Narration is now limited to the opening round (**10 calls → 6**), and a rate-limit response switches the whole run to deterministic text rather than burning the remaining allowance on calls that cannot succeed. Transient transport errors get exactly one retry; rate limits get none, per `precaution.md`.
+
+**Two correctness defects seen live and fixed:**
+- Agents argued from positions they had already conceded — the Stay Agent announced it was staying at the Taj after settling for Anjuna Beach Resort. Every figure was one it had been given, so `mentions_only` passed it, but the claim was incoherent on screen. Prompts now carry the current ask, what it currently buys, and that the opening position is gone.
+- The Intent Agent **dropped flights and stay from a Goa trip**, non-deterministically, having returned all four for the same goal minutes earlier. A trip with no flights and nowhere to sleep is not a plan, and it silently left most of the budget unspent (₹7,800 of ₹30,000). Model *priorities* are still trusted; its *omissions* are not. Any category a confidently-travel goal needs is restored at neutral weight, while narrowing still survives for non-travel goals — which is what the agent exists to do.
+- Validation: 125 Python tests pass. Deterministic output unchanged at ₹28,800 of ₹30,000. Three consecutive live runs each produced **₹28,800 and 4 purchases** whether narration succeeded, degraded, or was rate-limited — which is the resilience property the design exists for. Model availability verified directly against the account: `gpt-5.6-sol`, `gpt-4.1`, `gpt-4.1-nano`, `gpt-5-nano` all serve; `gpt-4.1-mini` is quota-exhausted.
+- Decision: `HUMSAFAR_REASONING_MODEL=gpt-5.6-sol` is now the default — the smoke check `execution-plan.md` required has been done and it works with structured output at ~3s. Specialists use `gpt-4.1-nano` for latency and to avoid the drained bucket.
+- **Needs from the team (Imran/Preethesh):** please check the OpenAI billing/credits page for this account. The handbook says $100 participation credits were issued, but a 50-requests-per-day ceiling is free-tier behaviour, which suggests the credit was not applied or the account is unverified. `precaution.md` already flags that Discord rollout reports are not proof for a particular account. The demo survives this — one run is comfortably within limits — but repeated rehearsal and recording will not be.
+- Blocked on: nothing in code.
+- Needs from Deepthi: nothing new. Orchestrator messages carry `[intent: openai|keyword]` and per-category emphasis if she wants to surface agent identity/stage.
+- Commit: `1542015` (pushed to `jeswin/agent-core`)
+
+### [2026-08-02 04:00 IST] — Priority 1 items 6–9: approval gate, mandate resolver, credential hygiene, cap proof
+- Prompt: continue.
+- Files changed: added `agents/humsafar/approval.py`, `agents/tests/test_approval_and_cards.py`; edited `agents/humsafar/{orchestrator,cards,guardian,events,__main__}.py`.
+- Changed: implemented items 6–9 against the contracts Preethesh locked in `9f47a99`. Item 10 (taste step) stays deferred — `execution-plan.md` gates it behind proven Prava evidence.
+
+**Item 6 — the cap proof now proves the right thing.** The over-cap attempt runs **before** that agent's own purchase and targets **the merchant it is about to buy from**. Both halves matter: afterwards a `max_charges: 1` mandate is already consumed, so the refusal would come from an exhausted use limit while we claimed card-network cap enforcement; and aimed at any other merchant it would be refused as `MANDATE_MERCHANT_NOT_ALLOWED` — a real refusal, for entirely the wrong reason. `describe_card_block` now names the actual cause: **only `THRESHOLD_EXCEEDED` is described as the amount cap blocking**, and `MANDATE_NOT_ACTIVE`, `TRIES_EXHAUSTED` or an unknown code are explicitly labelled *"not evidence of card-level overspend protection, must not be presented as the proof shot"*.
+
+Reordering exposed a modelling flaw in my own offline stub: it inferred the mandate ceiling from whichever charge arrived first, so once the over-cap attempt moved ahead of the purchase, **the inflated amount became the ceiling and was authorised**. Mandates are now authorised at their slice before any charge, which is what actually happens with Prava. Caught by an existing test failing, not by inspection.
+
+**Item 7 — mandate resolution via `GET /api/prava/mandates/resolve`.** My previous approach inverted `PRAVA_MANDATE_MERCHANTS_JSON` in Python, which duplicated backend state across two processes and could not learn about a mandate approved at runtime by `syncCustomerMandates`. The local map survives only as an offline fallback; the backend is the source of truth whenever reachable.
+
+**Item 8 — approval is server state, not a boolean.** `PolledApproval` drives the §7 protocol: create → poll → consume → only then mint. The digest binds the decision to an exact plan, consumption is one-shot, and **decline, expiry, a failed consume and an unreachable service are all treated identically: do not mint.** `AutoApproval` stays the default for keyless runs and declares itself non-human on the wire (`[auto-approved: no human decision was taken]`) so a fixture run can never be presented as one a person authorised.
+
+**Item 9 — `ScopedCard.safe()` redacts every transient credential**: `cardToken`, `dynamicCvv`, `expiryMonth`, `expiryYear`. `cardId` and `transactionId` survive deliberately — they are identifiers the report endpoint needs, and `precaution.md` permits recording them.
+
+- Validation: **151 Python and 59 Node tests pass** (26 new). Verified **live against the running backend**: a human `APPROVE` produced 4 purchases and ₹28,800; a human `DECLINE` produced **zero purchases, zero spend and no `card_issued` event at all**. Also asserted mechanically that no credential string reaches any event, and that the over-cap attempt precedes the same agent's mint.
+- Interface note for **Deepthi**: `approval_requested` now carries `runId`, `approvalRequestId`, `digest` and `expiresAt`; `approval_given` carries `runId`, `approvalRequestId` and `digest`. These are documented in `INTERFACES.md` §2 but **not yet enforced by `eventSchema.js`**, so they are additive and safe. The approval UI needs `approvalRequestId` + `digest` to POST a decision, and `expiresAt` for the countdown. Run `python3 -m humsafar --demo --await-approval` and the agent will genuinely wait for her button.
+- Interface note for **Preethesh**: no contract changed. `ScopedCardClient` now calls your resolver; the stub grew an `authorize(merchant, cap)` hook that is a no-op against live Prava, where mandates are provisioned out of band.
+- Blocked on: nothing in code. Item 10 and `LiveCheckout` both wait on genuine Prava sandbox evidence, which is the team's current gate.
+- Commit: `7dd56c7` (pushed to `jeswin/agent-core`)

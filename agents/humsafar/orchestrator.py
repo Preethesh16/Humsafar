@@ -17,10 +17,13 @@ recovery paths a real product needs anyway:
 
 from dataclasses import dataclass, field
 from typing import Optional
+from uuid import uuid4
 
+from .approval import AutoApproval
 from .cards import ScopedCard, StubScopedCardClient
 from .checkout import Checkout, SimulatedCheckout
-from .discovery import DiscoveryProvider, FixtureDiscovery, categories_for_goal
+from .discovery import DiscoveryProvider, FixtureDiscovery
+from .intent import GoalIntent, parse_intent
 from .events import EventEmitter
 from .guardian import Guardian
 from .mediator import Mediator
@@ -40,6 +43,10 @@ class RunConfig:
     overspend_agent: Optional[str] = None
     fail_agent: Optional[str] = None
     auto_approve: bool = True
+    # Correlates this run across the agent layer, the approval protocol
+    # (INTERFACES.md §7) and the OpenAI trace group. Generated when absent so a
+    # run is always identifiable.
+    run_id: str = field(default_factory=lambda: f"run-{uuid4().hex[:12]}")
 
 
 @dataclass
@@ -70,6 +77,7 @@ class Orchestrator:
         provider: Optional[DiscoveryProvider] = None,
         narrator=None,
         trust=None,
+        approval=None,
     ) -> None:
         self.emitter = emitter
         self.card_client = card_client or StubScopedCardClient()
@@ -77,9 +85,22 @@ class Orchestrator:
         self.provider = provider or FixtureDiscovery()
         self.narrator = narrator
         self.trust = trust
+        self.approval = approval or AutoApproval()
         self.mediator = Mediator()
+        self.intent = GoalIntent(categories=[])
 
     def run(self, config: RunConfig) -> RunReport:
+        # One OpenAI trace group per Humsafar run, so a trace can be correlated
+        # with an approval record and a receipt. Sensitive capture is disabled
+        # by default in ai.py: the trace shows which agent spoke, never a key,
+        # card token, CVV, expiry or raw Prava response.
+        runtime = getattr(self.narrator, "runtime", None)
+        if runtime is not None and hasattr(runtime, "trace_run"):
+            with runtime.trace_run(config.run_id):
+                return self._run(config)
+        return self._run(config)
+
+    def _run(self, config: RunConfig) -> RunReport:
         report = RunReport(goal=config.goal, budget_paise=config.budget_paise, negotiation=None)
 
         specialists = self._assemble(config)
@@ -104,25 +125,26 @@ class Orchestrator:
             self._execute(specialist, allocations[specialist.category], config, report)
 
         self._recover(by_category, allocations, report)
-
-        if config.overspend_agent in by_category:
-            self._attempt_overspend(
-                by_category[config.overspend_agent],
-                allocations[config.overspend_agent],
-                report,
-            )
-
         self._close(report)
         return report
 
     # -- phases ---------------------------------------------------------
 
     def _assemble(self, config: RunConfig) -> list[Specialist]:
-        categories = categories_for_goal(config.goal)
+        # Goal parsing is the one genuinely linguistic step in the run, so it is
+        # where a model earns its place. Everything it returns is validated, and
+        # a failure falls back to the keyword parser rather than blocking.
+        self.intent = parse_intent(config.goal, getattr(self.narrator, "runtime", None))
+        categories = self.intent.categories
+
+        emphasis = ", ".join(
+            f"{c} ({self.intent.weight_for(c):.0%})" for c in categories
+        )
         self._say(
             "orchestrator",
             f"Goal: {config.goal}. Budget: {format_inr(config.budget_paise)}. "
-            f"Bringing in {len(categories)} specialists: {', '.join(categories)}.",
+            f"Bringing in {len(categories)} specialists — {emphasis}. "
+            f"[intent: {self.intent.source}]",
         )
 
         specialists = build_specialists(categories, self.provider, config.goal)
@@ -146,6 +168,7 @@ class Orchestrator:
                 allocations, config.budget_paise, rnd
             ),
             narrator=self.narrator,
+            intent=self.intent,
         )
         result = engine.run()
         self._say(
@@ -157,15 +180,61 @@ class Orchestrator:
         return result
 
     def _approve(self, allocations: dict[str, int], config: RunConfig) -> bool:
-        self.emitter.approval_requested(allocations)
+        """Run the §7 approval protocol. Nothing is minted without it."""
+        record = self.approval.request(config.run_id, allocations)
+        if record is None:
+            self._say(
+                "orchestrator",
+                "Could not create an approval request, so nothing will be minted. "
+                f"{getattr(self.approval, 'last_error', '')}".strip(),
+            )
+            return False
+
+        self.emitter.approval_requested(
+            allocations,
+            run_id=record.run_id,
+            approval_request_id=record.approval_request_id,
+            digest=record.digest,
+            expires_at=record.expires_at,
+        )
         self._say(
             "orchestrator",
             "Sending the split for approval. One passkey covers the whole plan — after this, "
-            "no agent can be prompted into spending outside its own slice.",
+            "no agent can be prompted into spending outside its own slice."
+            + (
+                f" Waiting for a decision (expires {record.expires_at})."
+                if self.approval.requires_human
+                else " [auto-approved: no human decision was taken]"
+            ),
         )
-        if not config.auto_approve:
+
+        if not config.auto_approve and not self.approval.requires_human:
             return False
-        self.emitter.approval_given()
+
+        decided = self.approval.await_decision(record)
+        if not decided.approved:
+            self._say(
+                "orchestrator",
+                f"Approval {decided.status}. No cards minted, no money moved.",
+            )
+            return False
+
+        # Consume immediately before the first mint. A second consume, an
+        # expiry, or a digest that no longer matches the plan fails closed —
+        # which is what stops a stale approval authorising a different run.
+        if not self.approval.consume(decided):
+            self._say(
+                "orchestrator",
+                "Approval could not be consumed, so it may already have been used or the plan "
+                "changed since it was granted. Refusing to mint.",
+            )
+            return False
+
+        self.emitter.approval_given(
+            run_id=decided.run_id,
+            approval_request_id=decided.approval_request_id,
+            digest=decided.digest,
+        )
         return True
 
     def _execute(
@@ -210,6 +279,20 @@ class Orchestrator:
         if not verdict.allowed:
             self._record_block(specialist.category, option.price_paise, slice_paise, verdict.reason, report)
             return
+
+        # Tell the card layer what this merchant's mandate was approved at,
+        # before any charge. A no-op against live Prava, where mandates are
+        # provisioned out of band by the operator script.
+        authorize = getattr(self.card_client, "authorize", None)
+        if authorize is not None:
+            authorize(option.merchant, slice_paise)
+
+        # The over-cap proof runs BEFORE the real purchase, deliberately.
+        # Afterwards, a `max_charges: 1` mandate is already consumed, so the
+        # refusal would come from an exhausted use limit rather than the amount
+        # cap — proving the wrong thing while claiming card-network enforcement.
+        if config.overspend_agent == specialist.category:
+            self._attempt_overspend(specialist, option, slice_paise, report)
 
         # The card is capped at the agreed slice, not at this purchase — that is
         # the property the whole product rests on. Even if this agent is later
@@ -391,7 +474,7 @@ class Orchestrator:
             )
 
     def _attempt_overspend(
-        self, specialist: Specialist, slice_paise: int, report: RunReport
+        self, specialist: Specialist, option: Option, slice_paise: int, report: RunReport
     ) -> None:
         """The proof shot: try to charge past the slice and get refused.
 
@@ -399,17 +482,13 @@ class Orchestrator:
         this in software in a microsecond, but then the block would be our `if`
         statement, not the card network — and the card network is what we claim
         on stage. See guardian.py for the full reasoning.
+
+        Aimed at the merchant this agent is *about to buy from*, so the mandate
+        in play is the one that actually covers the purchase. Pointing it at any
+        other merchant would be refused as `MANDATE_MERCHANT_NOT_ALLOWED` — a
+        real refusal, but for entirely the wrong reason.
         """
         attempted = int(slice_paise * OVERSPEND_MULTIPLIER)
-        # Aim at the merchant this agent actually holds a mandate for. Pointing
-        # the attempt at some other merchant would prove nothing: it would be
-        # refused for the wrong reason (no mandate) rather than for exceeding
-        # the agreed cap.
-        bought = next(
-            (p for p in report.purchases if p.agent == specialist.category and p.status == "success"),
-            None,
-        )
-        merchant = bought.merchant if bought else specialist.options[0].merchant
 
         self._say(
             specialist.category,
@@ -417,7 +496,7 @@ class Orchestrator:
             f"past my agreed slice.",
         )
 
-        card = self.card_client.mint(merchant, attempted)
+        card = self.card_client.mint(option.merchant, attempted)
         if card.issued:
             # Worth failing loudly: if this ever succeeds, the safety claim at
             # the centre of the product is not true and must not be demoed.
@@ -429,7 +508,11 @@ class Orchestrator:
             return
 
         reason = Guardian.describe_card_block(
-            specialist.display_name, attempted, slice_paise, str(card.get("error", ""))
+            specialist.display_name,
+            attempted,
+            slice_paise,
+            card.error_code,
+            str(card.get("error", "")),
         )
         self._record_block(specialist.category, attempted, slice_paise, reason, report)
 

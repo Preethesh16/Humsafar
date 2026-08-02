@@ -168,6 +168,21 @@ class BackendDiscovery:
         return options
 
 
+TRAVEL_WORDS = ("trip", "travel", "visit", "weekend", "holiday", "vacation", "goa")
+
+
+def is_travel_goal(goal: str) -> bool:
+    """True when the goal is unambiguously a journey.
+
+    Distinct from `categories_for_goal`, which falls back to the full roster
+    when it has no opinion at all. Callers that need to know the difference
+    between "confidently a trip" and "no idea, default to everything" must use
+    this — see `intent._restore_dropped`.
+    """
+    text = goal.lower()
+    return any(word in text for word in TRAVEL_WORDS)
+
+
 def categories_for_goal(goal: str) -> list[str]:
     """Pick the specialist set for a goal.
 
@@ -176,11 +191,7 @@ def categories_for_goal(goal: str) -> list[str]:
     event schema cannot even represent. The LLM's job in this system is
     argument, not arithmetic or wiring.
     """
-    text = goal.lower()
-    stay_words = ("trip", "travel", "visit", "weekend", "holiday", "vacation", "goa")
-    needs_travel = any(word in text for word in stay_words)
-
-    if needs_travel:
+    if is_travel_goal(goal):
         return ["flights", "stay", "food", "guide"]
 
     # Non-travel goals still run through the same engine; they just field a

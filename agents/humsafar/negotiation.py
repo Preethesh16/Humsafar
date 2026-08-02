@@ -17,14 +17,27 @@ The engine holds no opinions about transport or LLMs — it reports through
 callbacks — so the whole thing is testable offline in milliseconds.
 """
 
+import os
 from typing import Callable, Optional
 
 from .discovery import DiscoveryProvider
+from .intent import GoalIntent
 from .mediator import Mediator, _distribute_capped
 from .models import NegotiationResult, Option, RoundRecord, Specialist
 from .money import format_inr
 
 MAX_ROUNDS = 5
+
+# How many opening rounds get model-written dialogue. Round 1 is where the
+# agents state their case and the model earns its place; the later rounds are
+# concessions, and the deterministic concession line ("Fine — I'll give up the
+# Taj and take Anjuna Beach Resort, that's Rs 4,800 back on the table") is
+# already the most concrete text in the transcript.
+#
+# This is a quota decision as much as an editorial one. A full run cost 10 model
+# calls; at the 50-requests-per-day free-tier ceiling that is five runs before
+# the demo stops working. Narrating the opening round only brings it to six.
+NARRATED_ROUNDS = int(os.environ.get("HUMSAFAR_NARRATED_ROUNDS", "1"))
 
 # Fraction of the outstanding gap the agents collectively close in each round.
 # Ramps to 1.0 so the negotiation always converges by round 3 whenever the
@@ -93,6 +106,7 @@ class NegotiationEngine:
         on_message: Optional[MessageSink] = None,
         on_split: Optional[SplitSink] = None,
         narrator=None,
+        intent=None,
     ) -> None:
         self.specialists = specialists
         self.budget_paise = budget_paise
@@ -100,6 +114,11 @@ class NegotiationEngine:
         self.on_message = on_message or (lambda agent, text: None)
         self.on_split = on_split or (lambda allocations, rnd: None)
         self.narrator = narrator
+        # A neutral intent leaves every multiplier at 1.0, so a run without goal
+        # parsing behaves exactly as it did before intent existed.
+        self.intent = intent if intent is not None else GoalIntent(
+            categories=[s.category for s in specialists]
+        )
 
     def run(self) -> NegotiationResult:
         rounds: list[RoundRecord] = []
@@ -123,7 +142,7 @@ class NegotiationEngine:
                 )
                 allocations = {s.category: s.ask_paise for s in self.specialists}
                 for note in self.mediator.allocate_surplus(
-                    self.specialists, allocations, self.budget_paise
+                    self.specialists, allocations, self.budget_paise, self.intent
                 ):
                     self._say("mediator", note, record)
                 if allocations != record.asks_paise:
@@ -131,6 +150,7 @@ class NegotiationEngine:
 
                 result = NegotiationResult(allocations, rounds, "converged", self.budget_paise)
                 self.mediator.verify(result)
+                self._explain(result, record)
                 return result
 
             if number < MAX_ROUNDS:
@@ -164,8 +184,13 @@ class NegotiationEngine:
             over_budget_paise=max(0, total - self.budget_paise),
         )
 
+        # Fetch the whole round's dialogue at once. The specialists argue
+        # independently, so waiting for them one after another just adds their
+        # latencies together — see AgentRuntime.ask_many.
+        spoken = self._argue_round(record)
         for specialist in self.specialists:
-            self._say(specialist.category, self._argue(specialist, record), record)
+            text = spoken.get(specialist.category) or self._default_argument(specialist, record)
+            self._say(specialist.category, text, record)
 
         self.on_split(asks, number)
         return record
@@ -200,7 +225,16 @@ class NegotiationEngine:
 
         rate = CONCESSION_SCHEDULE[min(number, len(CONCESSION_SCHEDULE)) - 1]
         target = int(min(gap, total_slack) * rate)
-        concessions = _distribute_capped(target, slacks, slacks)
+
+        # Slack says how much an agent *can* give up; the user's stated priority
+        # says how willing it should be. A category the user emphasised concedes
+        # less of the same slack. Caps stay at raw slack, so priority can never
+        # push anyone below their floor — it only reorders who gives ground.
+        weights = [
+            max(0, int(s.slack_paise * self.intent.concession_multiplier(s.category)))
+            for s in self.specialists
+        ]
+        concessions = _distribute_capped(target, weights, slacks)
 
         self._say(
             "mediator",
@@ -215,6 +249,29 @@ class NegotiationEngine:
             before = specialist.ask_paise
             specialist.ask_paise -= concession
             self._say(specialist.category, self._concede_text(specialist, before), record)
+
+    def _explain(self, result: NegotiationResult, record: RoundRecord) -> None:
+        """Let the mediator explain a settlement it did not choose.
+
+        Purely additive: the deterministic "Agreed. The split sums to ..." line
+        has already been said, so a missing or rejected model response costs the
+        run nothing.
+        """
+        if self.narrator is None:
+            return
+        explain = getattr(self.narrator, "explain_settlement", None)
+        if explain is None:
+            return
+
+        text = explain(
+            self.specialists,
+            result.allocations_paise,
+            self.budget_paise,
+            result.exit_reason,
+            len(result.rounds),
+        )
+        if text:
+            self._say("mediator", text, record)
 
     def _concede_text(self, specialist: Specialist, before: int) -> str:
         """Snap a conceded ask down to something the agent can actually buy.
@@ -253,6 +310,21 @@ class NegotiationEngine:
         )
 
     # -- dialogue -------------------------------------------------------
+
+    def _argue_round(self, record: RoundRecord) -> dict[str, Optional[str]]:
+        """Model dialogue for every specialist this round, or empty on fallback."""
+        if self.narrator is None or record.number > NARRATED_ROUNDS:
+            return {}
+
+        batch = getattr(self.narrator, "argue_many", None)
+        if batch is not None:
+            return batch(self.specialists, record, self.budget_paise) or {}
+
+        # A narrator without the batch method (a test double, say) still works.
+        return {
+            s.category: self.narrator.argue(s, record, self.budget_paise)
+            for s in self.specialists
+        }
 
     def _argue(self, specialist: Specialist, record: RoundRecord) -> str:
         if self.narrator is not None:

@@ -14,6 +14,7 @@ import sys
 
 from .approval import AutoApproval, PolledApproval
 from .cards import ScopedCardClient, StubScopedCardClient
+from .choice import AutoChoice, PolledChoice
 from .checkout import LiveCheckout
 from .config import load_env
 from .discovery import BackendDiscovery
@@ -63,6 +64,17 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use the real Prava credential and reconcile the outcome via mandate-report",
     )
+    parser.add_argument(
+        "--run-id", help="Correlate this run with an approval, a choice and a trace group"
+    )
+    parser.add_argument(
+        "--await-choice",
+        action="store_true",
+        help="Pause for the user to pick an option per category (INTERFACES.md §6)",
+    )
+    parser.add_argument(
+        "--choice-timeout", type=int, default=45, help="Seconds before the agent picks"
+    )
     parser.add_argument("--llm", action="store_true", help="Use OpenAI for agent dialogue")
     parser.add_argument("--overspend", metavar="AGENT", help="Have this agent attempt an over-slice charge")
     parser.add_argument("--fail", metavar="AGENT", help="Fail this agent's booking once, then recover")
@@ -100,7 +112,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.live_checkout
         else None
     )
+    choice = (
+        PolledChoice(args.run_id or "run-cli", emitter, base_url=args.backend, token=token,
+                     timeout_seconds=args.choice_timeout)
+        if args.await_choice
+        else AutoChoice()
+    )
 
+    run_id = args.run_id or None
     print(
         f"\n  HUMSAFAR — {args.goal}\n"
         f"  budget      : Rs {args.budget}\n"
@@ -124,6 +143,8 @@ def main(argv: list[str] | None = None) -> int:
         trust=trust,
         approval=approval,
         checkout=checkout,
+        choice=choice,
+        run_id=args.run_id,
         overspend_agent=overspend,
         fail_agent=fail,
     )

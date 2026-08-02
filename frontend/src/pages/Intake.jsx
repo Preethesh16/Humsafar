@@ -1,82 +1,88 @@
 import { useMemo, useState } from "react";
 
-import { resolvePlace, suggestPlaces } from "../lib/places.js";
+import { suggestPlaces } from "../lib/places.js";
 
-/**
- * Step 1 — the user states the goal.
- *
- * This is the page that turns the project from a scripted demo into a product:
- * a judge can type their own destination and budget and watch the agents work
- * on it. Discovery is destination-aware, so a Jaipur request really does return
- * Jaipur inventory.
- *
- * The goal is composed into a sentence rather than sent as structured fields,
- * because the Intent Agent already parses free text and that keeps the locked
- * event contract unchanged.
- */
+import {
+  buildTripGoal,
+  suggestedRooms,
+  TRAVEL_MODES,
+  TRIP_VIBES,
+  tripDays,
+  validateStep,
+} from "../lib/tripIntake.js";
 
-/**
- * Suggestion list for a place or code field.
- *
- * A native <datalist> rather than a custom combobox: the browser gives correct
- * keyboard handling, screen-reader semantics and mobile behaviour for free, and
- * a hand-rolled listbox is a well-known source of accessibility bugs. The
- * trade-off is that we cannot style the popup — worth it here.
- *
- * Options are recomputed from what has been typed so the list narrows as you go.
- */
-function PlaceOptions({ id, query, codesOnly = false }) {
-  const matches = suggestPlaces(query);
-  return (
-    <datalist id={id}>
-      {matches.map((place) => (
-        <option
-          key={place.code}
-          value={codesOnly ? place.code : place.city}
-          label={codesOnly ? `${place.city} · ${place.region}` : `${place.code} · ${place.region}`}
-        />
-      ))}
-    </datalist>
-  );
-}
+const QUESTIONS = [
+  { title: "Where do you want to disappear to?", helper: "A city, state, beach, mountains—say it normally." },
+  { title: "Where are you starting from?", helper: "No airport codes. Humsafar will work out the route." },
+  { title: "How do you feel about getting there?", helper: "If you do not care, let the Journey Agent compare the trade-offs." },
+  { title: "When can you go?", helper: "Exact dates are useful, but flexible is completely fine." },
+  { title: "Who is coming?", helper: "This changes transport, rooms, meals and the total plan." },
+  { title: "What is the hard spending limit?", helper: "One shared pot. The agents can trade slices, never cross it." },
+  { title: "What would make this trip feel right?", helper: "Pick as many as you care about. You can also say it in your own words." },
+  { title: "Did I understand you correctly?", helper: "Nothing is booked yet. This sends the brief to the agent team." },
+];
+
+const BUDGETS = [15000, 30000, 50000, 75000];
+const PARTY_SIZES = [1, 2, 3, 4, 6];
+const DURATIONS = [2, 3, 5, 7];
 
 export default function Intake({ onStarted, navigate }) {
-  const [origin, setOrigin] = useState("");
-  const [destination, setDestination] = useState("");
-  const [originCode, setOriginCode] = useState("");
-  const [destinationCode, setDestinationCode] = useState("");
-
-  /**
-   * Sets a city and fills its airport code, but only once the typed text
-   * unambiguously names a place. Guessing from a partial name could quietly
-   * point the flight search at the wrong airport, which is worse than leaving
-   * the field for the user. A code already typed by hand is never overwritten.
-   */
-  const pickCity = (value, setCity, setCode) => {
-    setCity(value);
-    const place = resolvePlace(value);
-    if (place) setCode(place.code);
-  };
-  const [budget, setBudget] = useState(30000);
-  const [departureDate, setDepartureDate] = useState(() => futureDate(7));
-  const [returnDate, setReturnDate] = useState(() => futureDate(10));
-  const [travelers, setTravelers] = useState(1);
-  const [rooms, setRooms] = useState(1);
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [emphasis, setEmphasis] = useState("");
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState(() => ({
+    destination: "",
+    origin: "",
+    travelMode: "compare",
+    dateMode: "flexible",
+    flexibleDays: 3,
+    departureDate: futureDate(7),
+    returnDate: futureDate(10),
+    travelers: 1,
+    rooms: 1,
+    budget: 30000,
+    vibes: [],
+    note: "",
+  }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const days = useMemo(
-    () => Math.max(1, Math.round((Date.parse(returnDate) - Date.parse(departureDate)) / 86_400_000)),
-    [departureDate, returnDate],
-  );
-  const goal = `Plan a ${days}-day trip from ${origin.trim()} to ${destination.trim()} for ${travelers} traveler${Number(travelers) === 1 ? "" : "s"}`
-    + (emphasis.trim() ? `, ${emphasis.trim()}` : "");
+  const days = useMemo(() => tripDays(answers), [answers]);
+  const goal = useMemo(() => buildTripGoal(answers), [answers]);
+  const question = QUESTIONS[step];
+  const isReview = step === QUESTIONS.length - 1;
 
-  async function start(event) {
+  function update(key, value) {
+    setAnswers((current) => ({ ...current, [key]: value }));
+    setError("");
+  }
+
+  function chooseParty(value) {
+    setAnswers((current) => ({
+      ...current,
+      travelers: value,
+      rooms: suggestedRooms(value),
+    }));
+    setError("");
+  }
+
+  function toggleVibe(id) {
+    setAnswers((current) => ({
+      ...current,
+      vibes: current.vibes.includes(id)
+        ? current.vibes.filter((item) => item !== id)
+        : [...current.vibes, id],
+    }));
+  }
+
+  async function submit(event) {
     event.preventDefault();
+    if (!isReview) {
+      const problem = validateStep(step, answers);
+      if (problem) return setError(problem);
+      setStep((current) => current + 1);
+      setError("");
+      return;
+    }
+
     setError("");
     setBusy(true);
     try {
@@ -85,173 +91,236 @@ export default function Intake({ onStarted, navigate }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           goal,
-          budget: Number(budget),
+          budget: Number(answers.budget),
           days,
-          origin: origin.trim(),
-          destination: destination.trim(),
-          originCode: originCode.trim().toUpperCase(),
-          destinationCode: destinationCode.trim().toUpperCase(),
-          departureDate,
-          returnDate,
-          travelers: Number(travelers),
-          rooms: Number(rooms),
-          latitude: latitude === "" ? undefined : Number(latitude),
-          longitude: longitude === "" ? undefined : Number(longitude),
+          origin: answers.origin.trim(),
+          destination: answers.destination.trim(),
+          departureDate: answers.dateMode === "exact" ? answers.departureDate : undefined,
+          returnDate: answers.dateMode === "exact" ? answers.returnDate : undefined,
+          travelers: Number(answers.travelers),
+          rooms: Number(answers.rooms),
+          travelMode: answers.travelMode,
+          dateFlexibility: answers.dateMode,
         }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error?.message ?? `Backend returned ${response.status}`);
-      const { runId } = payload;
-      onStarted?.({ runId, goal });
-      navigate(`/deliberate?runId=${encodeURIComponent(runId)}`);
+      onStarted?.({ runId: payload.runId, goal });
+      navigate(`/deliberate?runId=${encodeURIComponent(payload.runId)}`);
     } catch (cause) {
-      // Never pretend a run started. The demo stream stays available and is
-      // labelled as simulated wherever it is shown.
-      setError(
-        `Could not start a live run (${cause.message}). ` +
-          "You can still watch the simulated stream.",
-      );
+      setError(`Could not start the live agent team (${cause.message}).`);
       setBusy(false);
     }
   }
 
+  function back() {
+    setStep((current) => Math.max(0, current - 1));
+    setError("");
+  }
+
   return (
-    <form className="intake" onSubmit={start}>
-      <div className="eyebrow">Step 1 of 5 · your trip</div>
-      <h1 className="intake-title">
-        Where are you going, <span className="accent">and what can you spend?</span>
-      </h1>
-      <p className="intake-lede">
-        Four specialist agents will negotiate this budget between themselves, then each
-        executes its own part through a merchant-locked credential. You approve the exact plan once.
-      </p>
+    <main className="conversation-shell">
+      <header className="conversation-brand">
+        <span className="brand-mark" aria-hidden="true">H</span>
+        <span>Humsafar</span>
+        <span className="conversation-mode">trip concierge</span>
+      </header>
 
-      <div className="intake-grid">
-        <label className="field">
-          <span className="field-label">Leaving from</span>
-          <input
-            className="field-input"
-            value={origin}
-            onChange={(e) => pickCity(e.target.value, setOrigin, setOriginCode)}
-            placeholder="Bengaluru"
-            list="places-origin"
-            autoComplete="off"
-            required
-          />
-          <PlaceOptions id="places-origin" query={origin} />
-          <span className="field-hint">Start typing — the airport code fills itself.</span>
-        </label>
+      <div
+        className="conversation-progress"
+        role="progressbar"
+        aria-label="Trip questions completed"
+        aria-valuemin="1"
+        aria-valuemax={QUESTIONS.length}
+        aria-valuenow={step + 1}
+      >
+        <span style={{ width: `${((step + 1) / QUESTIONS.length) * 100}%` }} />
+      </div>
 
-        <label className="field">
-          <span className="field-label">Destination</span>
-          <input
-            className="field-input"
-            value={destination}
-            onChange={(e) => pickCity(e.target.value, setDestination, setDestinationCode)}
-            placeholder="Goa"
-            list="places-destination"
-            autoComplete="off"
-            required
-          />
-          <PlaceOptions id="places-destination" query={destination} />
-        </label>
-
-        <label className="field">
-          <span className="field-label">Origin airport code</span>
-          <input className="field-input" value={originCode} onChange={(e) => setOriginCode(e.target.value.toUpperCase())} placeholder="BLR" list="codes-origin" autoComplete="off" minLength="3" maxLength="3" pattern="[A-Za-z]{3}" required />
-          <PlaceOptions id="codes-origin" query={originCode} codesOnly />
-          <span className="field-hint">IATA code used for live flight search.</span>
-        </label>
-
-        <label className="field">
-          <span className="field-label">Destination airport code</span>
-          <input className="field-input" value={destinationCode} onChange={(e) => setDestinationCode(e.target.value.toUpperCase())} placeholder="GOI" list="codes-destination" autoComplete="off" minLength="3" maxLength="3" pattern="[A-Za-z]{3}" required />
-          <PlaceOptions id="codes-destination" query={destinationCode} codesOnly />
-        </label>
-
-        <label className="field">
-          <span className="field-label">Total budget (₹)</span>
-          <input
-            className="field-input"
-            type="number"
-            min="5000"
-            step="500"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            required
-          />
-          <span className="field-hint">The agents can never spend past this.</span>
-        </label>
-
-        <label className="field">
-          <span className="field-label">Departure</span>
-          <input
-            className="field-input"
-            type="date"
-            value={departureDate}
-            onChange={(e) => setDepartureDate(e.target.value)}
-            required
-          />
-        </label>
-
-        <label className="field">
-          <span className="field-label">Return</span>
-          <input className="field-input" type="date" min={departureDate} value={returnDate} onChange={(e) => setReturnDate(e.target.value)} required />
-          <span className="field-hint">{days} day trip</span>
-        </label>
-
-        <label className="field">
-          <span className="field-label">Travellers</span>
-          <input className="field-input" type="number" min="1" max="9" value={travelers} onChange={(e) => setTravelers(e.target.value)} required />
-        </label>
-
-        <label className="field">
-          <span className="field-label">Rooms</span>
-          <input className="field-input" type="number" min="1" max="9" value={rooms} onChange={(e) => setRooms(e.target.value)} required />
-        </label>
-
-        <label className="field wide">
-          <span className="field-label">Anything you care about? (optional)</span>
-          <input
-            className="field-input"
-            value={emphasis}
-            onChange={(e) => setEmphasis(e.target.value)}
-            placeholder="I really care about eating well"
-          />
-          <span className="field-hint">
-            This shifts which agent concedes first — it never changes the budget.
-          </span>
-        </label>
-
-        <details className="field wide">
-          <summary className="field-label">Override hotel search coordinates (optional)</summary>
-          <p className="field-hint">When Google Maps and Duffel are configured, Humsafar resolves your destination automatically. Only enter coordinates to override that location.</p>
-          <div className="intake-grid">
-            {/* These two are the only controls on the form not wrapped in a
-                <label>. A placeholder is not an accessible name — it is never
-                guaranteed to be announced and it disappears the moment you
-                type — so the name is carried explicitly. */}
-            <input className="field-input" type="number" step="any" min="-90" max="90" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="Latitude" aria-label="Latitude override" />
-            <input className="field-input" type="number" step="any" min="-180" max="180" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="Longitude" aria-label="Longitude override" />
+      <form className="conversation" onSubmit={submit}>
+        <section className="assistant-prompt" aria-live="polite">
+          <span className="assistant-avatar" aria-hidden="true">H</span>
+          <div>
+            <p className="assistant-kicker">Question {step + 1} of {QUESTIONS.length}</p>
+            <h1>{question.title}</h1>
+            <p>{question.helper}</p>
           </div>
-        </details>
+        </section>
+
+        <section className="answer-card">
+          {step === 0 && (
+            <TextAnswer
+              value={answers.destination}
+              onChange={(value) => update("destination", value)}
+              placeholder="Goa, Jaipur, somewhere quiet near the sea…"
+              label="Trip destination"
+              suggestId="places-destination"
+              autoFocus
+            />
+          )}
+
+          {step === 1 && (
+            <TextAnswer
+              value={answers.origin}
+              onChange={(value) => update("origin", value)}
+              placeholder="Mangaluru"
+              label="Leaving from"
+              suggestId="places-origin"
+              autoFocus
+            />
+          )}
+
+          {step === 2 && (
+            <div className="answer-options travel-options">
+              {TRAVEL_MODES.map((mode) => (
+                <button
+                  className={`answer-option ${answers.travelMode === mode.id ? "selected" : ""}`}
+                  type="button"
+                  key={mode.id}
+                  onClick={() => update("travelMode", mode.id)}
+                  aria-pressed={answers.travelMode === mode.id}
+                >
+                  <strong>{mode.label}</strong>
+                  <span>{mode.note}</span>
+                  {mode.id === "compare" && <em>Recommended</em>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {step === 3 && (
+            <>
+              <div className="segmented-choice" role="group" aria-label="Date preference">
+                <button type="button" className={answers.dateMode === "flexible" ? "selected" : ""} onClick={() => update("dateMode", "flexible")}>I am flexible</button>
+                <button type="button" className={answers.dateMode === "exact" ? "selected" : ""} onClick={() => update("dateMode", "exact")}>I know my dates</button>
+              </div>
+              {answers.dateMode === "flexible" ? (
+                <div className="quick-row" aria-label="Trip duration">
+                  {DURATIONS.map((duration) => (
+                    <button type="button" className={answers.flexibleDays === duration ? "selected" : ""} key={duration} onClick={() => update("flexibleDays", duration)}>{duration} days</button>
+                  ))}
+                </div>
+              ) : (
+                <div className="date-pair">
+                  <label><span>Leave</span><input type="date" value={answers.departureDate} onChange={(event) => update("departureDate", event.target.value)} /></label>
+                  <label><span>Come back</span><input type="date" min={answers.departureDate} value={answers.returnDate} onChange={(event) => update("returnDate", event.target.value)} /></label>
+                </div>
+              )}
+            </>
+          )}
+
+          {step === 4 && (
+            <>
+              <div className="quick-row" aria-label="Number of travellers">
+                {PARTY_SIZES.map((count) => (
+                  <button type="button" className={Number(answers.travelers) === count ? "selected" : ""} key={count} onClick={() => chooseParty(count)}>{count === 1 ? "Just me" : `${count} people`}</button>
+                ))}
+              </div>
+              <label className="compact-input"><span>Or enter a group size</span><input type="number" min="1" max="9" value={answers.travelers} onChange={(event) => chooseParty(Number(event.target.value))} /></label>
+            </>
+          )}
+
+          {step === 5 && (
+            <>
+              <div className="quick-row budget-options" aria-label="Budget suggestions">
+                {BUDGETS.map((amount) => (
+                  <button type="button" className={Number(answers.budget) === amount ? "selected" : ""} key={amount} onClick={() => update("budget", amount)}>{money(amount)}</button>
+                ))}
+              </div>
+              <label className="money-answer"><span>₹</span><input type="number" min="5000" step="500" value={answers.budget} onChange={(event) => update("budget", event.target.value)} aria-label="Custom total budget in rupees" /></label>
+              <p className="answer-note">Includes the journey, stay, food and things to do for the whole group.</p>
+            </>
+          )}
+
+          {step === 6 && (
+            <>
+              <div className="vibe-grid">
+                {TRIP_VIBES.map((vibe) => (
+                  <button type="button" className={answers.vibes.includes(vibe.id) ? "selected" : ""} key={vibe.id} onClick={() => toggleVibe(vibe.id)} aria-pressed={answers.vibes.includes(vibe.id)}>{vibe.label}</button>
+                ))}
+              </div>
+              <textarea className="free-answer" value={answers.note} onChange={(event) => update("note", event.target.value)} placeholder="Anything else? For example: no overnight buses, safe for parents, vegetarian food…" aria-label="Anything else Humsafar should know" rows="3" />
+            </>
+          )}
+
+          {isReview && <TripReview answers={answers} days={days} goal={goal} onEdit={setStep} />}
+        </section>
+
+        {error && <p className="conversation-error" role="alert">{error}</p>}
+
+        <nav className="conversation-actions" aria-label="Trip questions">
+          <button className="back-action" type="button" onClick={back} disabled={step === 0 || busy}>Back</button>
+          <button className="primary next-action" type="submit" disabled={busy}>
+            {busy ? "Waking up the agents…" : isReview ? "Build my plan" : "Continue"}
+          </button>
+        </nav>
+      </form>
+
+      <p className="intake-truth">Planning and negotiation are live. Free-data results and simulations are labelled; Humsafar never calls a link a booking.</p>
+    </main>
+  );
+}
+
+function TextAnswer({ value, onChange, placeholder, label, autoFocus = false, suggestId }) {
+  return (
+    <>
+      <input
+        className="big-answer"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        aria-label={label}
+        autoFocus={autoFocus}
+        list={suggestId}
+        autoComplete="off"
+      />
+      {suggestId ? <PlaceSuggestions id={suggestId} query={value} /> : null}
+    </>
+  );
+}
+
+/**
+ * Type-ahead for the two place questions.
+ *
+ * A native <datalist> rather than a custom combobox: the browser gives correct
+ * keyboard handling, screen-reader semantics and mobile behaviour for free, and
+ * a hand-rolled listbox is a well-known source of accessibility bugs. We lose
+ * control of the popup's styling, which is the right trade here.
+ *
+ * The list narrows as you type and never blocks free text — this flow is
+ * deliberately free-first, so "somewhere quiet near the sea" must still be a
+ * valid answer. Suggestions are a shortcut, not a constraint.
+ */
+function PlaceSuggestions({ id, query }) {
+  return (
+    <datalist id={id}>
+      {suggestPlaces(query).map((place) => (
+        <option key={place.code} value={place.city} label={`${place.code} · ${place.region}`} />
+      ))}
+    </datalist>
+  );
+}
+
+function TripReview({ answers, days, goal, onEdit }) {
+  const rows = [
+    ["Trip", `${answers.origin} → ${answers.destination}`, 0],
+    ["Travel", TRAVEL_MODES.find((item) => item.id === answers.travelMode)?.label, 2],
+    ["When", answers.dateMode === "exact" ? `${answers.departureDate} → ${answers.returnDate}` : `Flexible · about ${days} days`, 3],
+    ["People", `${answers.travelers} traveller${Number(answers.travelers) === 1 ? "" : "s"} · ${answers.rooms} room${answers.rooms === 1 ? "" : "s"}`, 4],
+    ["Ceiling", money(Number(answers.budget)), 5],
+  ];
+  return (
+    <>
+      <div className="review-grid">
+        {rows.map(([label, value, editStep]) => (
+          <button type="button" className="review-row" key={label} onClick={() => onEdit(editStep)}>
+            <span>{label}</span><strong>{value}</strong><em>Edit</em>
+          </button>
+        ))}
       </div>
-
-      <div className="intake-goal">
-        <span className="field-label">The agents will be told</span>
-        <code>{goal}</code>
-      </div>
-
-      {error ? (
-        <p className="intake-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      <button className="primary" type="submit" disabled={busy}>
-        {busy ? "Starting the agents…" : "Send in the agents"}
-      </button>
-    </form>
+      <div className="agent-brief"><span>The agents receive</span><p>{goal}</p></div>
+      <p className="answer-note">First they discover options and negotiate the one shared budget. You still choose the shortlist and approve the exact plan.</p>
+    </>
   );
 }
 
@@ -259,4 +328,8 @@ function futureDate(offsetDays) {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + offsetDays);
   return date.toISOString().slice(0, 10);
+}
+
+function money(amount) {
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
 }

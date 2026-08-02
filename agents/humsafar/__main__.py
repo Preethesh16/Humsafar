@@ -46,6 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--travelers", type=int, default=1)
     parser.add_argument("--rooms", type=int, default=1)
     parser.add_argument(
+        "--travel-mode",
+        choices=("compare", "flight", "train", "bus", "drive"),
+        default="compare",
+        help="User's preferred intercity mode; compare lets the journey specialist weigh all modes",
+    )
+    parser.add_argument(
         "--backend",
         default=os.environ.get("HUMSAFAR_BACKEND_URL", "http://127.0.0.1:3000"),
         help="Base URL of the Node backend",
@@ -124,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         "passengers": args.travelers,
         "guests": args.travelers,
         "rooms": args.rooms,
+        "travelMode": args.travel_mode,
         "originName": args.origin,
         "destinationName": args.destination,
         "latitude": args.latitude,
@@ -135,10 +142,18 @@ def main(argv: list[str] | None = None) -> int:
             base_url=args.backend,
             token=token,
             query=discovery_query,
-            fallback=FixtureDiscovery(days=args.days, origin=args.origin or "Bengaluru"),
+            fallback=FixtureDiscovery(
+                days=args.days,
+                origin=args.origin or "Bengaluru",
+                travel_mode=args.travel_mode,
+            ),
         )
         if not args.local_discovery
-        else FixtureDiscovery(days=args.days, origin=args.origin or "Bengaluru")
+        else FixtureDiscovery(
+            days=args.days,
+            origin=args.origin or "Bengaluru",
+            travel_mode=args.travel_mode,
+        )
     )
     trust = TrustClient(base_url=args.backend, token=token) if args.trust else None
     approval = (

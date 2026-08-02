@@ -35,9 +35,15 @@ class FixtureDiscovery:
     and it is what keeps the submission's disclosure section honest.
     """
 
-    def __init__(self, days: int = 3, origin: str = "Bengaluru") -> None:
+    def __init__(
+        self,
+        days: int = 3,
+        origin: str = "Bengaluru",
+        travel_mode: str = "flight",
+    ) -> None:
         self.days = days
         self.origin = origin
+        self.travel_mode = travel_mode
 
     def discover(self, category: str, goal: str) -> list[Option]:
         # The goal is no longer ignored. It used to be: every request returned
@@ -45,7 +51,12 @@ class FixtureDiscovery:
         # BLR-GOI flights and a hotel in Anjuna. Discovery now answers the
         # question that was actually asked.
         destination = parse_destination(goal)
-        rows = build_inventory(destination, self.days, self.origin).get(category, [])
+        rows = build_inventory(
+            destination,
+            self.days,
+            self.origin,
+            travel_mode=self.travel_mode,
+        ).get(category, [])
         return [
             Option(
                 category=category,

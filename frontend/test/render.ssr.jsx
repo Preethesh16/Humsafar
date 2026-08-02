@@ -202,21 +202,21 @@ for (const [name, html] of [["receipt", liveReceipt], ["approval", pendingHtml]]
 // so a crash or an unlabelled control there is worse than one deeper in.
 const intakeHtml = renderToStaticMarkup(<Intake onStarted={() => {}} navigate={() => {}} />);
 assert.ok(intakeHtml.includes("<form"), "the intake page renders a form");
-assert.ok(
-  !/<input(?![^>]*aria-label)(?![^>]*\/?>[\s\S]{0,80}<\/label>)[^>]*placeholder="Lat/.test(intakeHtml),
-  "the coordinate overrides must carry an accessible name, not just a placeholder",
-);
-assert.ok(intakeHtml.includes("Latitude override"), "latitude input is labelled");
-assert.ok(intakeHtml.includes("Longitude override"), "longitude input is labelled");
+assert.ok(intakeHtml.includes('aria-label="Trip destination"'), "the current text answer has an accessible name");
+assert.ok(intakeHtml.includes('role="progressbar"'), "question progress is programmatic, not just visual");
 
-// Place suggestions: all four location fields must offer a picker, so a judge
-// never has to know an IATA code or guess a spelling.
-for (const listId of ["places-origin", "places-destination", "codes-origin", "codes-destination"]) {
-  assert.ok(intakeHtml.includes(`id="${listId}"`), `field offers suggestions: ${listId}`);
-  assert.ok(intakeHtml.includes(`list="${listId}"`), `input is wired to ${listId}`);
-}
+// Place suggestions. Only one question renders at a time, so the first render
+// carries the destination list; the origin list appears on its own step. The
+// suggestions are a shortcut, never a constraint — this flow is free-first, so
+// "somewhere quiet near the sea" has to stay a valid answer.
+assert.ok(intakeHtml.includes('id="places-destination"'), "the destination question offers suggestions");
+assert.ok(intakeHtml.includes('list="places-destination"'), "the destination input is wired to them");
 assert.ok(intakeHtml.includes("Bengaluru"), "suggestions are populated");
-assert.ok(intakeHtml.includes("BLR"), "airport codes are offered");
+assert.ok(intakeHtml.includes("BLR"), "each suggestion shows its airport code");
+assert.ok(
+  !intakeHtml.includes("required"),
+  "the free-first flow must not hard-require a suggestion match",
+);
 
 const chooseState = {
   choice: {
@@ -265,6 +265,16 @@ for (const [needle, description] of [
   ["Truth layer", "footer disclosure"],
 ]) {
   assert.ok(shell.includes(needle), `app shell should contain ${description}: "${needle}"`);
+}
+
+for (const [needle, description] of [
+  ["Where do you want to disappear to?", "first conversational question"],
+  ["A city, state, beach, mountains", "plain-language destination prompt"],
+  ["Question 1 of 8", "question progress"],
+  ["trip concierge", "concierge mode label"],
+  ["Planning and negotiation are live", "honest capability boundary"],
+]) {
+  assert.ok(intakeHtml.includes(needle), `intake should contain ${description}: "${needle}"`);
 }
 
 // Nothing rendered may imply a live transaction while on the mocked stream.

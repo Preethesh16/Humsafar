@@ -305,3 +305,14 @@
 - Blocked on: the next step requires a deliberate mandate-session ceremony with the user's email, selected first merchant, and the cardholder ready for the hosted passkey/card flow.
 - Needs from Jeswin/Deepthi: none for authentication. Continue treating mandate approval as authorization only, not a completed purchase.
 - Commit: `2d9a4d2` (verifier correction committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 11:38 IST] — Prepared the first hosted Prava mandate ceremony
+- Prompt: shared Prava's current documentation, the Sandbox dashboard at onboarding step 2/3, and asked what to do next.
+- Files changed: `.env.example`, `package.json`, `backend/scripts/createPravaMandateSession.js`, `backend/test/createPravaMandateSession.test.js`, and `progress-preethesh.md`.
+- Changed: added `npm run prava:create-mandate-session`, a sandbox-only operator command for one merchant-specific, one-time, authorize-only mandate. It validates the secret-key prefix, sandbox origin, customer email, positive cap, HTTPS merchant URL, and ISO country code before network access. It prints only safe session metadata and the hosted `iframeUrl`; it deliberately drops `session_token`, keys, and card data. Added local configuration for a ₹100 Duffel cap-enforcement proof mandate.
+- Validation: read the complete supplied 124-line Prava introduction and compared today's official integration-choice, quickstart, SDK, create-session, and sandbox-testing pages with Humsafar's REST client. Root tests passed 62/62 and `git diff --check` passed. Confirmed the real local `.env` has no customer email yet, so the command was not run and no session/transaction allowance was consumed.
+- Decision: keep Humsafar on the hosted full-API path for this first proof. Do not install the global dashboard skill, do not use MCP/CLI, and do not paste the dashboard's generic SDK snippet. The dashboard currently shows 20 sandbox transactions remaining, which becomes the live operational limit regardless of the older 30-per-day organizer note.
+- Why: hosted mode is Prava's documented fastest/lowest-maintenance path and matches the backend already implemented. The global skill/CLI is a different agent-owned-interface product, while embedded SDK work would add frontend risk before one genuine sandbox proof exists.
+- Blocked on: the user adding `PRAVA_TEST_CUSTOMER_EMAIL` locally and being physically ready to open the short-lived hosted page, enter the team test card, and complete real WebAuthn/passkey approval.
+- Needs from Jeswin/Deepthi: none until the mandate is active; they must continue to treat mandate approval as authorization, not a purchase.
+- Commit: pending (safe hosted-session operator on `preethesh/integrations-backend`)

@@ -10,6 +10,7 @@
     "start": "node backend/src/server.js",
     "start:sandbox": "node --env-file=.env backend/src/server.js",
     "prava:verify": "node --env-file=.env backend/scripts/verifyPravaAccess.js",
+    "prava:create-mandate-session": "node --env-file=.env backend/scripts/createPravaMandateSession.js",
     "test": "node --test"
   },
   "dependencies": {

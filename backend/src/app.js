@@ -1,10 +1,20 @@
 import express from "express";
+import fs from "node:fs";
+import path from "node:path";
 
 import { validateEvent } from "./events/eventSchema.js";
 import { ApprovalError } from "./services/approvalService.js";
 import { ChoiceError } from "./services/choiceService.js";
+import {
+  SESSION_COOKIE,
+  createSessionToken,
+  isSecureRequest,
+  readCookie,
+  sessionCookieHeader,
+  verifySessionToken,
+} from "./session.js";
 
-export function createApp({ eventHub, scopedCardService, runService, discoveryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, discoveryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -15,6 +25,14 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "64kb" }));
+
+  // Two authorizers, because the browser and the agent process need different
+  // amounts of power. `agentOnly` is the original bearer-token check and still
+  // guards everything that touches money or the event stream's contents.
+  // `browserOrAgent` additionally accepts a signed session cookie, and is used
+  // only on the routes a human actually drives. See session.js.
+  const agentOnly = authorize(internalApiToken);
+  const browserOrAgent = authorizeBrowser(internalApiToken, sessionSecret);
 
   app.get("/health", (_request, response) => {
     response.json({ status: "ok" });
@@ -39,7 +57,7 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     eventHub.connect(request, response);
   });
 
-  app.post("/api/events", authorize(internalApiToken), (request, response) => {
+  app.post("/api/events", agentOnly, (request, response) => {
     const error = validateEvent(request.body);
     if (error) {
       return response.status(400).json({ error: { code: "INVALID_EVENT", message: error } });
@@ -50,18 +68,18 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     return response.status(202).json({ id });
   });
 
-  app.post("/api/scoped-cards", authorize(internalApiToken), async (request, response) => {
+  app.post("/api/scoped-cards", agentOnly, async (request, response) => {
     const { mandateId, merchant, amountCap } = request.body ?? {};
     const result = await scopedCardService.mintScopedCard(mandateId, merchant, amountCap);
     return response.status(result.status === "issued" ? 201 : 422).json(result);
   });
 
-  app.post("/api/approvals/requests", authorize(internalApiToken), (request, response) => {
+  app.post("/api/approvals/requests", agentOnly, (request, response) => {
     if (!approvalService) return response.status(503).json({ error: { code: "APPROVAL_UNAVAILABLE" } });
     return approvalResponse(response, () => approvalService.create(request.body), 201);
   });
 
-  app.get("/api/approvals/:approvalRequestId", authorize(internalApiToken), (request, response) => {
+  app.get("/api/approvals/:approvalRequestId", browserOrAgent, (request, response) => {
     if (!approvalService) return response.status(503).json({ error: { code: "APPROVAL_UNAVAILABLE" } });
     return approvalResponse(response, () => approvalService.get({
       approvalRequestId: request.params.approvalRequestId,
@@ -69,7 +87,7 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }));
   });
 
-  app.post("/api/approvals/:approvalRequestId/decision", authorize(internalApiToken), (request, response) => {
+  app.post("/api/approvals/:approvalRequestId/decision", browserOrAgent, (request, response) => {
     if (!approvalService) return response.status(503).json({ error: { code: "APPROVAL_UNAVAILABLE" } });
     return approvalResponse(response, () => approvalService.decide({
       ...request.body,
@@ -77,7 +95,7 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }), 202);
   });
 
-  app.post("/api/approvals/:approvalRequestId/consume", authorize(internalApiToken), (request, response) => {
+  app.post("/api/approvals/:approvalRequestId/consume", agentOnly, (request, response) => {
     if (!approvalService) return response.status(503).json({ error: { code: "APPROVAL_UNAVAILABLE" } });
     return approvalResponse(response, () => approvalService.consume({
       ...request.body,
@@ -85,7 +103,7 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }));
   });
 
-  app.post("/api/runs", authorize(internalApiToken), (request, response) => {
+  app.post("/api/runs", browserOrAgent, (request, response) => {
     if (!runService) return response.status(503).json({ error: { code: "RUN_UNAVAILABLE" } });
     try {
       return response.status(202).json(runService.start(request.body ?? {}));
@@ -96,7 +114,7 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }
   });
 
-  app.get("/api/runs/:runId", authorize(internalApiToken), (request, response) => {
+  app.get("/api/runs/:runId", browserOrAgent, (request, response) => {
     if (!runService) return response.status(503).json({ error: { code: "RUN_UNAVAILABLE" } });
     try {
       return response.json(runService.get(request.params.runId));
@@ -107,12 +125,12 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }
   });
 
-  app.post("/api/choices", authorize(internalApiToken), (request, response) => {
+  app.post("/api/choices", browserOrAgent, (request, response) => {
     if (!choiceService) return response.status(503).json({ error: { code: "CHOICE_UNAVAILABLE" } });
     return choiceResponse(response, () => choiceService.select(request.body), 202);
   });
 
-  app.get("/api/choices", authorize(internalApiToken), (request, response) => {
+  app.get("/api/choices", browserOrAgent, (request, response) => {
     if (!choiceService) return response.status(503).json({ error: { code: "CHOICE_UNAVAILABLE" } });
     return choiceResponse(response, () => {
       const data = choiceService.get(request.query);
@@ -121,7 +139,7 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     });
   });
 
-  app.post("/api/discovery/:category", authorize(internalApiToken), async (request, response) => {
+  app.post("/api/discovery/:category", agentOnly, async (request, response) => {
     if (!discoveryService) return response.status(503).json({ error: { code: "DISCOVERY_UNAVAILABLE" } });
     try {
       return response.json(await discoveryService.search(request.params.category, request.body));
@@ -130,7 +148,7 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }
   });
 
-  app.post("/api/trust/check", authorize(internalApiToken), async (request, response) => {
+  app.post("/api/trust/check", agentOnly, async (request, response) => {
     if (!trustService) return response.status(503).json({ error: { code: "TRUST_UNAVAILABLE" } });
     try {
       return response.json(await trustService.check(request.body));
@@ -139,17 +157,17 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }
   });
 
-  app.post("/api/prava/mandate-sessions", authorize(internalApiToken), async (request, response) => {
+  app.post("/api/prava/mandate-sessions", agentOnly, async (request, response) => {
     if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
     return response.status(201).json(await mandateService.createSetupSession(request.body));
   });
 
-  app.post("/api/prava/mandates/sync", authorize(internalApiToken), async (request, response) => {
+  app.post("/api/prava/mandates/sync", agentOnly, async (request, response) => {
     if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
     return response.json(await mandateService.syncCustomerMandates(request.body.customerId));
   });
 
-  app.get("/api/prava/mandates/resolve", authorize(internalApiToken), (request, response) => {
+  app.get("/api/prava/mandates/resolve", agentOnly, (request, response) => {
     if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
     try {
       const result = mandateService.resolveMandate(request.query.merchant);
@@ -166,7 +184,7 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }
   });
 
-  app.post("/api/prava/mandates/:mandateId/charges/:transactionId/report", authorize(internalApiToken), async (request, response) => {
+  app.post("/api/prava/mandates/:mandateId/charges/:transactionId/report", agentOnly, async (request, response) => {
     if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
     return response.json(await mandateService.reportCharge({
       ...request.body,
@@ -174,6 +192,40 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
       transactionId: request.params.transactionId,
     }));
   });
+
+  // The built frontend, when there is one. Registered after every API route so
+  // it can never shadow them, and skipped entirely in development where Vite
+  // serves the app itself.
+  if (frontendDist && fs.existsSync(path.join(frontendDist, "index.html"))) {
+    const indexHtml = path.join(frontendDist, "index.html");
+
+    const serveApp = (request, response) => {
+      // The session cookie is issued with the app shell, so any browser that
+      // loaded the page can drive the run. Re-issued on every shell request,
+      // which doubles as the refresh for a long demo.
+      if (sessionSecret) {
+        response.setHeader(
+          "Set-Cookie",
+          sessionCookieHeader(createSessionToken(sessionSecret), {
+            secure: isSecureRequest(request),
+          }),
+        );
+      }
+      response.sendFile(indexHtml);
+    };
+
+    // Hashed asset filenames, so these are safe to cache hard. index.html is
+    // served by hand below and never cached, or a redeploy would leave judges
+    // on a stale bundle pointing at assets that no longer exist.
+    app.use(express.static(frontendDist, { index: false, maxAge: "1y" }));
+
+    app.get("/", serveApp);
+    // SPA fallback. Express 5 dropped string `*` patterns, hence the RegExp.
+    // An unmatched `/api` path must still 404 as JSON rather than silently
+    // returning the app shell, which would turn a typo into a confusing
+    // "unexpected token <" in the client.
+    app.get(/^\/(?!api\/|health$|a2a\/|\.well-known\/).*/, serveApp);
+  }
 
   app.use((error, _request, response, _next) => {
     if (error instanceof SyntaxError && error.status === 400 && "body" in error) {
@@ -227,5 +279,37 @@ function authorize(expectedToken) {
     }
 
     return next();
+  };
+}
+
+/**
+ * Accepts the internal bearer token OR a valid browser session cookie.
+ *
+ * Used only on the routes a human drives. The token path is unchanged, so the
+ * agent process and every existing test keep working exactly as before; the
+ * cookie path is what makes the deployed frontend function without the token
+ * ever reaching client code.
+ *
+ * With no `sessionSecret` configured this degrades to plain `authorize`, which
+ * is what keeps local development and the test suite on the original behaviour.
+ */
+function authorizeBrowser(expectedToken, sessionSecret) {
+  const tokenOnly = authorize(expectedToken);
+
+  return (request, response, next) => {
+    if (!expectedToken) return next();
+    if (!sessionSecret) return tokenOnly(request, response, next);
+
+    if (request.get("authorization") === `Bearer ${expectedToken}`) return next();
+
+    const cookie = readCookie(request.get("cookie"), SESSION_COOKIE);
+    if (verifySessionToken(cookie, sessionSecret)) return next();
+
+    return response.status(401).json({
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Valid internal API token or browser session required",
+      },
+    });
   };
 }

@@ -220,3 +220,27 @@ Also resolved: `llm.py` claimed the engine decides every amount while `intent.py
 - Needs from Deepthi: the transcript now carries an opening line per agent (*"I'm opening on Taj Udaipur at ₹13,100. …"*) before the first negotiation round. Worth showing — it is the moment the agents commit to a position.
 - Blocked on: nothing.
 - Commit: pending
+
+### [2026-08-02 21:45 IST] — the app can actually be deployed now
+- Prompt: "can u fix it i want it to be proper" — a hosted link is required and nothing was hosted.
+- Files changed: `backend/src/session.js` (new), `backend/src/app.js`, `backend/src/server.js`, `backend/src/services/runService.js`, `backend/test/session.test.js` (new), `Dockerfile`, `.dockerignore`, `DEPLOY.md`.
+
+**The blocker was authentication, not hosting.** In development Vite proxies `/api` and injects `INTERNAL_API_TOKEN` on the way through; `vite.config.js` warns explicitly against ever putting that token in client code. Deployed there is no dev server, so the browser had no way to reach the API at all.
+
+The browser now gets a **signed, httpOnly session cookie**, issued by the server when it serves the app shell. The internal token never leaves the server. Routes are split by who legitimately needs them:
+
+| Caller | Reaches |
+|---|---|
+| Browser session cookie | start/read a run, choose an option, decide an approval, read the stream |
+| `Bearer INTERNAL_API_TOKEN` | all of the above **plus** card minting, event publishing, approval create/consume, discovery, trust, every Prava route |
+
+**This is narrower than what development has.** The dev proxy hands the browser the *full* internal token, so anyone with dev tools open can mint a scoped card or publish a forged event into the SSE stream. A session cookie can do neither, and `session.test.js` asserts it route by route.
+
+**A fatal deployment bug found only by running the production build.** `runService` never set `HUMSAFAR_BACKEND_URL`, so the spawned agent used its own default of `http://127.0.0.1:3000`. Render and Railway both *assign* `PORT` — so on any managed host the agent would have posted every event into the void and the dashboard would have sat blank through a complete, successful run. The server now derives the URL from the port it actually bound. Reading the code would not have caught this; the first run against the production build produced **zero events**, which is what exposed it.
+
+Also added a `Dockerfile` (Node 22 + Python 3, frontend built in, healthcheck) and `DEPLOY.md` with Render/Railway steps and a verification recipe.
+
+- Validation: **211 Python, 143 Node** (4 new), frontend build and render smoke pass. Verified end to end against the real production build: intake → choose → approve → receipt, **52 events terminating in `final_receipt`**, 4 `card_issued`, 4 `purchase_result`, ₹19,200 of ₹25,000 — driven entirely through cookie auth with no token in the browser. Confirmed `/api/scoped-cards` returns 401 to a browser session.
+- Needs from the team: someone with a Render or Railway account to connect the repo. Everything else is done — env vars are documented in `DEPLOY.md`.
+- Blocked on: nothing.
+- Commit: pending

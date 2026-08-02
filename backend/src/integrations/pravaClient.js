@@ -45,13 +45,14 @@ export class PravaClient {
       method: "POST",
       body: input,
     });
-    if (payload.data?.authorizeOnly !== true || !payload.data?.iframe_url) {
+    const session = normalizeSessionResponse(payload.data);
+    if (!session) {
       throw new PravaApiError("Prava did not return a mandate approval session", {
         code: "PRAVA_INVALID_MANDATE_SESSION",
         responseId: payload.responseId,
       });
     }
-    return { data: payload.data, source: "live" };
+    return { data: session, source: "live" };
   }
 
   async listMandates({ customerId, standingOnly = true }) {
@@ -110,6 +111,17 @@ export class PravaClient {
 
     return { data: payload, responseId };
   }
+}
+
+function normalizeSessionResponse(payload) {
+  const candidate = payload?.iframe_url ? payload : payload?.data;
+  if (
+    typeof candidate?.session_id !== "string" ||
+    typeof candidate?.iframe_url !== "string"
+  ) {
+    return undefined;
+  }
+  return candidate;
 }
 
 async function parseJson(response, responseId) {

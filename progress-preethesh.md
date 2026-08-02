@@ -316,3 +316,14 @@
 - Blocked on: the user adding `PRAVA_TEST_CUSTOMER_EMAIL` locally and being physically ready to open the short-lived hosted page, enter the team test card, and complete real WebAuthn/passkey approval.
 - Needs from Jeswin/Deepthi: none until the mandate is active; they must continue to treat mandate approval as authorization, not a purchase.
 - Commit: `186a715` (safe hosted-session operator committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 13:02 IST] — Created and opened the first live Prava sandbox mandate session
+- Prompt: authorized me to use the supplied email locally and proceed with the next Prava sandbox steps.
+- Files changed: local gitignored `.env`; `backend/src/integrations/pravaClient.js`, `backend/test/pravaClient.test.js`, and `progress-preethesh.md`. The email and all credentials remain excluded from tracked files.
+- Changed: added the customer email only to local `.env`, invoked the safe hosted-session operator, and opened the returned Prava page locally without printing its URL or session token. The first authenticated response used a nested/current envelope without the documented `authorizeOnly` field, so the strict parser rejected it; updated the parser to accept either documented top-level or observed nested envelopes while still requiring both `session_id` and `iframe_url`, then retried once successfully.
+- Validation: root tests passed 78/78. The second real sandbox call returned a one-time, merchant-listed, ₹100 INR Duffel authorization session with safe metadata and opened the hosted page. No card details, key, session token, hosted URL, email, or raw response entered Git/log output; no charge or checkout result exists yet.
+- Decision: the user must now finish the short-lived hosted card/passkey ceremony in the browser. Do not mint a credential, run the over-cap proof, or claim a transaction until the mandate is confirmed active through the read-only sync/list flow.
+- Why: actual Prava response envelopes differ slightly from the current example, but the two security-critical identifiers are stable. Accepting only those required fields preserves fail-closed behavior without rejecting a valid sandbox session.
+- Blocked on: human completion of sandbox card entry, any test OTP, and WebAuthn/passkey approval before session expiry.
+- Needs from Jeswin/Deepthi: none until mandate activation is confirmed; do not represent this created session as a purchase.
+- Commit: pending (live response compatibility fix on `preethesh/integrations-backend`)

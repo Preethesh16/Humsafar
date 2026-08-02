@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { metaFor, money } from "../lib/agents.js";
 import { labelForPurchase, provenCount, runMode, runModeLabel } from "../lib/provenance.js";
 import { IconCheck } from "../lib/icons.jsx";
+import { PravaPhoneApproval } from "./PravaPhoneApproval.jsx";
 
 /**
  * Confirmation fan-out (brainstorming.md §7 beat 7): the summary the user sees
@@ -140,6 +141,8 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
             <b>{renegotiations.length}</b>
           </div>
         </div>
+
+        {embedded && !isMock && <PravaPhoneApproval />}
 
         <button type="button" className="run-btn" onClick={copySummary}>
           Copy confirmation summary

@@ -470,3 +470,28 @@
 - Validation: 183/183 root Node tests, 218/218 Python agent tests and 88/88 frontend unit tests passed; SSR rendered all panels with 32 content assertions and the production bundle built. The browser rehearsal advanced into the formerly broken 5/12 state, asserted that rendered stops equal only the active day's count, asserted station coordinates are unique and at least eight board units apart, verified 390px layout with no overflow, and finished with zero browser errors. Visual inspection covered `/tmp/humsafar-e2e-mid-quest.png` and `/tmp/humsafar-e2e-mobile-receipt.png`.
 - External blocker: Prava/Visa's sandbox credential generator must return a credential before a transaction can be truthfully completed. The current failure is upstream and matches the previously documented intermittent `FETCH_AGENTIC_CREDS_ERROR`; a code-side retry would only consume scarce attempts. The user should send the sanitized error code/timestamp to Prava support or request a replacement test card if completion evidence is mandatory.
 - Commit: recorded by the single verified milestone commit pushed after final qualification.
+
+### [2026-08-03 00:42 IST] — Generated a phone-safe Prava approval QR
+- Prompt: asked whether a fresh hosted Prava approval link could be opened on the user's phone, as in the earlier successful mandate ceremony.
+- Files changed: this operational log only; no application code, configuration or credential file changed.
+- Changed: created exactly one fresh short-lived ₹100 INR Duffel mandate-setup session with the configured sandbox account. The hosted URL was piped directly into `qrencode` and displayed from `/tmp/humsafar-prava-approval.png`; it was not printed, committed or written into project files.
+- Decision: stop at the QR. Card entry, any issuer OTP and passkey approval remain human-presence steps on Prava's hosted phone surface. After “Mandate created,” run only the read-only verifier before considering another charge.
+- Payment status: authorization session created; no credential, checkout, report or payment occurred.
+- Commit: n/a; per the user's instruction, do not push a log-only operational update.
+
+### [2026-08-03 00:43 IST] — Opened the approval QR in the laptop browser
+- Prompt: asked me to pop the generated QR onto a webpage instead of leaving it only in chat.
+- Files changed: this operational log only; no application code changed.
+- Changed: opened the temporary QR image at `file:///tmp/humsafar-prava-approval.png` in the laptop's default browser for immediate phone scanning.
+- Payment status: unchanged—hosted authorization is awaiting human card/passkey completion; no payment occurred.
+- Commit: n/a; log-only update intentionally not pushed.
+
+### [2026-08-03 00:54 IST] — Embedded the opt-in Prava phone handoff in the receipt
+- Prompt: asked for the phone setup option directly inside the final confirmation card rather than as a separate QR page.
+- Files changed: Prava approval service/route/server/session tests under `backend/`; receipt component, new phone-handoff component/client, QR dependency, styles, SSR/unit/browser tests under `frontend/`; `.env.example`, README, frontend README, dynamic-flow spec, safety runbook and this log.
+- Changed: added **Set up on phone** to non-mock embedded receipts. It makes no request on page load. On an explicit click, the backend creates or reuses one unexpired server-pinned Duffel/₹100 sandbox ceremony and returns only the hosted URL, cap, merchant and expiry; the browser accepts only exact HTTPS `sandbox.collect.prava.space`, creates the QR locally and shows phone/card/passkey steps inline. Customer, merchant, amount and product cannot be supplied by the browser, and no Prava/API/card value enters markup or storage.
+- Safety decision: the feature is disabled by default with `HUMSAFAR_ENABLE_PRAVA_PHONE_APPROVAL=false`. It is authorization setup only—never a payment, booking or checkout—and card, OTP, biometric, PIN and screen lock remain entirely on Prava's phone surface. Double-clicks reuse the live session instead of consuming another session.
+- Test correction: the full browser rehearsal exposed that its mid-quest target used the whole-trip stop denominator even though the product intentionally renders one day-sized level. The test now caps its interaction target to `data-level-stops`; product logic did not change.
+- Validation: 189/189 JavaScript tests and 218/218 Python tests passed; frontend SSR and production build passed; both production dependency audits reported zero vulnerabilities. The real browser rehearsal passed from conversational intake through live itinerary, agents, choices, approval, receipt, geolocation and route progress, while asserting that the Prava button exists without clicking it. Desktop and 390px receipt layouts were visually inspected; the idle card and an in-memory synthetic expanded QR state fit with zero mobile overflow. No external Prava session, charge or transaction was created during validation.
+- Runtime: backend restarted with the local opt-in enabled and frontend restarted at `http://127.0.0.1:5173/`; clicking the receipt button is now the only action that creates a real hosted session.
+- Commit: record with this verified UI/backend milestone and push once after the final secret/diff/remote check.

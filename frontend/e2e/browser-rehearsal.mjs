@@ -113,6 +113,11 @@ assert.match(receipt.heading, /plan is ready|processing finished/i);
 assert.match(receipt.quest, /next station/i);
 assert.match(receipt.mascot, /cat travel concierge/i);
 assert.match(receipt.text, /fixture|sandbox|payment evidence/i, "receipt must state provenance");
+assert.match(
+  receipt.text,
+  /Approve Prava on your phone[\s\S]*Set up on phone/i,
+  "receipt must offer the explicit phone handoff without starting it automatically",
+);
 if (paymentProof) {
   assert.match(receipt.text, /Prava sandbox credential request refused — no checkout/i);
   assert.ok(!receipt.text.includes("Fixture-only run"), "a real sandbox refusal must not be relabelled as fixture-only");
@@ -139,7 +144,8 @@ await waitFor(() => evaluate("document.querySelector('.quest-xp')?.textContent.i
 // available rather than making this visual regression depend on provider row
 // count. The board must remain a clean day-sized level either way.
 const questTotal = await evaluate("Number(document.querySelector('.quest-xp')?.textContent.match(/\\/(\\d+) stops/)?.[1] ?? 1)");
-const targetProgress = Math.min(5, questTotal);
+const activeLevelStops = await evaluate("Number(document.querySelector('.quest-map--3d')?.dataset.levelStops ?? 1)");
+const targetProgress = Math.min(5, activeLevelStops);
 for (let progress = 2; progress <= targetProgress; progress += 1) {
   const xp = progress * 120;
   await waitFor(() => evaluate("Boolean(document.querySelector('.quest-drive:not(:disabled)'))"), 10_000, `ride button before ${xp} XP`);

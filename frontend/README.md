@@ -51,7 +51,8 @@ npm run test:e2e  # full browser rehearsal; requires Chrome/Brave debugging on :
 | `src/lib/useEventStream.js` | Switches between the mock replay and `EventSource("/api/events")`. |
 | `src/pages/Intake.jsx` | One-question-at-a-time destination, origin, journey mode, dates/flexibility, party, budget and vibe intake. Provider codes and coordinates are deliberately absent from the user flow. |
 | `src/pages/Choose.jsx` | Affordable option selection with honest ranking and timeout labels. |
-| `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, truthful receipt, full-size Milo guide and 3D trip quest. |
+| `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, truthful receipt, explicit Prava phone handoff, full-size Milo guide and 3D trip quest. |
+| `src/lib/pravaApproval.js` | Same-origin client for the opt-in, server-pinned Prava ceremony. It accepts only the exact sandbox hosted origin and creates the QR locally; it never carries card or API-key material. |
 | `src/lib/journeyGame.js` | Pure itinerary-to-station mapping, active-day level selection, collision-free board coordinates, real-coordinate distances and run-isolated progress keys. |
 | `e2e/browser-rehearsal.mjs` | Dependency-free Chrome DevTools rehearsal from intake through receipt, geolocation and mid-quest progress. It asserts active-day station counts and marker separation, then captures desktop intake, mid-ride, mid-quest, completion and 390px mobile evidence under `/tmp`. Set `HUMSAFAR_E2E_PAYMENT=true` only for a deliberate Prava proof run. |
 | `src/lib/icons.jsx` | Inline SVG glyphs. Presentation only. |
@@ -110,6 +111,14 @@ Rules it enforces:
 - if only some categories exercise Prava, the run is labelled **mixed-mode** and
   the receipt states how many lines genuinely exercised a payment path, so one
   real line can never stand for the whole run.
+
+The embedded receipt also offers **Set up on phone** when the stream is not the
+mock lab. This is a separate, explicit authorization ceremony—not an automatic
+checkout. The backend pins the customer, Duffel merchant and ₹100 cap; the page
+receives only a short-lived `sandbox.collect.prava.space` URL, generates the QR
+locally and keeps card/OTP/passkey entry on Prava's phone surface. Ordinary
+browser rehearsals assert the button is present but never click it, so tests do
+not consume sandbox sessions.
 
 ## Dev proxy
 

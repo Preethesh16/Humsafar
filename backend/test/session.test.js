@@ -59,6 +59,13 @@ test("a browser session opens the human routes and nothing else", async (t) => {
       start: () => ({ runId: "run_1", status: "started" }),
       get: () => ({ runId: "run_1", status: "running" }),
     },
+    pravaApprovalService: {
+      create: () => ({
+        environment: "sandbox",
+        iframeUrl: "https://sandbox.collect.prava.space/session/test-only",
+        authorizeOnly: true,
+      }),
+    },
   });
 
   const server = app.listen(0, "127.0.0.1");
@@ -79,6 +86,7 @@ test("a browser session opens the human routes and nothing else", async (t) => {
   // The routes a human drives: reachable with a session cookie.
   assert.equal((await post("/api/runs", { cookie })).status, 202);
   assert.equal((await fetch(`${baseUrl}/api/runs/run_1`, { headers: { cookie } })).status, 200);
+  assert.equal((await post("/api/prava/phone-approval", { cookie })).status, 201);
 
   // The routes that touch money or the stream's contents: bearer token only.
   // This is the whole point of splitting the authorizers — the dev proxy handed

@@ -67,6 +67,7 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Run-scoped approval protocol | **Working** and verified end to end. |
 | Prava sandbox authentication | **Verified.** `npm run prava:verify` returns authentication OK. |
 | Prava mandates | **Historically created.** Five approvals are preserved in the evidence record; the current read-only standing-mandate check on 3 Aug shows one Duffel mandate, `active` / `available`, capped at ₹100. |
+| Phone approval handoff | **Working and opt-in.** The embedded receipt can request one server-pinned, short-lived Prava sandbox URL and render it as an inline phone QR. Card, OTP and passkey entry remain on Prava; creating the link is authorization setup, not a charge or booking. |
 | Scoped credential issuance | **Verified on real rails.** Four credentials issued in a single run, one per agent, each capped at its own slice. |
 | Browser-to-Prava refusal path | **Verified.** A full Journey-only browser run reused the phone-approved Duffel mandate and asked Prava for a ₹10,300 credential against its ₹100 cap. Prava refused credential issuance, no merchant checkout ran, and the receipt reported ₹0 charged. |
 | One-shot ₹100 completion attempt | **Blocked upstream on 3 Aug.** Humsafar made exactly one in-cap charge request after a read-only dry-run; Prava returned `FETCH_AGENTIC_CREDS_ERROR` before issuing credentials. No checkout/report ran, the mandate remains available with ₹100 remaining, and no retry loop was used. |
@@ -211,13 +212,21 @@ cd frontend && npm run test:render # server-rendered UI smoke test
 cd agents && python3 -m unittest discover -s tests -t .
 ```
 
-Currently **87 JavaScript** and **178 Python** tests, plus frontend SSR and production-build checks.
+Currently **189 JavaScript** and **218 Python** tests, plus frontend SSR,
+production-build and browser-rehearsal checks.
 
 ### Environment
 
 Copy `.env.example` to `.env`. `.env` is gitignored and must stay that way — never commit
 a key, a card number, or a raw Prava response. Read `precaution.md` before configuring
 anything payment-related.
+
+The receipt's **Set up on phone** control is deliberately disabled by default. For a
+cardholder-attended sandbox ceremony, set
+`HUMSAFAR_ENABLE_PRAVA_PHONE_APPROVAL=true`, fill the existing `PRAVA_TEST_*` values,
+and start with `npm run start:sandbox`. Nothing is sent to Prava until the user clicks
+the button. Repeated clicks reuse the same unexpired ceremony, and the browser never
+sends customer, merchant, amount, API key or card details.
 
 ---
 

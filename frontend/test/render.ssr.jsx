@@ -96,18 +96,19 @@ for (const [needle, description] of expectations) {
 // The exact scenario precaution.md warns about: ONE category genuinely
 // exercises Prava sandbox, the other three are fixtures. The receipt must not
 // let that one real line stand for the whole run.
+const mixedReceipt = {
+  budget: 30000,
+  totalSpent: 21000,
+  purchases: [
+    { agent: "flights", merchant: "Sandbox merchant", amount: 11800, status: "success", source: "sandbox", details: "x" },
+    { agent: "food", merchant: "OpenTable-shaped fixture", amount: 4850, status: "success", source: "fixture", details: "y" },
+    { agent: "guide", merchant: "Viator-shaped fixture", amount: 0, status: "failed", source: "fixture", details: "sold out" },
+    { agent: "stay", merchant: "Untagged merchant", amount: 4350, status: "success", details: "no source tag" },
+  ],
+};
 const liveReceipt = renderToStaticMarkup(
   <FinalReceipt
-    receipt={{
-      budget: 30000,
-      totalSpent: 21000,
-      purchases: [
-        { agent: "flights", merchant: "Sandbox merchant", amount: 11800, status: "success", source: "sandbox", details: "x" },
-        { agent: "food", merchant: "OpenTable-shaped fixture", amount: 4850, status: "success", source: "fixture", details: "y" },
-        { agent: "guide", merchant: "Viator-shaped fixture", amount: 0, status: "failed", source: "fixture", details: "sold out" },
-        { agent: "stay", merchant: "Untagged merchant", amount: 4350, status: "success", details: "no source tag" },
-      ],
-    }}
+    receipt={mixedReceipt}
     summary={{ failedPurchases: 1 }}
     blockedAttempts={[]}
     renegotiations={[]}
@@ -132,6 +133,21 @@ assert.ok(
 );
 assert.ok(liveReceipt.includes("not charged"), "a failed line must not show a charged amount");
 assert.ok(!liveReceipt.includes("₹0"), "a failed line must not render a zero-rupee charge");
+const embeddedReceipt = renderToStaticMarkup(
+  <FinalReceipt
+    receipt={mixedReceipt}
+    summary={{ failedPurchases: 1 }}
+    blockedAttempts={[]}
+    renegotiations={[]}
+    isMock={false}
+    onDismiss={() => {}}
+    embedded
+  />,
+);
+assert.ok(
+  embeddedReceipt.includes("Set up on phone"),
+  "a non-mock embedded receipt should offer the explicit Prava phone handoff",
+);
 assert.equal(
   (liveReceipt.match(/completed sandbox checkout/g) ?? []).length,
   1,

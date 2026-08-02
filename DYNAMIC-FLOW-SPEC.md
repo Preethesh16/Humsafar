@@ -127,6 +127,14 @@ stations are separated visually while preserving their real visit order. The
 course is a game visualization rather than road geometry; opening directions
 explicitly hands the real coordinates to Google Maps.
 
+The same receipt contains an opt-in **Set up on phone** handoff for Prava
+sandbox authorization. It performs no request on page load. A click asks the
+same-origin backend for server-pinned Duffel/₹100 terms, accepts only an HTTPS
+URL on `sandbox.collect.prava.space`, and generates the phone QR in the browser.
+An unexpired ceremony is reused to prevent double-click waste. The cardholder
+enters card, OTP and passkey only on Prava; this step creates authorization and
+must never be represented as a purchase or booking.
+
 ## 4. Structured trip context — landed
 
 The goal remains available to the Intent Agent, while provider-critical values

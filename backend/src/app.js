@@ -14,7 +14,7 @@ import {
   verifySessionToken,
 } from "./session.js";
 
-export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, pravaApprovalService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -175,6 +175,30 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
   app.post("/api/prava/mandate-sessions", agentOnly, async (request, response) => {
     if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
     return response.status(201).json(await mandateService.createSetupSession(request.body));
+  });
+
+  // Human-driven and explicitly opt-in. The browser supplies no customer,
+  // merchant or amount: those terms are pinned in server configuration. It
+  // receives only Prava's short-lived hosted URL so it can render a phone QR;
+  // card entry and passkey approval stay entirely on Prava's origin.
+  app.post("/api/prava/phone-approval", browserOrAgent, async (_request, response) => {
+    if (!pravaApprovalService) {
+      return response.status(503).json({
+        error: { code: "PRAVA_PHONE_APPROVAL_UNAVAILABLE", message: "Phone approval is unavailable" },
+      });
+    }
+    try {
+      return response.status(201).json(await pravaApprovalService.create());
+    } catch (error) {
+      const disabled = error?.code === "PRAVA_PHONE_APPROVAL_DISABLED";
+      return response.status(disabled ? 503 : 502).json({
+        error: {
+          code: error?.code ?? "PRAVA_PHONE_APPROVAL_FAILED",
+          message: error instanceof Error ? error.message : "Prava phone approval failed",
+          responseId: error?.responseId,
+        },
+      });
+    }
   });
 
   app.post("/api/prava/mandates/sync", agentOnly, async (request, response) => {

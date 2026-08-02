@@ -23,7 +23,10 @@ import crypto from "node:crypto";
  * What it does *not* do is identify a user. Anyone who can load the page can
  * start a run, which is correct for a public demo with no accounts — the
  * guarantee being kept here is that a browser cannot reach the payment
- * machinery, not that runs are private.
+ * machinery, not that runs are private. The only Prava route a browser session
+ * may reach is the explicitly enabled phone-approval ceremony: its amount and
+ * merchant are pinned server-side, it returns no credential, and payment still
+ * requires cardholder presence on Prava's hosted origin.
  */
 
 export const SESSION_COOKIE = "humsafar_session";

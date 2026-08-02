@@ -1177,3 +1177,12 @@ footer p { max-width: 760px; margin: 0; }
 @media (max-width: 640px) {
   .mandate-setup__frame { min-height: 540px; }
 }
+.mandate-setup.is-done { border-color: #9ec9ae; background: linear-gradient(135deg, #e9f7ef, rgba(255, 253, 248, 0.96)); }
+.mandate-setup__note--ok { color: #2f6f4e; font-weight: 600; }
+.mandate-setup__waiting { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; opacity: 1; }
+.mandate-setup__waiting .pulse {
+  width: 9px; height: 9px; border-radius: 50%; background: #2f6f4e; flex: none;
+  animation: mandate-pulse 1.4s ease-in-out infinite;
+}
+@keyframes mandate-pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mandate-setup__waiting .pulse { animation: none; opacity: 1; } }

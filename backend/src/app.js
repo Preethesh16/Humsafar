@@ -163,6 +163,25 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     return itineraryResponse(response, () => itineraryService.plan(request.body ?? {}));
   });
 
+  // Polled by the authorisation page. Prava offers no redirect-back for
+  // mandate setup, so this is how the UI learns the user finished — and it
+  // works whichever surface they used: the embedded frame, a new tab, or their
+  // phone. On completion the page re-syncs the mandate registry, which is what
+  // makes the merchant resolvable to the agents.
+  app.get("/api/prava/mandate-sessions/:sessionId/status", browserOrAgent, async (request, response) => {
+    if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
+    try {
+      return response.json(await mandateService.sessionStatus(request.params.sessionId));
+    } catch (error) {
+      return response.status(error.status ?? 502).json({
+        error: {
+          code: error.code ?? "PRAVA_SESSION_STATUS_FAILED",
+          message: error.message ?? "Could not read the authorisation status",
+        },
+      });
+    }
+  });
+
   app.post("/api/trust/check", agentOnly, async (request, response) => {
     if (!trustService) return response.status(503).json({ error: { code: "TRUST_UNAVAILABLE" } });
     try {

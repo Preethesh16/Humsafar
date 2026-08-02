@@ -62,6 +62,8 @@ Strongly recommended:
 | `OPENAI_API_KEY` | Without it the agents fall back to deterministic dialogue — the run still works and spends identically, but the specialists no longer choose their own opening positions. |
 | `PUBLIC_BASE_URL` | Only used for `agentfacts.json`. |
 | `DUFFEL_ACCESS_TOKEN` | The only reason inventory is fixture rather than live. |
+| `GEOAPIFY_API_KEY` | **The mapped itinerary is dead without it.** Both `/api/itineraries/*` routes return `503 GEOAPIFY_NOT_CONFIGURED`, so the intake page loses its suggestions and the plan never renders. Free tier is enough. |
+| `GOOGLE_MAPS_API_KEY` | Optional; falls back to Nominatim for geocoding. |
 
 Set automatically by the Dockerfile: `HOST=0.0.0.0`, `PORT=3000`,
 `HUMSAFAR_PYTHON=python3`, `NODE_ENV=production`.

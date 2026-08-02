@@ -94,7 +94,7 @@ events, so the SSE hub can enforce run isolation:
 // A purchase completed or failed
 { type: "purchase_result", agent: string, status: "success" | "failed", amount: number,
   merchant: string, details: string, source: "fixture" | "sandbox" | "production",
-  outcome?: "simulated" | "credential_issued" | "checkout_completed" | "checkout_failed" | "advisory" }
+  outcome?: "simulated" | "credential_issued" | "credential_failed" | "checkout_completed" | "checkout_failed" | "advisory" }
 
 // Proof-shot events (for the two demo beats)
 { type: "blocked_attempt", agent: string, attemptedAmount: number, cap: number, reason: string }
@@ -115,7 +115,7 @@ shape above; legacy acceptance is removed after his branch lands.
 - `split_update.allocations` during rounds shows what the agents are *asking for*, which is deliberately allowed to exceed `totalBudget` in early rounds — that overflow is the negotiation beat and is worth showing visually. Only the final split is guaranteed to fit.
 - `final_receipt` is always the **last** event of a run and is safe to use as the "run finished" signal. Nothing is emitted after it.
 - Every category the goal did not use is sent as `0` rather than omitted, so all four keys are always present. Goals needing a category outside the locked four would arrive as an *extra* key alongside them; the current MVP goals never do this.
-- Each entry in `final_receipt.purchases` carries `source: "fixture" | "sandbox" | "production"`, `outcome`, and a `details` string. `sandbox` says where the attempt happened, not whether it succeeded; `outcome: "credential_issued"` is authorization only and must never render as a checkout. `outcome: "advisory"` is an approved planning reserve with no card, reservation, or payment. Anything else with `source: "fixture"` must be labelled as simulated — it is not a completed order.
+- Each entry in `final_receipt.purchases` carries `source: "fixture" | "sandbox" | "production"`, `outcome`, and a `details` string. `sandbox` says where the attempt happened, not whether it succeeded; `outcome: "credential_issued"` is authorization only and must never render as a checkout. `outcome: "credential_failed"` means the Prava credential request itself was refused and therefore no merchant checkout occurred. `outcome: "advisory"` is an approved planning reserve with no card, reservation, or payment. Anything else with `source: "fixture"` must be labelled as simulated — it is not a completed order.
 
 - Deepthi builds her dashboard against a **mocked stream** matching this exact shape first — don't wait for Preethesh's real backend.
 - If Preethesh needs to add a field mid-build, he edits this file, adds the field, and flags it in his progress.md — he does not silently ship a differently-shaped event.

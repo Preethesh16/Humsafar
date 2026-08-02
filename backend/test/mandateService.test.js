@@ -82,3 +82,44 @@ test("MandateService drops consumed and cancelled mandates from the registry", a
   assert.deepEqual([...mandateMerchants.entries()], [["mdt_live", "Duffel"]]);
   assert.equal(service.resolveMandate("Duffel").data.mandateId, "mdt_live");
 });
+
+test("MandateService forwards Prava's documented reconciliation fields", async () => {
+  let reported;
+  const service = new MandateService({
+    pravaClient: {
+      async reportMandateCharge(input) {
+        reported = input;
+        return { data: { status: "completed" }, source: "live" };
+      },
+    },
+    mandateMerchants: new Map(),
+  });
+
+  await service.reportCharge({
+    mandateId: "mdt_1",
+    transactionId: "txn_1",
+    txn_status: "APPROVED",
+    amount_paid: "40.00",
+    authorization_code: "sandbox-proof",
+  });
+
+  assert.equal(reported.txn_status, "APPROVED");
+  assert.equal(reported.txn_type, "PURCHASE");
+  assert.equal(reported.amount_paid, "40.00");
+  assert.equal(reported.authorization_code, "sandbox-proof");
+  assert.equal(reported.status, undefined);
+  assert.equal(reported.amountPaid, undefined);
+});
+
+test("MandateService accepts legacy report aliases and rejects unknown outcomes", async () => {
+  let reported;
+  const service = new MandateService({
+    pravaClient: { async reportMandateCharge(input) { reported = input; return { data: {}, source: "live" }; } },
+    mandateMerchants: new Map(),
+  });
+
+  await service.reportCharge({ mandateId: "mdt_1", transactionId: "txn_1", status: "DECLINED", amountPaid: 12.5 });
+  assert.equal(reported.txn_status, "DECLINED");
+  assert.equal(reported.amount_paid, "12.50");
+  await assert.rejects(() => service.reportCharge({ txn_status: "PENDING" }), /APPROVED or DECLINED/);
+});

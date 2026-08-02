@@ -17,7 +17,9 @@ import { AuditLog } from "../src/components/AuditLog.jsx";
 import { BudgetSplit } from "../src/components/BudgetSplit.jsx";
 import { DeliberationFeed } from "../src/components/DeliberationFeed.jsx";
 import { FinalReceipt } from "../src/components/FinalReceipt.jsx";
+import { MascotGuide } from "../src/components/MascotGuide.jsx";
 import { ProofPanel } from "../src/components/ProofPanel.jsx";
+import { TripQuest } from "../src/components/TripQuest.jsx";
 import Choose from "../src/pages/Choose.jsx";
 import Intake from "../src/pages/Intake.jsx";
 import { PurchaseCards } from "../src/components/PurchaseCards.jsx";
@@ -78,7 +80,7 @@ const expectations = [
   ["mocked stream", "mock labelling on purchases"],
   ["Audit log", "audit heading"],
   ["renegotiation_triggered", "renegotiation in the audit log"],
-  ["Every agent has settled", "final receipt"],
+  ["Your plan is ready", "truthful fixture receipt heading"],
   ["No payment was made", "mock receipt warning"],
   ["Fixture-only run — no payment was attempted", "run-level provenance banner"],
 ];
@@ -94,18 +96,19 @@ for (const [needle, description] of expectations) {
 // The exact scenario precaution.md warns about: ONE category genuinely
 // exercises Prava sandbox, the other three are fixtures. The receipt must not
 // let that one real line stand for the whole run.
+const mixedReceipt = {
+  budget: 30000,
+  totalSpent: 21000,
+  purchases: [
+    { agent: "flights", merchant: "Sandbox merchant", amount: 11800, status: "success", source: "sandbox", details: "x" },
+    { agent: "food", merchant: "OpenTable-shaped fixture", amount: 4850, status: "success", source: "fixture", details: "y" },
+    { agent: "guide", merchant: "Viator-shaped fixture", amount: 0, status: "failed", source: "fixture", details: "sold out" },
+    { agent: "stay", merchant: "Untagged merchant", amount: 4350, status: "success", details: "no source tag" },
+  ],
+};
 const liveReceipt = renderToStaticMarkup(
   <FinalReceipt
-    receipt={{
-      budget: 30000,
-      totalSpent: 21000,
-      purchases: [
-        { agent: "flights", merchant: "Sandbox merchant", amount: 11800, status: "success", source: "sandbox", details: "x" },
-        { agent: "food", merchant: "OpenTable-shaped fixture", amount: 4850, status: "success", source: "fixture", details: "y" },
-        { agent: "guide", merchant: "Viator-shaped fixture", amount: 0, status: "failed", source: "fixture", details: "sold out" },
-        { agent: "stay", merchant: "Untagged merchant", amount: 4350, status: "success", details: "no source tag" },
-      ],
-    }}
+    receipt={mixedReceipt}
     summary={{ failedPurchases: 1 }}
     blockedAttempts={[]}
     renegotiations={[]}
@@ -130,6 +133,21 @@ assert.ok(
 );
 assert.ok(liveReceipt.includes("not charged"), "a failed line must not show a charged amount");
 assert.ok(!liveReceipt.includes("₹0"), "a failed line must not render a zero-rupee charge");
+const embeddedReceipt = renderToStaticMarkup(
+  <FinalReceipt
+    receipt={mixedReceipt}
+    summary={{ failedPurchases: 1 }}
+    blockedAttempts={[]}
+    renegotiations={[]}
+    isMock={false}
+    onDismiss={() => {}}
+    embedded
+  />,
+);
+assert.ok(
+  embeddedReceipt.includes("Set up on phone"),
+  "a non-mock embedded receipt should offer the explicit Prava phone handoff",
+);
 assert.equal(
   (liveReceipt.match(/completed sandbox checkout/g) ?? []).length,
   1,
@@ -204,6 +222,27 @@ const intakeHtml = renderToStaticMarkup(<Intake onStarted={() => {}} navigate={(
 assert.ok(intakeHtml.includes("<form"), "the intake page renders a form");
 assert.ok(intakeHtml.includes('aria-label="Trip destination"'), "the current text answer has an accessible name");
 assert.ok(intakeHtml.includes('role="progressbar"'), "question progress is programmatic, not just visual");
+assert.ok(intakeHtml.includes("Milo · question 1"), "the full-size route cat gives a useful tip on every intake question");
+assert.ok(intakeHtml.includes('mascot-guide stage'), "intake renders Milo as a stage-size left companion");
+
+const mascotHtml = renderToStaticMarkup(<MascotGuide message="Pick the route." />);
+assert.ok(mascotHtml.includes("Humsafar&#x27;s cat travel concierge"), "the mascot image has useful alternative text");
+
+const questHtml = renderToStaticMarkup(<TripQuest plan={{
+  destination: { name: "Goa", placeId: "goa" },
+  base: { name: "Goa centre", latitude: 15.49, longitude: 73.82 },
+  baseAssumption: "Destination centre",
+  localTransportMode: "scooter",
+  days: [{ day: 1, date: "2026-08-10", returnToBase: { arriveAt: "18:00" }, timeline: [
+    { type: "place", id: "church", name: "Church", address: "Old Goa", startAt: "09:00", latitude: 15.5, longitude: 73.83 },
+  ] }],
+}} />);
+assert.ok(questHtml.includes("Your next station"), "the completed plan becomes a trip quest");
+assert.ok(questHtml.includes("Use my location"), "the quest offers browser-local geolocation");
+assert.ok(questHtml.includes("Virtual ride · day 1 · stop 1"), "the quest offers a day-scoped virtual vehicle progression");
+assert.ok(questHtml.includes("not turn-by-turn navigation"), "the game never claims to replace navigation");
+assert.ok(questHtml.includes("quest-track-depth"), "the route has a raised 3D track layer");
+assert.ok(questHtml.includes("quest-painted-segment active"), "the next real itinerary segment is ready to paint");
 
 // Place suggestions. Only one question renders at a time, so the first render
 // carries the destination list; the origin list appears on its own step. The

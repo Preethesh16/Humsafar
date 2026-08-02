@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ItineraryPlan } from "../components/ItineraryPlan.jsx";
+import { MascotGuide } from "../components/MascotGuide.jsx";
 import { fetchPlaceSuggestions, itineraryRequest, previewItinerary } from "../lib/itinerary.js";
 import { suggestPlaces } from "../lib/places.js";
 
@@ -30,6 +31,19 @@ const QUESTIONS = [
   { title: "What would make this trip feel right?", helper: "Pick as many as you care about. You can also say it in your own words." },
   { title: "How much of the day plan should I decide?", helper: "Pick mapped places yourself, or let the Local Planner connect sensible nearby stops for you." },
   { title: "Did I understand you correctly?", helper: "Nothing is booked yet. This sends the brief to the agent team." },
+];
+
+const CAT_TIPS = [
+  "Name the feeling or the place—ordinary language is enough.",
+  "I will compare the route from where you actually begin.",
+  "Pick compare if speed, comfort and cost are all negotiable.",
+  "A nearby date helps me fetch provider prices and real weather.",
+  "Group size changes rooms, fares and the budget split.",
+  "Switch off anything you already handled; that agent gets nothing.",
+  "This is the hard ceiling. No agent can borrow past it.",
+  "Your priorities decide which specialist concedes first.",
+  "Easy mode gives me the map; choose mode gives you veto power.",
+  "Read the route once. Nothing leaves without your approval.",
 ];
 
 const BUDGETS = [15000, 30000, 50000, 75000];
@@ -237,16 +251,18 @@ export default function Intake({ onStarted, navigate }) {
       </div>
 
       <form className="conversation" onSubmit={submit}>
-        <section className="assistant-prompt" aria-live="polite">
-          <span className="assistant-avatar" aria-hidden="true">H</span>
-          <div>
+        <div className="intake-stage">
+          <MascotGuide stage message={CAT_TIPS[step]} label={`Milo · question ${step + 1}`} />
+          <div className="intake-dialog">
+            <section className="assistant-prompt" aria-live="polite">
+              <div>
             <p className="assistant-kicker">Question {step + 1} of {QUESTIONS.length}</p>
             <h1>{question.title}</h1>
             <p>{question.helper}</p>
-          </div>
-        </section>
+              </div>
+            </section>
 
-        <section className="answer-card">
+            <section className="answer-card">
           {step === 0 && (
             <TextAnswer
               value={answers.destination}
@@ -467,17 +483,19 @@ export default function Intake({ onStarted, navigate }) {
             </>
           )}
 
-          {isReview && <TripReview answers={answers} days={days} goal={goal} itinerary={itinerary} planBusy={planBusy} onRetry={() => setPlanAttempt((value) => value + 1)} onEdit={setStep} />}
-        </section>
+              {isReview && <TripReview answers={answers} days={days} goal={goal} itinerary={itinerary} planBusy={planBusy} onRetry={() => setPlanAttempt((value) => value + 1)} onEdit={setStep} />}
+            </section>
 
-        {error && <p className="conversation-error" role="alert">{error}</p>}
+            {error && <p className="conversation-error" role="alert">{error}</p>}
 
-        <nav className="conversation-actions" aria-label="Trip questions">
-          <button className="back-action" type="button" onClick={back} disabled={step === 0 || busy}>Back</button>
-          <button className="primary next-action" type="submit" disabled={busy}>
-            {busy ? "Waking up the agents…" : isReview ? "Start booking agents with this plan" : "Continue"}
-          </button>
-        </nav>
+            <nav className="conversation-actions" aria-label="Trip questions">
+              <button className="back-action" type="button" onClick={back} disabled={step === 0 || busy}>Back</button>
+              <button className="primary next-action" type="submit" disabled={busy}>
+                {busy ? "Waking up the agents…" : isReview ? "Start planning agents" : "Continue"}
+              </button>
+            </nav>
+          </div>
+        </div>
       </form>
 
       <p className="intake-truth">Planning and negotiation are live. Free-data results and simulations are labelled; Humsafar never calls a link a booking.</p>

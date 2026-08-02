@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { metaFor, money } from "../lib/agents.js";
 import { labelForPurchase, provenCount, runMode, runModeLabel } from "../lib/provenance.js";
 import { IconCheck } from "../lib/icons.jsx";
+import { PravaPhoneApproval } from "./PravaPhoneApproval.jsx";
 
 /**
  * Confirmation fan-out (brainstorming.md §7 beat 7): the summary the user sees
@@ -10,21 +11,21 @@ import { IconCheck } from "../lib/icons.jsx";
  * external channel. The fan-out button is deliberately inert until a channel is
  * wired — it copies the summary rather than pretending a message was sent.
  */
-export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations, isMock, onDismiss, checkout }) {
+export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations, isMock, onDismiss, embedded = false }) {
   const closeRef = useRef(null);
 
   // A modal that can only be dismissed with the mouse is a keyboard trap. Escape
   // closes it, and focus moves into the dialog when it appears so a screen
   // reader announces it rather than leaving focus behind on the page.
   useEffect(() => {
-    if (!receipt) return undefined;
+    if (!receipt || embedded) return undefined;
     const onKey = (event) => {
       if (event.key === "Escape") onDismiss?.();
     };
     document.addEventListener("keydown", onKey);
     closeRef.current?.focus();
     return () => document.removeEventListener("keydown", onKey);
-  }, [receipt, onDismiss]);
+  }, [receipt, onDismiss, embedded]);
 
   if (!receipt) return null;
 
@@ -40,7 +41,7 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
 
   const copySummary = () => {
     const text = [
-      `Humsafar — trip settled${isMock ? " (MOCKED DEMO DATA)" : ""}`,
+      `Humsafar — plan processing finished${isMock ? " (MOCKED DEMO DATA)" : ""}`,
       // The fan-out payload carries the same labels as the screen — a summary
       // pasted into a channel must not read as a live order either.
       `${modeLabel.text}. ${proven} of ${lines.length} exercised a payment path.`,
@@ -55,13 +56,12 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
     navigator.clipboard?.writeText(text);
   };
 
-  return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label="Final receipt">
+  const content = (
       <div className="outcome">
         <div className="outcome-top">
           <div>
             <div className="outcome-kicker">Confirmation fan-out</div>
-            <h2>Every agent has settled</h2>
+            <h2>{mode === "fixture" ? "Your plan is ready" : "Plan processing finished"}</h2>
           </div>
           <span className="outcome-check">
             <IconCheck />
@@ -129,7 +129,7 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
             <b>{money(receipt.budget)}</b>
           </div>
           <div className="outcome-stat">
-            <span>Spent</span>
+            <span>{mode === "fixture" ? "Planned value" : "Charged"}</span>
             <b>{money(receipt.totalSpent)}</b>
           </div>
           <div className="outcome-stat">
@@ -137,20 +137,26 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
             <b>{blockedAttempts.length}</b>
           </div>
           <div className="outcome-stat">
-            <span>Recovered</span>
-            <b>{summary.failedPurchases}</b>
+            <span>Renegotiated</span>
+            <b>{renegotiations.length}</b>
           </div>
         </div>
 
-        {/* Inside the panel, not after it. This is a modal overlay, so a
-            sibling rendered afterwards sits behind it and is invisible — which
-            is exactly how the pay button went missing. */}
-        {checkout}
+        {embedded && !isMock && <PravaPhoneApproval />}
 
         <button type="button" className="run-btn" onClick={copySummary}>
           Copy confirmation summary
         </button>
       </div>
+  );
+
+  if (embedded) {
+    return <section className="receipt-embedded" aria-label="Final receipt">{content}</section>;
+  }
+
+  return (
+    <div className="overlay" role="dialog" aria-modal="true" aria-label="Final receipt">
+      {content}
     </div>
   );
 }

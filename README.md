@@ -60,16 +60,20 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Live dashboard over SSE | **Working**, including reconnect replay. |
 | Conversational trip concierge | **Working.** Nine one-question prompts collect ordinary city names, journey mode, flexible/exact dates, party, optional trip parts, accommodation style, budget and vibe—no IATA codes or coordinates. |
 | Local day planner | **Working with Geoapify.** Travellers choose mapped suggestions or “decide for me”; Humsafar clusters nearby stops, routes them with timings, suggests nearby food/cost ranges without booking it, and returns to the selected stay each night. Open-Meteo supplies in-window weather. |
+| Guided completion experience | **Working.** Milo is a full-size left-side companion from intake through the quest. The receipt opens with a persistent 3D game board derived from the mapped stop order: raised track, painted progress, browser-only geolocation, next-stop distance, a transport-aware moving runner and XP. It is a playful itinerary view, while real directions open in Google Maps. |
 | Flexible specialist scope | **Working.** Travellers can disable Journey, Stay, Food or Things to do; disabled agents do not negotiate, receive a slice, offer choices or execute. |
 | Group accommodation | **Working in concierge mode.** Party/room-aware comparisons include hotel rooms, hostels, homestays and entire-home/villa estimates. Whole-home rows are labelled search handoffs/fixtures, not live Airbnb inventory. |
 | Human option choice | **Working.** Only offered affordable options are accepted, once; selections are bound into approval. |
 | Run-scoped approval protocol | **Working** and verified end to end. |
 | Prava sandbox authentication | **Verified.** `npm run prava:verify` returns authentication OK. |
-| Prava mandates | **Created.** Five approved through the hosted passkey ceremony, `active`/`available`. |
+| Prava mandates | **Historically created.** Five approvals are preserved in the evidence record; the current read-only standing-mandate check on 3 Aug shows one Duffel mandate, `active` / `available`, capped at ₹100. |
+| Phone approval handoff | **Working and opt-in.** The embedded receipt can request one server-pinned, short-lived Prava sandbox URL and render it as an inline phone QR. Card, OTP and passkey entry remain on Prava; creating the link is authorization setup, not a charge or booking. |
 | Scoped credential issuance | **Verified on real rails.** Four credentials issued in a single run, one per agent, each capped at its own slice. |
+| Browser-to-Prava refusal path | **Verified.** A full Journey-only browser run reused the phone-approved Duffel mandate and asked Prava for a ₹10,300 credential against its ₹100 cap. Prava refused credential issuance, no merchant checkout ran, and the receipt reported ₹0 charged. |
+| One-shot ₹100 completion attempt | **Blocked upstream on 3 Aug.** Humsafar made exactly one in-cap charge request after a read-only dry-run; Prava returned `FETCH_AGENTIC_CREDS_ERROR` before issuing credentials. No checkout/report ran, the mandate remains available with ₹100 remaining, and no retry loop was used. |
 | Network cap enforcement | **Verified.** Visa declined ₹160 against a ₹100 mandate — *"Total amount 160.00 exceeds …"*. |
 | Merchant order | **Not performed.** No goods were bought; the charge is deliberately left unreconciled. |
-| Duffel flights/stays | **Optional provider test search, not order creation.** Ordinary city names are resolved through Duffel Places. Non-INR inventory fails closed; missing/unsupported provider access falls back to disclosed estimates. |
+| Duffel flights/stays | **Flights verified against provider test search; no order creation.** Ordinary city names resolve through Duffel Places, with coordinate-based airport fallback. Foreign-currency totals are converted into labelled INR planning estimates while preserving the provider amount. This account still needs Duffel Stays access, so hotels currently fall back to disclosed estimates. |
 | Activities / Food | **Advisory only.** Geoapify supplies real mapped possibilities and the planner supplies labelled cost bands. No activity ticket, guide, restaurant reservation, card or payment is claimed. |
 
 ### What actually happened on Prava
@@ -120,6 +124,7 @@ unit tests assert the forbidden phrasings can never appear.
 |---|---|
 | `fixture / simulated; no payment attempted` | Local fixture data. No payment path touched. |
 | `Prava sandbox credential issued` | A sandbox credential exists. Nothing has been charged. |
+| `Prava sandbox credential request refused — no checkout` | Prava refused before issuing a credential, so no merchant checkout could run. |
 | `Prava sandbox checkout attempt — not completed` | A sandbox checkout was attempted and did not complete. |
 | `completed sandbox checkout` | A sandbox checkout genuinely completed. Sandbox, not real money. |
 | `source unverified; not evidence of a payment` | Provenance was missing or unrecognised. Assume nothing. |
@@ -207,13 +212,21 @@ cd frontend && npm run test:render # server-rendered UI smoke test
 cd agents && python3 -m unittest discover -s tests -t .
 ```
 
-Currently **87 JavaScript** and **178 Python** tests, plus frontend SSR and production-build checks.
+Currently **189 JavaScript** and **218 Python** tests, plus frontend SSR,
+production-build and browser-rehearsal checks.
 
 ### Environment
 
 Copy `.env.example` to `.env`. `.env` is gitignored and must stay that way — never commit
 a key, a card number, or a raw Prava response. Read `precaution.md` before configuring
 anything payment-related.
+
+The receipt's **Set up on phone** control is deliberately disabled by default. For a
+cardholder-attended sandbox ceremony, set
+`HUMSAFAR_ENABLE_PRAVA_PHONE_APPROVAL=true`, fill the existing `PRAVA_TEST_*` values,
+and start with `npm run start:sandbox`. Nothing is sent to Prava until the user clicks
+the button. Repeated clicks reuse the same unexpired ceremony, and the browser never
+sends customer, merchant, amount, API key or card details.
 
 ---
 
@@ -250,9 +263,11 @@ Required by the hackathon rules, and stated precisely:
 - **Not bookings, and labelled as such:** the day planner uses real Geoapify map/place
   results for food and activities, but its cost bands are estimates and those categories
   are advisory—no card, reservation or order is created. The agent negotiation still
-  uses disclosed Guide/Food estimate rows until a transactional partner exists. Flights
-  and stays fall back to disclosed fixtures whenever Duffel is unconfigured or unusable,
-  and the run prints which source each category actually resolved to.
+  uses disclosed Guide/Food estimate rows until a transactional partner exists. Duffel
+  flight search is live against test inventory; foreign-currency offers retain their
+  provider total and receive a clearly labelled reference-rate INR planning conversion.
+  Stays and any unavailable flight search fall back to disclosed fixtures, and the run
+  prints which source each category actually resolved to.
 - **Payment status:** Prava **sandbox** only — no production access was requested or used,
   and no real money moved at any point. Five mandates were approved by a human through
   Prava's hosted passkey ceremony. Four merchant-scoped, amount-capped credentials were

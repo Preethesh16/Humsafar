@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createApp } from "./app.js";
 import { EventHub } from "./events/eventHub.js";
 import { DuffelClient } from "./integrations/duffelClient.js";
+import { FxRateClient } from "./integrations/fxRateClient.js";
 import { GoogleMapsClient } from "./integrations/googleMapsClient.js";
 import { GeoapifyClient } from "./integrations/geoapifyClient.js";
 import { NominatimClient } from "./integrations/nominatimClient.js";
@@ -14,6 +15,7 @@ import { DiscoveryService } from "./services/discoveryService.js";
 import { ApprovalService } from "./services/approvalService.js";
 import { ChoiceService } from "./services/choiceService.js";
 import { MandateService } from "./services/mandateService.js";
+import { PravaApprovalService } from "./services/pravaApprovalService.js";
 import { RunService } from "./services/runService.js";
 import { ScopedCardService } from "./services/scopedCardService.js";
 import { TrustService } from "./services/trustService.js";
@@ -49,6 +51,24 @@ const scopedCardService = new ScopedCardService({
   mandateMerchants,
 });
 const pravaClient = scopedCardService.pravaClient;
+const mandateService = new MandateService({ pravaClient, mandateMerchants });
+const pravaApprovalService = new PravaApprovalService({
+  mandateService,
+  enabled: process.env.HUMSAFAR_ENABLE_PRAVA_PHONE_APPROVAL === "true",
+  config: {
+    customerId: process.env.PRAVA_TEST_CUSTOMER_ID,
+    customerEmail: process.env.PRAVA_TEST_CUSTOMER_EMAIL,
+    amountCap: process.env.PRAVA_TEST_MANDATE_AMOUNT_CAP ?? "100",
+    merchant: {
+      name: process.env.PRAVA_TEST_MERCHANT_NAME ?? "Duffel",
+      url: process.env.PRAVA_TEST_MERCHANT_URL ?? "https://duffel.com",
+      countryCode: process.env.PRAVA_TEST_MERCHANT_COUNTRY ?? "GB",
+    },
+    product: {
+      description: process.env.PRAVA_TEST_PRODUCT_DESCRIPTION ?? "Humsafar sandbox approval",
+    },
+  },
+});
 const geocoder = process.env.GOOGLE_MAPS_API_KEY
   ? new GoogleMapsClient()
   : new NominatimClient();
@@ -58,12 +78,14 @@ const app = createApp({
   discoveryService: new DiscoveryService({
     duffelClient: new DuffelClient(),
     googleMapsClient: geocoder,
+    fxRateClient: new FxRateClient(),
   }),
   itineraryService: new ItineraryService({
     geoapifyClient: new GeoapifyClient(),
     weatherClient: new OpenMeteoClient(),
   }),
-  mandateService: new MandateService({ pravaClient, mandateMerchants }),
+  mandateService,
+  pravaApprovalService,
   approvalService: new ApprovalService(),
   choiceService: new ChoiceService(),
   trustService: new TrustService(),

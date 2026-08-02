@@ -97,6 +97,17 @@ an unanswered Discord question into an implementation assumption.
 
 - [ ] Create the session only when the cardholder and supported browser are
   ready; the hosted session expires after 15 minutes.
+- [ ] Keep `HUMSAFAR_ENABLE_PRAVA_PHONE_APPROVAL=false` except during an
+  attended sandbox ceremony. The receipt button is an operator opt-in, not a
+  background startup action.
+- [ ] The browser may request the server-pinned ceremony but must never submit
+  its own customer, merchant, cap or product terms. Reject any returned URL
+  outside the exact HTTPS `sandbox.collect.prava.space` origin.
+- [ ] Generate the QR in memory from the short-lived hosted URL. Do not persist,
+  log, commit, analytics-track or include that URL in a screenshot intended for
+  publication.
+- [ ] Reuse an unexpired hosted session after a double-click. Do not turn a UI
+  retry into a session-creation loop.
 - [ ] For this workstation, treat Linux as the operator/backend surface and a
   passkey-capable phone as the Prava hosted-approval surface. Do not burn
   sessions repeatedly trying to force WebAuthn through the Linux browser.
@@ -145,6 +156,13 @@ an unanswered Discord question into an implementation assumption.
   that message and label its result as simulated/sandbox—not a merchant order.
 - [ ] A one-time mandate reported `APPROVED` becomes consumed. Do not schedule
   another charge against it.
+- [ ] Before a deliberate charge, test the local report adapter with Prava's
+  exact wire names (`txn_status`, `txn_type`, `amount_paid`). A legacy alias
+  mismatch once caused the backend to overwrite those fields with `undefined`;
+  regression tests now lock the documented contract.
+- [ ] `FETCH_AGENTIC_CREDS_ERROR` happens before credentials exist. Record it as
+  a credential-generation failure, leave checkout/report untouched, and do not
+  hide it with an automatic retry—sandbox attempts are scarce.
 
 ## Approval and multi-process precautions
 
@@ -167,6 +185,7 @@ Use these exact distinctions:
 | Local fixture checkout | `fixture / simulated; no payment attempted` | live, sandbox transaction, order placed |
 | Prava session or mandate approved | `Prava sandbox authorization` | purchase complete |
 | Prava credential issued | `Prava sandbox credential issued` | merchant charged, booking complete |
+| Prava refuses credential issuance before checkout | `Prava sandbox credential request refused — no checkout` | merchant decline, checkout attempted, money moved |
 | Real merchant rejects sandbox credential | `Prava sandbox checkout attempt — declined as expected` | successful order, money moved |
 | Merchant/test processor actually approves and Prava is truthfully reconciled | `completed sandbox checkout` plus the exact merchant/test qualification | production, real-money order |
 

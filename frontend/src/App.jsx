@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Choose from "./pages/Choose.jsx";
-import PravaCheckout from "./components/PravaCheckout.jsx";
 import Intake from "./pages/Intake.jsx";
 
 import { ApprovalPanel } from "./components/ApprovalPanel.jsx";
@@ -10,8 +9,10 @@ import { BudgetSplit } from "./components/BudgetSplit.jsx";
 import { DeliberationFeed } from "./components/DeliberationFeed.jsx";
 import { FinalReceipt } from "./components/FinalReceipt.jsx";
 import { ItineraryPlan } from "./components/ItineraryPlan.jsx";
+import { MascotGuide } from "./components/MascotGuide.jsx";
 import { ProofPanel } from "./components/ProofPanel.jsx";
 import { PurchaseCards } from "./components/PurchaseCards.jsx";
+import { TripQuest } from "./components/TripQuest.jsx";
 import { PHASES, summarize } from "./state/sessionReducer.js";
 import { SOURCE, initialSource, useEventStream } from "./lib/useEventStream.js";
 import { money } from "./lib/agents.js";
@@ -89,6 +90,10 @@ export function Dashboard({ state, connection, source, setSource, goal, itinerar
           its merchant and amount.
         </p>
       </section>
+
+      <MascotGuide message={state.phase === PHASES.COMPLETE
+        ? "The plan is ready. I have turned the itinerary into a playable route on the receipt page."
+        : "I am watching the shared pot while the specialists negotiate. You still approve the exact result."} />
 
       <div className="command">
         <div className="command-labels">
@@ -273,6 +278,19 @@ export default function App() {
     writeSession("humsafar.itinerary", JSON.stringify(nextItinerary ?? null));
   };
 
+  const restart = () => {
+    setRunId(null);
+    setGoal(null);
+    setItinerary(null);
+    setSource(SOURCE.MOCK);
+    if (typeof sessionStorage !== "undefined") {
+      sessionStorage.removeItem("humsafar.runId");
+      sessionStorage.removeItem("humsafar.goal");
+      sessionStorage.removeItem("humsafar.itinerary");
+    }
+    navigate("/");
+  };
+
   let page;
   if (pathname === "/deliberate") {
     page = <Dashboard state={state} connection={connection} source={source} setSource={setSource} goal={goal} itinerary={itinerary} />;
@@ -281,7 +299,7 @@ export default function App() {
   } else if (pathname === "/approve") {
     page = <ApprovalPage state={state} source={source} />;
   } else if (pathname === "/receipt") {
-    page = <ReceiptPage state={state} source={source} navigate={navigate} />;
+    page = <ReceiptPage state={state} source={source} itinerary={itinerary} onRestart={restart} navigate={navigate} />;
   } else {
     page = <Intake onStarted={started} navigate={navigate} />;
   }
@@ -327,41 +345,35 @@ function ApprovalPage({ state, source }) {
       <div className="eyebrow">Step 4 of 5 · approve</div>
       <h2>Review the exact split and selected plan.</h2>
       <p>The digest binds this decision to this run, these slices, and these option IDs.</p>
+      <MascotGuide message="This is the only authorization gate. Check the total and selected options before you approve." />
       <ApprovalPanel approval={state.approval} isMock={source === SOURCE.MOCK} />
     </div>
   );
 }
 
-function ReceiptPage({ state, source, navigate }) {
+function ReceiptPage({ state, source, itinerary, onRestart, navigate }) {
   const summary = useMemo(() => summarize(state), [state]);
   if (!state.receipt) return <div className="page-empty"><h2>Waiting for the agents to settle…</h2></div>;
-
-  // Every merchant the user chose, each payable on its own. Prava rejects a
-  // multi-merchant session outright ("Multi-merchant checkout is not yet
-  // supported"), so a four-agent plan really is four payments.
-  //
-  // Derived from `choice.made` rather than from a successful purchase: with
-  // live agent cards on, a Visa outage fails every mint and reports amount 0,
-  // and the advisory categories report 0 by design — so keying off purchases
-  // hid the button at exactly the moment a person would want to pay by hand.
-  const payables = Object.values(state.choice?.made ?? {})
-    .filter((pick) => Number(pick.price) > 0)
-    .sort((a, b) => Number(b.price) - Number(a.price));
-
   return (
-    <FinalReceipt
-      receipt={state.receipt}
-      summary={summary}
-      blockedAttempts={state.blockedAttempts}
-      renegotiations={state.renegotiations}
-      isMock={source === SOURCE.MOCK}
-      onDismiss={() => navigate("/deliberate")}
-      checkout={
-        source !== SOURCE.MOCK && payables.length > 0 ? (
-          <PravaCheckout items={payables} />
-        ) : null
-      }
-    />
+    <main className="completion-page">
+      <div className="completion-title">
+        <div><span className="eyebrow">Step 5 of 5 · plan ready</span><h1>Your itinerary becomes a quest.</h1></div>
+        <button type="button" className="secondary-action" onClick={onRestart}>Plan another trip</button>
+      </div>
+      <TripQuest plan={itinerary} />
+      <div className="completion-grid">
+        <FinalReceipt
+          receipt={state.receipt}
+          summary={summary}
+          blockedAttempts={state.blockedAttempts}
+          renegotiations={state.renegotiations}
+          isMock={source === SOURCE.MOCK}
+          embedded
+          onDismiss={() => navigate("/deliberate")}
+        />
+      </div>
+      <ItineraryPlan plan={itinerary} />
+    </main>
   );
 }
 

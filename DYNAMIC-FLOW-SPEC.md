@@ -26,7 +26,7 @@ external APIs; it is no longer a handoff checklist.
 | Goal/budget already drive a run | Jeswin | **Done** — `run_goal(goal, budget, …)` |
 | **`POST /api/runs`** — start a run from the browser | **Preethesh** | **Done** — structured trip context, provider discovery, status endpoint, one active run |
 | **`POST` / `GET /api/choices`** | **Preethesh** | **Done** — offered-option validation, one-shot settlement, timeout conflicts |
-| Duffel real inventory | Preethesh | Needs `DUFFEL_ACCESS_TOKEN` |
+| Duffel real inventory | Preethesh | **Done for test search** — server-side token, conversational/coordinate place resolution and labelled reference FX conversion; order creation remains outside the available account scope |
 | Five-page journey | Deepthi + Preethesh | **Done** — native History API, no router dependency |
 | Conversational destination, origin, transport, flexible/exact dates, party, trip scope, budget and vibe | Preethesh | **Done** — nine prompts, no IATA/coordinate knowledge required |
 | User-controlled specialist roster | Preethesh + Jeswin | **Done** — Journey/Stay/Food/Things-to-do can be disabled; omitted agents receive no allocation, choice or checkout |
@@ -35,6 +35,7 @@ external APIs; it is no longer a handoff checklist.
 | Keyless destination geocoding | Preethesh | **Done** — policy-compliant cached Nominatim fallback; Google is optional |
 | Preference-driven local itinerary | Preethesh | **Done** — choose mapped places or “decide for me”; Geoapify clusters nearby stops, routes each day and finds meal possibilities; Open-Meteo adds exact-date weather |
 | Hotel-based daily routing | Preethesh | **Done** — preview starts from the destination centre, then every day is recalculated to start/end at the selected stay |
+| Mascot-guided trip quest | Preethesh + Deepthi | **Done** — Milo owns a full-size left rail from intake onward; receipt includes browser-only location, next-station distance, day-sized raised 3D levels, separated station markers, a route that paints as the transport runner moves, and persistent XP |
 | Real merchant order creation | External/provider boundary | **Not done** — needs Duffel booking credentials, traveller details and processor integration |
 | Food and activity booking providers | External/provider boundary | **Not connected** — mapped suggestions and cost bands are advisory; no card, reservation or payment is created |
 
@@ -114,8 +115,25 @@ will say `agent-timeout` — surface that, don't hide it.
 
 **`/approve`** — reuse `ApprovalPanel`, driven by `approval_requested`.
 
-**`/receipt`** — the existing receipt, plus each line's `chosenBy`: *"you chose
-this"* vs *"auto-selected on timeout"*.
+**`/receipt`** — a truthful embedded receipt plus each line's `chosenBy`: *"you
+chose this"* vs *"auto-selected on timeout"*. Fixture runs say **planned value**,
+never spent. Above it, the trip quest turns the mapped itinerary into a raised
+3D course with numbered stations, the next stop, distance from an optional
+browser-only location, a transport-aware runner that paints each completed
+segment, and session-persistent XP. Only the active day is drawn as a level;
+completed and upcoming days stay in a compact day strip so shared return-to-base
+coordinates cannot stack into marker blobs or crossing multi-day tracks. Nearby
+stations are separated visually while preserving their real visit order. The
+course is a game visualization rather than road geometry; opening directions
+explicitly hands the real coordinates to Google Maps.
+
+The same receipt contains an opt-in **Set up on phone** handoff for Prava
+sandbox authorization. It performs no request on page load. A click asks the
+same-origin backend for server-pinned Duffel/₹100 terms, accepts only an HTTPS
+URL on `sandbox.collect.prava.space`, and generates the phone QR in the browser.
+An unexpired ceremony is reused to prevent double-click waste. The cardholder
+enters card, OTP and passkey only on Prava; this step creates authorization and
+must never be represented as a purchase or booking.
 
 ## 4. Structured trip context — landed
 

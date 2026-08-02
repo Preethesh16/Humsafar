@@ -63,6 +63,14 @@ export function labelForPurchase(line = {}) {
     };
   }
 
+  if (line.outcome === "credential_failed" && source === PROVENANCE.SANDBOX) {
+    return {
+      text: "Prava sandbox credential request refused — no checkout",
+      tone: "danger",
+      proven: true,
+    };
+  }
+
   switch (source) {
     case PROVENANCE.FIXTURE:
       text = "fixture / simulated; no payment attempted";

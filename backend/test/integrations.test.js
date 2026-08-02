@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DuffelClient } from "../src/integrations/duffelClient.js";
+import { FxRateClient } from "../src/integrations/fxRateClient.js";
 import { GoogleMapsClient } from "../src/integrations/googleMapsClient.js";
 import { NominatimClient } from "../src/integrations/nominatimClient.js";
 import { withFixtureFallback } from "../src/integrations/withFixtureFallback.js";
@@ -58,6 +59,32 @@ test("Duffel resolves a typed city through its official place suggestions endpoi
   assert.equal(request.options.body, undefined);
 });
 
+test("Duffel can resolve the nearest airport from geocoded coordinates", async () => {
+  let request;
+  const client = new DuffelClient({
+    token: "duffel-token",
+    fetchImpl: async (url) => {
+      request = new URL(url);
+      return new Response(JSON.stringify({ data: [{ type: "airport", name: "Kempegowda", iata_code: "BLR" }] }), { status: 200 });
+    },
+  });
+  assert.equal((await client.suggestNearby({ latitude: 12.97, longitude: 77.59 })).code, "BLR");
+  assert.equal(request.searchParams.get("lat"), "12.97");
+  assert.equal(request.searchParams.get("lng"), "77.59");
+  assert.equal(request.searchParams.get("rad"), "150000");
+});
+
+test("Duffel converts a non-JSON access response into a safe structured error", async () => {
+  const client = new DuffelClient({
+    token: "duffel-token",
+    fetchImpl: async () => new Response("This feature is unavailable for this account", { status: 403 }),
+  });
+  await assert.rejects(
+    client.searchStays({ latitude: 15, longitude: 74, checkInDate: "2026-08-10", checkOutDate: "2026-08-12" }),
+    (error) => error.code === "DUFFEL_ACCESS_REQUIRED" && error.status === 403 && !error.message.includes("This feature"),
+  );
+});
+
 test("flight discovery resolves conversational city names before live search", async () => {
   const resolved = [];
   let searchInput;
@@ -82,6 +109,24 @@ test("flight discovery resolves conversational city names before live search", a
   assert.deepEqual(resolved, ["Mangaluru", "Goa"]);
   assert.equal(searchInput.origin, "IXE");
   assert.equal(searchInput.destination, "GOI");
+});
+
+test("flight discovery geocodes a city when Duffel recognises only its nearby airport", async () => {
+  const service = new DiscoveryService({
+    duffelClient: {
+      async suggestPlace() { const error = new Error("not found"); error.code = "DUFFEL_PLACE_NOT_FOUND"; throw error; },
+      async suggestNearby(point) { assert.deepEqual(point, { latitude: 12.97, longitude: 77.59 }); return { code: "BLR" }; },
+      async searchFlights(input) {
+        assert.equal(input.origin, "BLR");
+        assert.equal(input.destination, "BLR");
+        return { offers: [] };
+      },
+    },
+    googleMapsClient: { async geocode() { return { latitude: 12.97, longitude: 77.59 }; } },
+    logger,
+  });
+  const result = await service.search("flights", { originName: "Bengaluru", destinationName: "Bengaluru", travelMode: "flight" });
+  assert.equal(result.source, "live");
 });
 
 test("DiscoveryService degrades missing Duffel credentials to labeled fixtures", async () => {
@@ -160,6 +205,42 @@ test("Duffel inventory in a non-INR billing currency fails closed", async () => 
   });
   assert.equal(result.source, "fixture");
   assert.ok(warnings.some((event) => event.code === "DUFFEL_CURRENCY_UNSUPPORTED"));
+});
+
+test("non-INR Duffel flights use a reference conversion while preserving the provider amount", async () => {
+  const service = new DiscoveryService({
+    duffelClient: {
+      async suggestPlace(name) { return { code: name === "Bengaluru" ? "BLR" : "GOI" }; },
+      async searchFlights() {
+        return { offers: [{ id: "off_1", total_amount: "100.00", total_currency: "GBP", owner: { name: "Test Air" }, slices: [] }] };
+      },
+    },
+    fxRateClient: { async convert() { return { amount: 12_345.67, date: "2026-08-01" }; } },
+    logger,
+  });
+  const result = await service.search("flights", { originName: "Bengaluru", destinationName: "Goa", travelMode: "flight" });
+  assert.equal(result.source, "live");
+  assert.equal(result.data[0].price, 12_345.67);
+  assert.equal(result.data[0].currency, "INR");
+  assert.equal(result.data[0].providerAmount, 100);
+  assert.equal(result.data[0].providerCurrency, "GBP");
+  assert.equal(result.data[0].merchant, "Duffel");
+  assert.equal(result.data[0].priceBasis, "reference-rate-conversion");
+  assert.match(result.data[0].description, /provider total GBP 100/);
+});
+
+test("Frankfurter conversion is keyless, cached, and rounds upward to paise", async () => {
+  let calls = 0;
+  const client = new FxRateClient({
+    fetchImpl: async (url) => {
+      calls += 1;
+      assert.equal(url, "https://api.frankfurter.dev/v2/rate/GBP/INR");
+      return new Response(JSON.stringify({ date: "2026-08-01", base: "GBP", quote: "INR", rate: 123.4567 }), { status: 200 });
+    },
+  });
+  assert.equal((await client.convert(10.001, "GBP")).amount, 1234.7);
+  await client.convert(20, "GBP");
+  assert.equal(calls, 1);
 });
 
 test("Nominatim provides cached, identified, keyless geocoding", async () => {

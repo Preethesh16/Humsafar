@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { metaFor } from "../lib/agents.js";
 import { destinationFromGoal, isExactPlace, mapsUrl } from "../lib/maps.js";
+import { MascotGuide } from "../components/MascotGuide.jsx";
 
 /**
  * Step 3 — the user picks the taste.
@@ -175,6 +176,7 @@ export default function Choose({ state, runId, goal }) {
         Every option below already fits that agent's agreed slice — picking cannot push the
         plan over budget.
       </p>
+      <MascotGuide message="I checked the slice first. Pick what feels right; every visible card already fits." />
 
       {Object.values(requested).map((row) => {
         const decided = made[row.agent];

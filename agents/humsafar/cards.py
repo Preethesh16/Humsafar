@@ -66,7 +66,11 @@ class ScopedCard(dict):
 
 
 def failed_card(
-    merchant: str, amount_cap_paise: int, error: str, error_code: str = "SCOPED_CARD_REJECTED"
+    merchant: str,
+    amount_cap_paise: int,
+    error: str,
+    error_code: str = "SCOPED_CARD_REJECTED",
+    source: str = "sandbox",
 ) -> ScopedCard:
     return ScopedCard(
         cardId="",
@@ -78,7 +82,7 @@ def failed_card(
         merchant=merchant,
         amountCap=to_rupees(amount_cap_paise),
         status="failed",
-        source="sandbox",
+        source=source,
         errorCode=error_code,
         error=error,
     )
@@ -239,7 +243,7 @@ class StubScopedCardClient:
 
     def mint(self, merchant: str, amount_cap_paise: int) -> ScopedCard:
         if amount_cap_paise <= 0:
-            return failed_card(merchant, amount_cap_paise, "amountCap must be positive")
+            return failed_card(merchant, amount_cap_paise, "amountCap must be positive", source="fixture")
 
         key = merchant.strip().lower()
         approved = self.mandate_caps.setdefault(key, amount_cap_paise)
@@ -254,6 +258,7 @@ class StubScopedCardClient:
                 f"simulated mandate ceiling for {merchant} is "
                 f"{to_rupees(approved):.2f}; refusing {to_rupees(amount_cap_paise):.2f}",
                 error_code="THRESHOLD_EXCEEDED",
+                source="fixture",
             )
 
         self.minted.append((merchant, amount_cap_paise))

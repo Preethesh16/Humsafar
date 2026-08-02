@@ -13,7 +13,7 @@ npm install && npm start          # http://127.0.0.1:3000
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-The root page is an eight-question conversational trip concierge. Starting a run switches to the live
+The root page is a one-question-at-a-time conversational trip concierge. Starting a run switches to the live
 stream automatically and persists the run correlation for refreshes. With no
 run, the dashboard can still boot on the clearly labelled mocked stream; use
 `?source=live` or `?source=mock` to select explicitly.
@@ -39,6 +39,7 @@ error, kill the old one (`pkill -f "node.*vite"`) rather than opening 5174.
 npm test          # reducer unit tests (also run by `npm test` at the repo root)
 npm run test:render   # SSR smoke test: renders every panel against the full mock script
 npm run build     # production bundle
+npm run test:e2e  # full browser rehearsal; requires Chrome/Brave debugging on :9222
 ```
 
 ## Layout
@@ -50,7 +51,10 @@ npm run build     # production bundle
 | `src/lib/useEventStream.js` | Switches between the mock replay and `EventSource("/api/events")`. |
 | `src/pages/Intake.jsx` | One-question-at-a-time destination, origin, journey mode, dates/flexibility, party, budget and vibe intake. Provider codes and coordinates are deliberately absent from the user flow. |
 | `src/pages/Choose.jsx` | Affordable option selection with honest ranking and timeout labels. |
-| `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, final receipt. |
+| `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, truthful receipt, explicit Prava phone handoff, full-size Milo guide and 3D trip quest. |
+| `src/lib/pravaApproval.js` | Same-origin client for the opt-in, server-pinned Prava ceremony. It accepts only the exact sandbox hosted origin and creates the QR locally; it never carries card or API-key material. |
+| `src/lib/journeyGame.js` | Pure itinerary-to-station mapping, active-day level selection, collision-free board coordinates, real-coordinate distances and run-isolated progress keys. |
+| `e2e/browser-rehearsal.mjs` | Dependency-free Chrome DevTools rehearsal from intake through receipt, geolocation and mid-quest progress. It asserts active-day station counts and marker separation, then captures desktop intake, mid-ride, mid-quest, completion and 390px mobile evidence under `/tmp`. Set `HUMSAFAR_E2E_PAYMENT=true` only for a deliberate Prava proof run. |
 | `src/lib/icons.jsx` | Inline SVG glyphs. Presentation only. |
 | `src/styles.css` | The warm "paper" theme — canvas `#f3efe5`, forest `#1d3b2d`, coral `#e56b52`, mint `#c9f2dd`. |
 
@@ -67,6 +71,13 @@ purely from the `phase` the reducer already computes — it is a display mapping
 not a second state machine.
 
 `@media (prefers-reduced-motion: reduce)` disables every animation.
+
+Milo is intentionally a large character rail, not an avatar button: 255×350px
+on desktop intake/quest, a 170×210px companion on intermediate pages, and a
+130×160px horizontal companion on phones. The quest borrows the broad visual
+language of minimalist line-painting games—raised white track, bright completed
+trail, chunky runner and low-poly scenery—but uses original CSS/SVG and the
+traveller's actual itinerary order. No game asset or source code is copied.
 
 ## Two things that are deliberate, not accidental
 
@@ -94,10 +105,20 @@ Rules it enforces:
 - a failed sandbox line is **not** claimed as a decline that proves cap
   enforcement — without a structured cause it could be an ordinary booking
   failure;
+- a structured `credential_failed` line says Prava refused credential issuance
+  and that no checkout occurred; it never implies a merchant decline;
 - `environment: "test"` is always qualified as test inventory;
 - if only some categories exercise Prava, the run is labelled **mixed-mode** and
   the receipt states how many lines genuinely exercised a payment path, so one
   real line can never stand for the whole run.
+
+The embedded receipt also offers **Set up on phone** when the stream is not the
+mock lab. This is a separate, explicit authorization ceremony—not an automatic
+checkout. The backend pins the customer, Duffel merchant and ₹100 cap; the page
+receives only a short-lived `sandbox.collect.prava.space` URL, generates the QR
+locally and keeps card/OTP/passkey entry on Prava's phone surface. Ordinary
+browser rehearsals assert the button is present but never click it, so tests do
+not consume sandbox sessions.
 
 ## Dev proxy
 

@@ -442,6 +442,8 @@ class Orchestrator:
         # reported. Least privilege and an honest receipt are the same fix.
         card = self.card_client.mint(option.merchant, option.price_paise)
         if not card.issued:
+            card_source = str(card.get("source") or "unknown")
+            detail = f"Card issuance failed: {card.get('error', 'unknown error')}"
             self._say(
                 specialist.category,
                 f"No card, no purchase: {card.get('error', 'issuance failed')}",
@@ -451,7 +453,9 @@ class Orchestrator:
                 "failed",
                 0,
                 option.merchant,
-                f"Card issuance failed: {card.get('error', 'unknown error')}",
+                detail,
+                card_source,
+                "credential_failed",
             )
             report.purchases.append(
                 Purchase(
@@ -461,10 +465,11 @@ class Orchestrator:
                     amount_paise=0,
                     status="failed",
                     card_id="",
-                    source="fixture",
-                    detail=str(card.get("error", "card issuance failed")),
+                    source=card_source,
+                    detail=detail,
                     option_id=option_id(specialist.category, option),
                     chosen_by=getattr(picked, "chosen_by", ""),
+                    outcome="credential_failed",
                 )
             )
             return

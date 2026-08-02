@@ -33,6 +33,19 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
           : undefined;
       },
     },
+    pravaApprovalService: {
+      async create() {
+        return {
+          environment: "sandbox",
+          merchant: "Duffel",
+          amountCap: 100,
+          currency: "INR",
+          iframeUrl: "https://sandbox.collect.prava.space/session/test-only",
+          expiresAt: "2026-08-03T00:15:00.000Z",
+          authorizeOnly: true,
+        };
+      },
+    },
   });
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
@@ -142,6 +155,13 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
     data: { mandateId: "mdt_123", merchant: "Duffel" },
     source: "sandbox",
   });
+
+  const phoneApproval = await fetch(`${baseUrl}/api/prava/phone-approval`, {
+    method: "POST",
+    headers: { authorization: "Bearer internal-test-token" },
+  });
+  assert.equal(phoneApproval.status, 201);
+  assert.equal((await phoneApproval.json()).authorizeOnly, true);
 
   const choiceEvent = {
     type: "choice_requested",

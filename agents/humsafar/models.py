@@ -101,7 +101,7 @@ class Purchase:
     amount_paise: int
     status: Literal["success", "failed"]
     card_id: str
-    source: Literal["live", "fixture"]
+    source: Literal["live", "fixture", "sandbox", "production", "unknown"]
     detail: str
     option_id: str = ""
     chosen_by: str = ""

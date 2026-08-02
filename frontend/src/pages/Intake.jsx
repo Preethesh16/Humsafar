@@ -119,18 +119,25 @@ export default function Intake({ onStarted, navigate }) {
   return (
     <main className="conversation-shell">
       <header className="conversation-brand">
-        <span className="brand-mark">H</span>
+        <span className="brand-mark" aria-hidden="true">H</span>
         <span>Humsafar</span>
         <span className="conversation-mode">trip concierge</span>
       </header>
 
-      <div className="conversation-progress" aria-label={`Question ${step + 1} of ${QUESTIONS.length}`}>
+      <div
+        className="conversation-progress"
+        role="progressbar"
+        aria-label="Trip questions completed"
+        aria-valuemin="1"
+        aria-valuemax={QUESTIONS.length}
+        aria-valuenow={step + 1}
+      >
         <span style={{ width: `${((step + 1) / QUESTIONS.length) * 100}%` }} />
       </div>
 
       <form className="conversation" onSubmit={submit}>
         <section className="assistant-prompt" aria-live="polite">
-          <span className="assistant-avatar">H</span>
+          <span className="assistant-avatar" aria-hidden="true">H</span>
           <div>
             <p className="assistant-kicker">Question {step + 1} of {QUESTIONS.length}</p>
             <h1>{question.title}</h1>
@@ -144,6 +151,7 @@ export default function Intake({ onStarted, navigate }) {
               value={answers.destination}
               onChange={(value) => update("destination", value)}
               placeholder="Goa, Jaipur, somewhere quiet near the sea…"
+              label="Trip destination"
               autoFocus
             />
           )}
@@ -153,6 +161,7 @@ export default function Intake({ onStarted, navigate }) {
               value={answers.origin}
               onChange={(value) => update("origin", value)}
               placeholder="Mangaluru"
+              label="Leaving from"
               autoFocus
             />
           )}
@@ -226,7 +235,7 @@ export default function Intake({ onStarted, navigate }) {
                   <button type="button" className={answers.vibes.includes(vibe.id) ? "selected" : ""} key={vibe.id} onClick={() => toggleVibe(vibe.id)} aria-pressed={answers.vibes.includes(vibe.id)}>{vibe.label}</button>
                 ))}
               </div>
-              <textarea className="free-answer" value={answers.note} onChange={(event) => update("note", event.target.value)} placeholder="Anything else? For example: no overnight buses, safe for parents, vegetarian food…" rows="3" />
+              <textarea className="free-answer" value={answers.note} onChange={(event) => update("note", event.target.value)} placeholder="Anything else? For example: no overnight buses, safe for parents, vegetarian food…" aria-label="Anything else Humsafar should know" rows="3" />
             </>
           )}
 
@@ -248,8 +257,8 @@ export default function Intake({ onStarted, navigate }) {
   );
 }
 
-function TextAnswer({ value, onChange, placeholder, autoFocus = false }) {
-  return <input className="big-answer" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} autoFocus={autoFocus} />;
+function TextAnswer({ value, onChange, placeholder, label, autoFocus = false }) {
+  return <input className="big-answer" value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} aria-label={label} autoFocus={autoFocus} />;
 }
 
 function TripReview({ answers, days, goal, onEdit }) {

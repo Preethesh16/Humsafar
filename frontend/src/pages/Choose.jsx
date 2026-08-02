@@ -63,6 +63,10 @@ function OptionCard({ option, chosen, disabled, onPick }) {
       className={`option-card ${chosen ? "chosen" : ""}`}
       onClick={() => onPick(option.optionId)}
       disabled={disabled}
+      // Selection was carried only by a CSS class, so a screen reader had no
+      // way to tell which option was picked. aria-pressed makes the toggle
+      // state programmatic rather than purely visual.
+      aria-pressed={chosen}
     >
       <div className="option-head">
         <span className="option-vendor">{option.vendor}</span>

@@ -12,13 +12,14 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { Dashboard } from "../src/App.jsx";
-import Intake from "../src/pages/Intake.jsx";
 import { ApprovalPanel } from "../src/components/ApprovalPanel.jsx";
 import { AuditLog } from "../src/components/AuditLog.jsx";
 import { BudgetSplit } from "../src/components/BudgetSplit.jsx";
 import { DeliberationFeed } from "../src/components/DeliberationFeed.jsx";
 import { FinalReceipt } from "../src/components/FinalReceipt.jsx";
 import { ProofPanel } from "../src/components/ProofPanel.jsx";
+import Choose from "../src/pages/Choose.jsx";
+import Intake from "../src/pages/Intake.jsx";
 import { PurchaseCards } from "../src/components/PurchaseCards.jsx";
 import { MOCK_EVENTS } from "../src/lib/mockStream.js";
 import { PHASES, initialState, reduce, summarize } from "../src/state/sessionReducer.js";
@@ -196,6 +197,37 @@ for (const [name, html] of [["receipt", liveReceipt], ["approval", pendingHtml]]
   assert.ok(hidden >= svgs, `a11y: every ${name} icon must be aria-hidden (${svgs} svg, ${hidden} hidden)`);
 }
 
+// The two intake/choice pages landed after the original panels and had no
+// render coverage at all. They are the first and third things a judge touches,
+// so a crash or an unlabelled control there is worse than one deeper in.
+const intakeHtml = renderToStaticMarkup(<Intake onStarted={() => {}} navigate={() => {}} />);
+assert.ok(intakeHtml.includes("<form"), "the intake page renders a form");
+assert.ok(intakeHtml.includes('aria-label="Trip destination"'), "the current text answer has an accessible name");
+assert.ok(intakeHtml.includes('role="progressbar"'), "question progress is programmatic, not just visual");
+
+const chooseState = {
+  choice: {
+    requested: {
+      stay: {
+        agent: "stay",
+        slice: 11200,
+        ranking: "rating",
+        timeoutSeconds: 45,
+        options: [
+          { optionId: "o1", vendor: "Anjuna Beach Resort", description: "Pool view", price: 11200, rating: 4.4, ratingBasis: "fixture-score", source: "fixture" },
+          { optionId: "o2", vendor: "Vagator Guesthouse", description: "Private room", price: 9200, rating: null, source: "fixture" },
+        ],
+      },
+    },
+    made: {},
+  },
+};
+const chooseHtml = renderToStaticMarkup(<Choose state={chooseState} runId="run_1" />);
+assert.ok(chooseHtml.includes("Anjuna Beach Resort"), "options render");
+assert.ok(chooseHtml.includes("no rating available"), "an unrated option says so rather than showing a fake score");
+assert.ok(chooseHtml.includes('aria-pressed'), "option selection state is programmatic, not just visual");
+assert.ok(!chooseHtml.includes("live order"), "a fixture option must never read as a live order");
+
 // The app shell itself must render — it carries the hero, the journey stepper
 // and the simulated-stream notice, none of which the panel renders above cover.
 // Dashboard rather than App: App now wraps everything in a BrowserRouter,
@@ -222,7 +254,6 @@ for (const [needle, description] of [
   assert.ok(shell.includes(needle), `app shell should contain ${description}: "${needle}"`);
 }
 
-const intake = renderToStaticMarkup(<Intake navigate={() => {}} />);
 for (const [needle, description] of [
   ["Where do you want to disappear to?", "first conversational question"],
   ["A city, state, beach, mountains", "plain-language destination prompt"],
@@ -230,7 +261,7 @@ for (const [needle, description] of [
   ["trip concierge", "concierge mode label"],
   ["Planning and negotiation are live", "honest capability boundary"],
 ]) {
-  assert.ok(intake.includes(needle), `intake should contain ${description}: "${needle}"`);
+  assert.ok(intakeHtml.includes(needle), `intake should contain ${description}: "${needle}"`);
 }
 
 // Nothing rendered may imply a live transaction while on the mocked stream.
@@ -240,5 +271,5 @@ console.log(
   `render smoke test passed — ${MOCK_EVENTS.length} events folded, ` +
     `${state.messages.length} messages, ${state.purchases.length} purchases, ` +
     `${html.length} chars of panel markup + ${shell.length} of app shell, ` +
-    `${expectations.length + 8} content assertions.`,
+    `${expectations.length + 16} content assertions (panels, app shell, intake and choice pages).`,
 );

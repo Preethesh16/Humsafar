@@ -327,3 +327,14 @@
 - Blocked on: human completion of sandbox card entry, any test OTP, and WebAuthn/passkey approval before session expiry.
 - Needs from Jeswin/Deepthi: none until mandate activation is confirmed; do not represent this created session as a purchase.
 - Commit: `7ba86fa` (live response compatibility fix committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 13:07 IST] — Clarified where to complete the hosted approval
+- Prompt: asked where to enter the sandbox card, OTP, and passkey after the mandate session was created.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: clarified that these actions occur on Prava's separate hosted collection/approval page opened from the session's `iframeUrl`, not in the developer dashboard or terminal.
+- Validation: confirmed the preceding operator run reported `hostedPageOpened: true`; the URL was intentionally neither logged nor persisted and the session is short-lived.
+- Decision: first check the browser for a new Prava checkout/approval tab. If absent, blank, or expired, create exactly one fresh session while the cardholder is ready and open its returned `iframeUrl` locally.
+- Why: the dashboard manages keys/activity; sensitive card entry and WebAuthn approval are isolated on Prava's hosted surface.
+- Blocked on: the human completing the hosted browser flow.
+- Needs from Jeswin/Deepthi: none.
+- Commit: pending (hosted-page clarification on `preethesh/integrations-backend`)

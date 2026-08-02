@@ -176,3 +176,24 @@ Reordering exposed a modelling flaw in my own offline stub: it inferred the mand
 - Blocked on: nothing for the cap proof. A *completed merchant checkout* still requires a checkout target; the charge sits at `awaiting_result` and must not be reported `APPROVED` without a genuine processor result.
 - Needs from Deepthi: the receipt can now show a genuine `sandbox` line for the stay category. Everything else in a default run remains `fixture`, so the run is mixed-mode and must be labelled per line.
 - Commit: `5bceb6a` (pushed to `jeswin/agent-core`)
+
+### [2026-08-02 20:55 IST] — credential least-privilege, a retracted audit finding, and the payment blocker identified
+- Prompt: Preethesh asked me to figure out payment; the user supplied a Discord dump from another team.
+- Files changed: `agents/humsafar/orchestrator.py`, `agents/humsafar/events.py`, `agents/humsafar/llm.py`, `agents/humsafar/negotiation.py`, `agents/tests/test_orchestrator.py`, `INTERFACES.md`, `agents/PRAVA-EVIDENCE.md`.
+
+**The payment blocker is our card, not our code.** `FETCH_AGENTIC_CREDS_ERROR — "Visa 400 — Fetching cryptogram failed"` is now reproduced across every axis we can vary: both Prava flows (mandate charge and standard checkout), both currencies (INR and USD), both merchant countries (IN and US), and amounts from ₹50 to ₹28,800. The passkey ceremony succeeds and Visa's own threshold checks succeed — an over-cap attempt declines correctly with `visaCorrelationId=1785678386_7`. Only cryptogram issuance fails, and `token`, `dynamic_cvv` and `expiry` all come back null.
+
+Another team (`_Devastation__`) hit the **identical error string** on Prava's own Playground. Prava staff called it Visa sandbox flakiness and advised retrying; retrying 4–5 times did not fix it. What fixed it was Yash issuing a **replacement card**. That is the ask now outstanding with Prava for `CARD-17` / `...2341`.
+
+**Corroboration worth recording:** Prava staff stated on the record that reaching `Creds_Generated` **is** the intended outcome at this stage — Birdie: *"working exactly as intended for this stage of the flow"*; Yash: *"that was the expected scenario. Congrats 🔥"*. Our evidence file claims exactly that milestone and no more, so the submission stands whether or not the card is replaced.
+
+**I retracted an audit finding rather than shipping the fix as a bug fix.** An audit flagged `mint(slice_paise)` against `buy(option.price_paise)` as a live money discrepancy — the mandate charged more than the receipt reported. **It is not reachable.** I swept ₹13,000–₹200,000 across the converged, recovery and forced-compromise paths and found **zero** runs where the two differed: allocation already clamps every slice to the price of the option that slice buys. Reporting it as a discovered-and-fixed bug would have been a fabricated finding.
+
+The change is still in, on its own merits: the credential is now minted at the option price, so least privilege is a property of the design rather than a coincidence of the allocator, and the first thing that would have broken the accidental equality is live Duffel inventory. The **mandate** ceiling is untouched at the slice — that is what the over-cap proof fires against. `card_issued` now carries both: `amountCap` (credential) and the additive `mandateCap` (slice), with `amountCap <= mandateCap` asserted.
+
+**Docstring contradiction resolved.** `llm.py` claimed "the engine decides what an agent GETS"; `intent.py` documented two modules away that a parsed priority weight genuinely moves money. The real rule is now stated once: *model output may influence allocation only through bounded, validated parameters — never as an amount.* Also deleted `_argue`, unreachable since batching landed.
+
+- Validation: **202 Python, 139 Node, frontend build and render smoke all pass** (3 new tests). No credential value was printed, logged or committed at any point.
+- Needs from Preethesh: nothing blocking. `DUFFEL_ACCESS_TOKEN` is still the only reason inventory is fixture — the live path is wired and is already the default.
+- Blocked on: Prava issuing a replacement test card. Everything else in the agent core is done.
+- Commit: pending

@@ -135,6 +135,64 @@ class RecoveryTest(unittest.TestCase):
         self.assertIn("Recovered", guide.detail)
 
 
+class CredentialCeilingTest(unittest.TestCase):
+    """What is minted must equal what the receipt says was spent.
+
+    An audit flagged `mint(slice)` against `buy(price)` as a live money bug: the
+    mandate charged more than the receipt showed. It is not — a sweep of
+    Rs 13,000 to Rs 200,000 across the converged, recovery and forced-compromise
+    paths found zero runs where the two differed, because allocation already
+    clamps every slice to the price of the option that slice will buy. The
+    equality held by construction, not by intent.
+
+    That is precisely why it is worth a test. An invariant nothing asserts is
+    one refactor away from being false, and the first place it would break is
+    live Duffel inventory, where prices do not line up with allocation as
+    neatly as fixtures do. Minting the price rather than the slice makes the
+    credential least-privilege by design instead of by coincidence.
+
+    The mandate ceiling is unaffected and stays at the slice — that is the cap
+    the over-cap proof is fired against.
+    """
+
+    def _mints(self, **kwargs):
+        cards = StubScopedCardClient()
+        report, emitter = run(card_client=cards, checkout=SimulatedCheckout(), **kwargs)
+        return report, emitter, dict(cards.minted)
+
+    def test_the_credential_matches_what_was_actually_spent(self):
+        report, _, minted = self._mints()
+
+        for purchase in report.purchases:
+            if purchase.status != "success":
+                continue
+            self.assertEqual(
+                minted[purchase.merchant],
+                purchase.amount_paise,
+                f"{purchase.agent}: minted {minted[purchase.merchant]} but spent "
+                f"{purchase.amount_paise} — the mandate and the receipt disagree",
+            )
+
+    def test_it_holds_through_a_recovery_too(self):
+        report, _, minted = self._mints(fail_agent="guide")
+
+        guide = next(p for p in report.purchases if p.agent == "guide")
+        self.assertEqual(guide.status, "success")
+        self.assertEqual(minted[guide.merchant], guide.amount_paise)
+
+    def test_a_credential_never_exceeds_the_mandate_it_is_drawn_from(self):
+        _, emitter, _ = self._mints()
+
+        issued = [e for e in emitter.sent if e["type"] == "card_issued"]
+        self.assertTrue(issued)
+        for event in issued:
+            # Both ceilings are now on the wire. They are equal today; the
+            # assertion is `<=` because that is the guarantee, and an equality
+            # assertion would fail the day allocation legitimately leaves slack.
+            self.assertLessEqual(event["amountCap"], event["mandateCap"])
+            self.assertIsNone(validate_event(event), event)
+
+
 class TightBudgetTest(unittest.TestCase):
     def test_a_budget_below_the_floor_never_overspends(self):
         report, emitter = run(budget="9000")

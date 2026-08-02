@@ -398,11 +398,20 @@ class Orchestrator:
         if config.overspend_agent == specialist.category:
             self._attempt_overspend(specialist, option, slice_paise, report)
 
-        # The card is capped at the agreed slice, not at this purchase — that is
-        # the property the whole product rests on. Even if this agent is later
-        # talked into a different purchase, the credential cannot exceed its
-        # slice or reach another agent's money.
-        card = self.card_client.mint(option.merchant, slice_paise)
+        # Two ceilings, deliberately different.
+        #
+        # The *mandate* is approved at the agreed slice — that is the property
+        # the whole product rests on, and it is what `authorize()` above pins.
+        # No credential for this agent can ever exceed its slice or reach
+        # another agent's money.
+        #
+        # The *credential* is minted at the price of the thing being bought,
+        # which is the minimum that can complete this purchase. Minting at the
+        # slice used to overstate it: on the converged path price == slice so
+        # nothing showed, but after `forced_compromise` or a recovery the two
+        # diverge, and the mandate was then charged more than the receipt
+        # reported. Least privilege and an honest receipt are the same fix.
+        card = self.card_client.mint(option.merchant, option.price_paise)
         if not card.issued:
             self._say(
                 specialist.category,
@@ -431,7 +440,13 @@ class Orchestrator:
             )
             return
 
-        self.emitter.card_issued(specialist.category, card["cardId"], slice_paise)
+        # `amountCap` is what the credential itself permits; `mandateCap` is the
+        # slice the mandate was approved at. Both are shown, because "capped at
+        # ₹4,200 inside a mandate approved for ₹4,800" is the actual guarantee
+        # and reporting only one of them loses half of it.
+        self.emitter.card_issued(
+            specialist.category, card["cardId"], option.price_paise, slice_paise
+        )
         result = self.checkout.pay(option, card)
         status = "success" if result.ok else "failed"
         outcome = result.get("outcome", "")
@@ -471,8 +486,8 @@ class Orchestrator:
         )
         self._say(
             specialist.category,
-            f"{action} {option.vendor} at "
-            f"{format_inr(option.price_paise)} on a card capped at {format_inr(slice_paise)}.",
+            f"{action} {option.vendor} at {format_inr(option.price_paise)} on a card capped at "
+            f"exactly that, inside a mandate approved for {format_inr(slice_paise)}.",
         )
 
     def _apply_trust(

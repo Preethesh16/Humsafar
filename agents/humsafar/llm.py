@@ -1,14 +1,26 @@
 """Agent narration over a deterministic negotiation.
 
-The division of labour is the single most important thing in this file:
+The division of labour is the single most important thing in this file, and it
+is worth stating precisely rather than snappily:
 
-    The model decides what an agent SAYS.
-    The engine decides what an agent GETS.
+    Model output may influence allocation only through bounded, validated
+    parameters. It is never itself an amount.
 
-Every rupee comes from integer arithmetic in `money.py`, `negotiation.py` and
-`mediator.py`. The model is handed the real figures and asked to argue for them
-in character. It cannot move money, and — because of `mentions_only` below — it
-cannot even *claim* a figure it wasn't given.
+An earlier version of this docstring said "the engine decides what an agent
+GETS", full stop. That was wrong, and `intent.py` said so two modules away: a
+parsed priority weight genuinely changes who concedes and who wins surplus. It
+is still not a contradiction of the real rule, because the weight is clamped to
+[0, 1] and scaled by `PRIORITY_INFLUENCE`, and every rupee downstream of it is
+integer arithmetic in `money.py`, `negotiation.py` and `mediator.py`.
+
+So: a model can shift the *shape* of a split within limits the code sets. It
+cannot state a figure and have that figure spent. Where a model does propose a
+number — a specialist's opening ask — it is clamped to `[floor, ceiling]` and
+grounded against real inventory before the engine will look at it.
+
+For narration specifically, the model is handed the real figures and asked to
+argue for them in character. Because of `mentions_only` below, it cannot even
+*claim* a figure it wasn't given.
 
 That last part matters more than it sounds. Instructing a model not to invent
 numbers is not a guarantee; checking its output is. If a specialist says

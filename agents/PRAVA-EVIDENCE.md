@@ -174,6 +174,39 @@ succeed — an over-cap charge still declines correctly with a
 `/v1/mandates/{id}/charge` and the session checkout path hit it. No client-side
 change can route around this.
 
+**Every other variable ruled out (2026-08-02, ~20:40 IST).** A screenshot of
+another team's successful payment (VISA ••••2275, merchant "Libas", **$5.23
+USD**) raised currency and merchant country as the difference. Both are
+disproven — a USD session against a US merchant fails with byte-identical
+output:
+
+```
+session ses_01KZ1FYXPHVFBAS94M403N083N   status: failed
+txn_01KZ1G6YZZ58PRDZYQ9DYBXV32 -> failed
+creds: token=NULL | cvv=NULL | expiry=NULL
+error: FETCH_AGENTIC_CREDS_ERROR — Visa 400 —  Fetching cryptogram failed
+```
+
+The full matrix now tested and failing: **mandate charge and standard checkout ×
+INR and USD × merchant country IN and GB and US × ₹50 through ₹28,800.** Not
+amount, not currency, not country, not flow, not quota — the sandbox transaction
+limit surfaces as a separate `429 TRIES_EXHAUSTED`, which we have never seen.
+
+**Root cause: the card.** In Prava's support channel, `_Devastation__` reported
+the identical error string on Prava's **own Playground** — so it reproduces with
+zero third-party code involved. Prava staff advised retrying; 4–5 retries did
+not clear it. It was fixed by Yash issuing a **replacement test card**, after
+which that team confirmed *"it's working now"*. A replacement for `CARD-17`
+(`...2341`) is the outstanding ask.
+
+**Prava staff have validated `Creds_Generated` as the intended milestone.** On
+seeing that exact status, Birdie: *"this is working exactly as intended for this
+stage of the flow… Prava has successfully created the single-use,
+merchant-scoped payment credential for this session"*; Yash: *"that was the
+expected scenario. Congrats 🔥"*. §1.2 claims precisely this and nothing beyond
+it, which is now corroborated by the vendor rather than only by our reading of
+the docs.
+
 **Consequence:** no *further* live runs are possible until this clears. It does
 not affect the evidence above — the complete four-agent run at 15:30 and the cap
 decline both landed before the fault began, and are visible in the dashboard.

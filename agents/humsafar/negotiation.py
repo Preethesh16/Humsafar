@@ -333,13 +333,6 @@ class NegotiationEngine:
             for s in self.specialists
         }
 
-    def _argue(self, specialist: Specialist, record: RoundRecord) -> str:
-        if self.narrator is not None:
-            text = self.narrator.argue(specialist, record, self.budget_paise)
-            if text:
-                return text
-        return self._default_argument(specialist, record)
-
     def _default_argument(self, specialist: Specialist, record: RoundRecord) -> str:
         """Deterministic fallback dialogue.
 

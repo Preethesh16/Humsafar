@@ -348,4 +348,4 @@
 - Why: card entry and biometric/passkey approval are deliberately isolated human-presence controls on Prava's hosted origin.
 - Blocked on: completion of the newly opened browser page before its short expiry.
 - Needs from Jeswin/Deepthi: none until mandate activation is verified.
-- Commit: pending (fresh-session operational log on `preethesh/integrations-backend`)
+- Commit: `4c0f209` (fresh-session operational log committed on `preethesh/integrations-backend`)

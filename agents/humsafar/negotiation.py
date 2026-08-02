@@ -34,10 +34,17 @@ MAX_ROUNDS = 5
 # Taj and take Anjuna Beach Resort, that's Rs 4,800 back on the table") is
 # already the most concrete text in the transcript.
 #
-# This is a quota decision as much as an editorial one. A full run cost 10 model
-# calls; at the 50-requests-per-day free-tier ceiling that is five runs before
-# the demo stops working. Narrating the opening round only brings it to six.
-NARRATED_ROUNDS = int(os.environ.get("HUMSAFAR_NARRATED_ROUNDS", "1"))
+# Was 1 while the account sat on a 50-requests-per-day free tier — a full run
+# cost 10 calls, so narrating every round meant five runs before the demo died.
+# Prava announced on 2026-08-02 that the OpenAI hackathon credit is now at max
+# tier with the rate limit removed, so that constraint is gone.
+#
+# 2 covers the opening statements AND the round where agents actually concede,
+# which is the part worth hearing. Later rounds stay templated: by then the
+# deterministic concession line ("Fine — I'll give up the Taj and take Anjuna
+# Beach Resort, that's Rs 4,800 back on the table") is more concrete than
+# anything a model adds.
+NARRATED_ROUNDS = int(os.environ.get("HUMSAFAR_NARRATED_ROUNDS", "2"))
 
 # Fraction of the outstanding gap the agents collectively close in each round.
 # Ramps to 1.0 so the negotiation always converges by round 3 whenever the

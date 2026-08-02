@@ -10,9 +10,9 @@ Target flow, as requested:
 5. /receipt     credentials issued, per-line provenance
 ```
 
-The agent core half is **done and on `main`**. This file states exactly what is
-still missing so the three of us are not guessing at each other's boundaries
-with the deadline this close.
+The full browser-to-agent flow is implemented. This file now records the
+landed contract and the provider boundaries that still require credentials or
+external APIs; it is no longer a handoff checklist.
 
 ---
 
@@ -20,30 +20,38 @@ with the deadline this close.
 
 | Piece | Owner | State |
 |---|---|---|
-| Choice step: shortlist, honest ranking, timeout, buy-exactly-what-was-chosen | Jeswin | **Done** — `agents/humsafar/choice.py`, 18 tests |
+| Choice step: shortlist, honest ranking, timeout, execute exactly the approved option | Jeswin + Preethesh | **Done** |
 | `choice_requested` / `choice_made` events | Jeswin | **Done** |
 | Run-scoped approval protocol | Jeswin + Preethesh | **Done** |
 | Goal/budget already drive a run | Jeswin | **Done** — `run_goal(goal, budget, …)` |
-| **`POST /api/runs`** — start a run from the browser | **Preethesh** | **MISSING — blocks everything below** |
-| **`POST` / `GET /api/choices`** | **Preethesh** | **MISSING — blocks the choose page** |
+| **`POST /api/runs`** — start a run from the browser | **Preethesh** | **Done** — structured trip context, provider discovery, status endpoint, one active run |
+| **`POST` / `GET /api/choices`** | **Preethesh** | **Done** — offered-option validation, one-shot settlement, timeout conflicts |
 | Duffel real inventory | Preethesh | Needs `DUFFEL_ACCESS_TOKEN` |
-| Router + five pages | Deepthi | Not started |
-| `days` / destination in the goal | Jeswin | See §4 |
+| Five-page journey | Deepthi + Preethesh | **Done** — native History API, no router dependency |
+| Origin, destination, IATA codes, dates, travellers, rooms, optional stay coordinates | Preethesh | **Done** |
+| Real merchant order creation | External/provider boundary | **Not done** — needs Duffel booking credentials, traveller details and processor integration |
+| Food and guide providers | External/provider boundary | **Fixtures, explicitly labelled** |
 
-**The keystone is `POST /api/runs`.** Today a run only starts from the CLI, so
-no amount of frontend work can make the product dynamic until it exists.
+Browser runs use backend discovery and trust checks by default. OpenAI narration
+turns on when `OPENAI_API_KEY` exists. Prava card minting and live checkout stay
+explicit environment opt-ins so merely opening the UI cannot consume a sandbox
+mandate.
 
 ---
 
-## 1. Preethesh — `POST /api/runs`
+## 1. Run API — landed
 
 ```
 POST /api/runs
-{ goal: string, budget: number, days?: number, destination?: string }
--> 202 { runId }
+{ goal, budget, days, origin, destination, originCode, destinationCode,
+  departureDate, returnDate, travelers, rooms, latitude?, longitude? }
+-> 202 { runId, status, trip, modes }
+
+GET /api/runs/:runId
+-> { runId, status: "running" | "complete" | "failed", trip, modes, ... }
 ```
 
-Spawn the existing CLI as a subprocess and return immediately:
+The service spawns the existing CLI as a subprocess and returns immediately:
 
 ```js
 spawn("python3", ["-m", "humsafar",
@@ -58,16 +66,17 @@ Keep one active run per browser session; reject a second with `409`.
 **Do not** block the response on the run finishing — it waits for human
 approval and can last minutes.
 
-## 2. Preethesh — `/api/choices`
+## 2. Choice API — landed
 
 Locked in §6.3. `POST` accepts `{ runId, agent, optionId }` → `202`.
 `GET /api/choices?runId&agent` → `{ data: { optionId } }` or `204` while the
 user is still deciding. My `PolledChoice` already polls exactly that shape.
 
-## 3. Deepthi — the five pages
+## 3. The five pages — landed
 
-Add `react-router-dom`; keep the existing theme and every provenance label
-exactly as they are.
+The five screens use the browser History API directly. This avoids a router
+dependency and its unresolved 2026 advisory chain while preserving back/forward
+navigation and direct URLs.
 
 **`/` — intake.** Destination, budget, days. `POST /api/runs`, then navigate to
 `/deliberate?runId=…`. This is the moment that makes the demo feel like a
@@ -92,14 +101,13 @@ will say `agent-timeout` — surface that, don't hide it.
 **`/receipt`** — the existing receipt, plus each line's `chosenBy`: *"you chose
 this"* vs *"auto-selected on timeout"*.
 
-## 4. Jeswin — remaining
+## 4. Structured trip context — landed
 
-`days` and `destination` are not modelled yet. The goal string carries them
-today (*"Plan my Goa trip"*), and the Intent Agent already parses arbitrary
-goals. Cheapest correct route: the intake page composes a goal string —
-`"Plan my {destination} trip for {days} days"` — and no schema changes. I will
-add explicit fields only if Duffel needs structured dates, which it will for
-real search.
+The goal remains available to the Intent Agent, while provider-critical values
+also travel as validated structured fields: origin/destination IATA codes,
+departure/return dates, travellers, rooms, and optional destination coordinates
+for Duffel Stays. The local fallback uses the requested origin, destination and
+trip length instead of returning Goa inventory for every goal.
 
 ---
 

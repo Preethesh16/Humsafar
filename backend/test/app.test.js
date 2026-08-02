@@ -4,6 +4,7 @@ import test from "node:test";
 import { createApp } from "../src/app.js";
 import { EventHub } from "../src/events/eventHub.js";
 import { ApprovalService } from "../src/services/approvalService.js";
+import { ChoiceService } from "../src/services/choiceService.js";
 
 test("health, event ingestion, validation, auth, and scoped card routes work", async (t) => {
   const eventHub = new EventHub();
@@ -24,6 +25,7 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
       },
     },
     approvalService: new ApprovalService({ createId: () => "approval_1" }),
+    choiceService: new ChoiceService(),
     mandateService: {
       resolveMandate(merchant) {
         return merchant === "Duffel"
@@ -140,4 +142,29 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
     data: { mandateId: "mdt_123", merchant: "Duffel" },
     source: "sandbox",
   });
+
+  const choiceEvent = {
+    type: "choice_requested",
+    runId: "run_1",
+    agent: "stay",
+    slice: 9000,
+    ranking: "rating",
+    timeoutSeconds: 45,
+    options: [{ optionId: "stay:a:8000", vendor: "A", description: "Room", price: 8000, currency: "INR", source: "fixture" }],
+  };
+  assert.equal((await fetch(`${baseUrl}/api/events`, {
+    method: "POST",
+    headers: { authorization: "Bearer internal-test-token", "content-type": "application/json" },
+    body: JSON.stringify(choiceEvent),
+  })).status, 202);
+
+  assert.equal((await fetch(`${baseUrl}/api/choices`, {
+    method: "POST",
+    headers: { authorization: "Bearer internal-test-token", "content-type": "application/json" },
+    body: JSON.stringify({ runId: "run_1", agent: "stay", optionId: "stay:a:8000" }),
+  })).status, 202);
+  const selected = await fetch(`${baseUrl}/api/choices?runId=run_1&agent=stay`, {
+    headers: { authorization: "Bearer internal-test-token" },
+  });
+  assert.deepEqual(await selected.json(), { data: { optionId: "stay:a:8000" } });
 });

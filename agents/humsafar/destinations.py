@@ -152,7 +152,9 @@ GOA_INVENTORY: dict[str, list[tuple]] = {
 }
 
 
-def build_inventory(destination: str, days: int = 3) -> dict[str, list[tuple]]:
+def build_inventory(
+    destination: str, days: int = 3, origin_city: str = "Bengaluru"
+) -> dict[str, list[tuple]]:
     """Fixture options shaped for one destination.
 
     Returns the same `(vendor, description, merchant, price, rating)` tuples
@@ -162,11 +164,11 @@ def build_inventory(destination: str, days: int = 3) -> dict[str, list[tuple]]:
 
     # Goa is the pinned demo destination — see GOA_INVENTORY above. Returned
     # verbatim so the live mandates and the tuned negotiation stay valid.
-    if city.lower() == "goa" and days == 3:
+    if city.lower() == "goa" and days == 3 and origin_city.strip().lower() in {"bengaluru", "bangalore"}:
         return GOA_INVENTORY
 
     code = airport_code(city)
-    origin = airport_code(ORIGIN_CITY)
+    origin = airport_code(origin_city or ORIGIN_CITY)
     route = f"{origin}-{code}"
     factor = price_factor(city)
     nights = nights_for(days)

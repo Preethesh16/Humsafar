@@ -24,6 +24,7 @@ Three rules from §6 are enforced here rather than left to the caller:
 """
 
 import json
+import hashlib
 import time
 import urllib.error
 import urllib.request
@@ -48,7 +49,11 @@ class Choice:
 
 def option_id(category: str, option: Option) -> str:
     """Stable within a run, which is all §6.1 requires."""
-    return f"{category}:{option.vendor}:{option.price_paise}".replace(" ", "-").lower()
+    fingerprint = hashlib.sha256(
+        f"{option.vendor}\0{option.description}\0{option.price_paise}".encode("utf-8")
+    ).hexdigest()[:10]
+    vendor = option.vendor.replace(" ", "-").lower()
+    return f"{category}:{vendor}:{option.price_paise}:{fingerprint}"
 
 
 def rank_options(options: list[Option]) -> tuple[list[Option], str]:

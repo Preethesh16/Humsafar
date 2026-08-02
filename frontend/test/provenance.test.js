@@ -47,6 +47,13 @@ test("a successful sandbox purchase is a completed sandbox checkout", () => {
   assert.ok(!label.text.includes("production"), "must never imply production");
 });
 
+test("a credential without a merchant result is never called a checkout", () => {
+  const label = labelForPurchase({ source: "sandbox", status: "success", outcome: "credential_issued" });
+  assert.equal(label.text, "Prava sandbox credential issued");
+  assert.equal(label.proven, true);
+  assert.ok(!label.text.includes("checkout"));
+});
+
 test("a failed sandbox purchase is not claimed as an expected decline", () => {
   const label = labelForPurchase({ source: "sandbox", status: "failed" });
   assert.equal(label.text, "Prava sandbox checkout attempt — not completed");

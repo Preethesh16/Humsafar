@@ -4,9 +4,13 @@ export class DuffelClient {
     this.fetchImpl = fetchImpl;
   }
 
-  async searchFlights({ origin, destination, departureDate, passengers = 1 }) {
+  async searchFlights({ origin, destination, departureDate, returnDate, passengers = 1 }) {
+    const slices = [{ origin, destination, departure_date: departureDate }];
+    if (returnDate) {
+      slices.push({ origin: destination, destination: origin, departure_date: returnDate });
+    }
     return this.request("/air/offer_requests?return_offers=true&supplier_timeout=10000", {
-      slices: [{ origin, destination, departure_date: departureDate }],
+      slices,
       passengers: Array.from({ length: passengers }, () => ({ type: "adult" })),
       cabin_class: "economy",
     });

@@ -24,3 +24,25 @@ test("validateEvent validates every allocation category", () => {
     round: 1,
   }), /allocations/);
 });
+
+test("validateEvent accepts a complete choice request and rejects invented shapes", () => {
+  const event = {
+    type: "choice_requested",
+    runId: "run_1",
+    agent: "stay",
+    slice: 9000,
+    ranking: "rating",
+    timeoutSeconds: 45,
+    options: [{
+      optionId: "stay:hotel:8000",
+      vendor: "Hotel",
+      description: "Two nights",
+      price: 8000,
+      currency: "INR",
+      source: "fixture",
+    }],
+  };
+  assert.equal(validateEvent(event), undefined);
+  assert.match(validateEvent({ ...event, options: [] }), /non-empty array/);
+  assert.match(validateEvent({ ...event, agent: "attacker" }), /agent/);
+});

@@ -12,17 +12,12 @@ not a writing job — the deadline is the one thing in this project we cannot re
 
 ---
 
-## 1. How to use the two variants
+## 1. Evidence position (final)
 
-Every claim below that depends on a real Prava charge is written **twice**:
-
-- **[A] charge landed** — use only if a genuine sandbox checkout completed and the result
-  was truthfully reconciled.
-- **[B] no charge** — use if it did not.
-
-Pick one per claim. **Never mix**: an [A] pitch with a [B] demo is exactly the misleading
-combination the handbook penalises. If in doubt, use [B] — an honest smaller claim beats a
-disqualified larger one.
+Prava sandbox evidence exists for four merchant-scoped credentials and a genuine
+Visa over-cap decline. No merchant order was placed and no checkout was reported
+as approved. The copy below uses that one evidence position consistently; there
+are no longer A/B variants that can be mixed accidentally.
 
 ---
 
@@ -30,8 +25,8 @@ disqualified larger one.
 
 ### Tagline (one line)
 
-> A team of AI agents that negotiates over one shared budget, then buys with a locked
-> card per agent — so no agent can overspend, and none can touch another's money.
+> A team of AI agents that negotiates one shared budget, then delegates a locked,
+> capped credential per specialist — so no agent can reach another's slice.
 
 ### The problem
 
@@ -49,7 +44,7 @@ disqualified larger one.
 > option the agent actually found, not scripted dialogue. A neutral mediator settles the
 > split. The user approves that exact plan once, through an expiring, one-shot,
 > run-scoped approval. Then each agent gets its **own merchant-scoped Prava credential
-> capped at its slice**, and buys only its part.
+> capped at its slice**, and executes only through its configured merchant adapter.
 >
 > Two things make the multi-agent design load-bearing rather than decorative: agents
 > genuinely contend for one pot, which a single agent cannot meaningfully reason about;
@@ -57,18 +52,15 @@ disqualified larger one.
 
 ### How we used Prava
 
-> **[A]** Prava is the settlement layer and the enforcement layer. After the mediator
+> Prava is the delegation and enforcement layer. After the mediator
 > finalises the split, the orchestrator mints one merchant-scoped credential per agent,
 > capped at that agent's allocation, against an approved mandate. Cap and merchant are
 > enforced at the card network, not by our own code — we deliberately did **not** implement
 > the over-cap refusal as a software `if`, because a guardian check presented as network
-> enforcement would be a fabricated claim. Evidence: [link to the sandbox result].
->
-> **[B]** Prava is the settlement and enforcement layer by design: one merchant-scoped,
-> capped credential per agent, minted only after an explicit approval. Sandbox
-> authentication is verified. **We did not complete a sandbox charge before the deadline**,
-> so every purchase in the demo is a labelled fixture and the UI states this on every line
-> and again at run level. We are not presenting a simulated purchase as a completed order.
+> enforcement would be a fabricated claim. A real sandbox run generated four credentials
+> totalling ₹28,800, and Visa separately declined ₹160 against a ₹100 mandate for exceeding
+> the amount cap. **No merchant order was placed**; credential issuance is not presented as
+> a booking or completed checkout.
 
 ### What makes it different
 
@@ -106,9 +98,9 @@ disqualified larger one.
 > Viator/OpenTable responses; partner API approval does not clear in a weekend. Flights and
 > stays fall back to the same fixtures when Duffel is unconfigured, and each run prints the
 > source every category actually resolved to.
-> **Payment status:** [A] one genuine sandbox checkout, described exactly as sandbox and
-> never as production or real money. / [B] Prava sandbox authentication verified; no
-> customer, mandate, session, credential or transaction created; no payment occurred.
+> **Payment status:** Prava sandbox authentication, mandates and four scoped credentials
+> verified; a separate over-cap attempt was genuinely declined by Visa. No merchant order
+> or completed checkout occurred, and none is claimed.
 > **Prior art:** the buyer/mediator negotiation structure was adapted from a teammate's
 > earlier separate project ("Accord"); the seller side was not used. Fixture-fallback and
 > partial-failure-recovery patterns were adopted from a same-hackathon project reviewed for
@@ -130,7 +122,7 @@ key.** Before recording, run `git status` to confirm no `.env` is open in an edi
 | 5 | Credentials | 1:25–1:40 | Four credential cards with caps | "Each agent gets its own card, locked to one merchant and capped at its slice." |
 | 6 | **Proof 1** | 1:40–2:05 | Blocked panel: ₹17,920 vs ₹11,200 cap | "Stay tries to spend beyond its slice and is refused. We deliberately did not implement this as an `if` statement in our own code." |
 | 7 | **Proof 2** | 2:05–2:30 | Renegotiation panel, guide re-issued | "One booking fails. Only that agent's slice reopens — the other three purchases stand." |
-| 8 | Receipt | 2:30–2:50 | Receipt with run-mode banner | **[A]** "One genuine sandbox checkout, three fixtures — the run is labelled mixed-mode and every line carries its own provenance." **[B]** "Every line is a labelled fixture. No payment was attempted, and the dashboard says so rather than letting you assume otherwise." |
+| 8 | Receipt | 2:30–2:50 | Receipt with run-mode banner | "This run labels every line by provenance. The Prava evidence proves scoped delegation and cap enforcement; it does not claim a merchant order." |
 | 9 | Close | 2:50–3:00 | Audit log | "A team of agents spent your budget together — not one of them could overspend it." |
 
 **Do not say**, in any variant: "order placed", "booking confirmed", "real money",
@@ -140,9 +132,9 @@ most damaging.
 ### Recording commands
 
 ```bash
-npm start                                   # terminal 1
+npm run start:sandbox                       # terminal 1
 cd frontend && npm run dev                  # terminal 2
-cd agents && python3 -m humsafar --goal "Plan my Goa trip" --budget 30000 --demo --live-discovery
+# Open http://localhost:5173, enter any trip, and submit it.
 ```
 
 Restart the backend and the dev server **after any pull** — file watching does not fire on
@@ -154,7 +146,7 @@ this setup, so a stale process will happily record last hour's code.
 
 - [ ] Live Devfolio countdown checked; **earlier** deadline assumed.
 - [ ] Every teammate accepted onto the team; RSVP/check-in complete. Only the admin submits.
-- [ ] Variant [A] or [B] chosen **consistently** across README, video and Devfolio copy.
+- [ ] README, video and Devfolio all use the final credential-plus-cap evidence position.
 - [ ] No key, card number or raw Prava response in the repo, the video, or any screenshot.
 - [ ] `.env` still gitignored; secret scan run over the commits being submitted.
 - [ ] `npm test` and the Python suite pass on `main`.

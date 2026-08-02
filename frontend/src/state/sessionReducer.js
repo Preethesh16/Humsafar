@@ -40,6 +40,7 @@ export function initialState() {
       approvalRequestId: null,
       digest: null,
       expiresAt: null,
+      requestedChoices: {},
     },
     // INTERFACES.md §6. `requested` is keyed by agent; `made` records who
     // decided, because a timed-out auto-pick must never render as a human
@@ -61,6 +62,7 @@ export function initialState() {
  * @param {{ id?: number, event: object }} envelope one stream frame
  */
 export function reduce(state, envelope) {
+  if (envelope?.reset) return initialState();
   const { id = null, event } = envelope ?? {};
   if (!event || typeof event.type !== "string") return state;
 
@@ -152,6 +154,7 @@ export function reduce(state, envelope) {
           approvalRequestId: event.approvalRequestId ?? null,
           digest: event.digest ?? null,
           expiresAt: event.expiresAt ?? null,
+          requestedChoices: event.choices ? { ...event.choices } : {},
           // A fresh request supersedes any earlier decision for this run.
           given: false,
           givenAt: null,
@@ -201,6 +204,7 @@ export function reduce(state, envelope) {
             // INTERFACES.md Section 4 envelope tag. Optional on this event, so
             // it is read tolerantly — absent means "not stated", never "live".
             source: event.source ?? null,
+            outcome: event.outcome ?? null,
           },
         ],
       };

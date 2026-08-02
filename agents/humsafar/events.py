@@ -101,6 +101,10 @@ def validate_event(event: dict) -> Optional[str]:
             return "purchase_result.amount is invalid"
         if not _non_empty(event.get("merchant")):
             return "purchase_result.merchant is required"
+        if event.get("outcome") is not None and event.get("outcome") not in {
+            "simulated", "credential_issued", "checkout_completed", "checkout_failed"
+        }:
+            return "purchase_result.outcome is invalid"
         return None if _non_empty(event.get("details")) else "purchase_result.details is required"
     if kind == "blocked_attempt":
         if not _non_empty(event.get("agent")):
@@ -110,10 +114,31 @@ def validate_event(event: dict) -> Optional[str]:
         if not _non_negative(event.get("cap")):
             return "blocked_attempt.cap is invalid"
         return None if _non_empty(event.get("reason")) else "blocked_attempt.reason is required"
-    if kind in ("choice_requested", "choice_made"):
-        # Additive §6 events. Validated loosely here because eventSchema.js does
-        # not know them yet; tightened when Preethesh adds them.
-        return None if _non_empty(event.get("runId")) else f"{kind}.runId is required"
+    if kind == "choice_requested":
+        if not _non_empty(event.get("runId")):
+            return "choice_requested.runId is required"
+        if event.get("agent") not in WIRE_CATEGORIES:
+            return "choice_requested.agent is invalid"
+        if not _non_negative(event.get("slice")):
+            return "choice_requested.slice is invalid"
+        options = event.get("options")
+        if not isinstance(options, list) or not options:
+            return "choice_requested.options must be a non-empty array"
+        if not all(_valid_choice_option(option) for option in options):
+            return "choice_requested.options is invalid"
+        if event.get("ranking") not in {"rating", "price"}:
+            return "choice_requested.ranking is invalid"
+        return None if _positive_int(event.get("timeoutSeconds")) else "choice_requested.timeoutSeconds is invalid"
+    if kind == "choice_made":
+        if not _non_empty(event.get("runId")):
+            return "choice_made.runId is required"
+        if event.get("agent") not in WIRE_CATEGORIES:
+            return "choice_made.agent is invalid"
+        if not _non_empty(event.get("optionId")) or not _non_empty(event.get("vendor")):
+            return "choice_made option and vendor are required"
+        if not _positive(event.get("price")):
+            return "choice_made.price is invalid"
+        return None if event.get("chosenBy") in {"user", "agent-timeout"} else "choice_made.chosenBy is invalid"
     if kind == "renegotiation_triggered":
         if not _non_empty(event.get("agent")):
             return "renegotiation_triggered.agent is required"
@@ -143,8 +168,11 @@ class EventEmitter:
         self.enabled = enabled
         self.sent: list[dict] = []
         self.delivery_failures = 0
+        self.run_id: Optional[str] = None
 
     def emit(self, event: dict) -> None:
+        if self.run_id and "runId" not in event:
+            event = {**event, "runId": self.run_id}
         error = validate_event(event)
         if error:
             raise EventSchemaError(f"{error}: {json.dumps(event, default=str)}")
@@ -196,6 +224,7 @@ class EventEmitter:
     def approval_requested(
         self,
         allocations_paise: dict[str, int],
+        choices: Optional[dict[str, str]] = None,
         run_id: str = "",
         approval_request_id: str = "",
         digest: str = "",
@@ -209,6 +238,7 @@ class EventEmitter:
             {
                 "type": "approval_requested",
                 "allocations": wire_allocations(allocations_paise),
+                "choices": choices or {},
                 "runId": run_id,
                 "approvalRequestId": approval_request_id,
                 "digest": digest,
@@ -240,10 +270,16 @@ class EventEmitter:
         )
 
     def purchase_result(
-        self, agent: str, status: str, amount_paise: int, merchant: str, details: str
+        self,
+        agent: str,
+        status: str,
+        amount_paise: int,
+        merchant: str,
+        details: str,
+        source: Optional[str] = None,
+        outcome: Optional[str] = None,
     ) -> None:
-        self.emit(
-            {
+        event = {
                 "type": "purchase_result",
                 "agent": agent,
                 "status": status,
@@ -251,7 +287,11 @@ class EventEmitter:
                 "merchant": merchant,
                 "details": details,
             }
-        )
+        if source is not None:
+            event["source"] = source
+        if outcome is not None:
+            event["outcome"] = outcome
+        self.emit(event)
 
     def blocked_attempt(
         self, agent: str, attempted_paise: int, cap_paise: int, reason: str
@@ -352,3 +392,15 @@ def _positive_int(value) -> bool:
 
 def _allocations(value) -> bool:
     return isinstance(value, dict) and all(_non_negative(value.get(key)) for key in WIRE_CATEGORIES)
+
+
+def _valid_choice_option(value) -> bool:
+    return (
+        isinstance(value, dict)
+        and _non_empty(value.get("optionId"))
+        and _non_empty(value.get("vendor"))
+        and _non_empty(value.get("description"))
+        and _positive(value.get("price"))
+        and value.get("currency") == "INR"
+        and value.get("source") in {"live", "fixture"}
+    )

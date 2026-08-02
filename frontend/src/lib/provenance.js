@@ -62,7 +62,11 @@ export function labelForPurchase(line = {}) {
       break;
 
     case PROVENANCE.SANDBOX:
-      if (failed) {
+      if (line.outcome === "credential_issued") {
+        text = "Prava sandbox credential issued";
+        tone = "neutral";
+        proven = true;
+      } else if (failed) {
         // Deliberately NOT "declined as expected". A sandbox failure may be a
         // genuine decline that proves cap enforcement, or an ordinary booking
         // failure. Without a structured cause we must not claim the flattering

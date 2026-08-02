@@ -1,14 +1,22 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 
 // The backend (Preethesh) binds to 127.0.0.1:3000 by default and does not set
 // CORS headers. Rather than ask him to widen the backend's origin policy for a
 // dev-only concern, the dev server proxies /api to it so the dashboard and the
 // SSE stream are same-origin. `EventSource` cannot send custom headers, so the
 // stream must stay same-origin either way.
-const BACKEND = process.env.HUMSAFAR_BACKEND_URL ?? "http://127.0.0.1:3000";
+const REPO_ROOT = fileURLToPath(new URL("../", import.meta.url));
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Vite's working directory is frontend/, while the shared gitignored .env
+  // lives at the repository root. loadEnv reads it only for this server-side
+  // proxy configuration; no value is exposed to client code unless it has the
+  // explicit VITE_ prefix.
+  const serverEnv = { ...loadEnv(mode, REPO_ROOT, ""), ...process.env };
+  const backend = serverEnv.HUMSAFAR_BACKEND_URL ?? "http://127.0.0.1:3000";
+  return ({
   plugins: [react()],
   server: {
     port: 5173,
@@ -33,17 +41,18 @@ export default defineConfig({
       // needs an equivalent proxy; do not "solve" this by putting the token in
       // import.meta.env, which would publish it to every visitor.
       "/api": {
-        target: BACKEND,
+        target: backend,
         changeOrigin: true,
         configure: (proxy) => {
-          const token = process.env.INTERNAL_API_TOKEN;
+          const token = serverEnv.INTERNAL_API_TOKEN;
           if (!token) return;
           proxy.on("proxyReq", (proxyReq) => {
             proxyReq.setHeader("Authorization", `Bearer ${token}`);
           });
         },
       },
-      "/health": { target: BACKEND, changeOrigin: true },
+      "/health": { target: backend, changeOrigin: true },
     },
   },
+  });
 });

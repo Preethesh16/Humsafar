@@ -14,15 +14,33 @@ import { randomUUID } from "node:crypto";
  * is reported over the channel the dashboard is already reading.
  */
 export class RunService {
-  constructor({ cwd = "agents", python = "python3", spawnImpl = spawn, logger = console } = {}) {
+  constructor({ cwd = "agents", python = "python3", spawnImpl = spawn, logger = console, env = process.env } = {}) {
     this.cwd = cwd;
     this.python = python;
     this.spawnImpl = spawnImpl;
     this.logger = logger;
+    this.env = env;
     this.active = new Map();
+    this.runs = new Map();
   }
 
-  start({ goal, budget, days, awaitApproval = true, awaitChoice = true } = {}) {
+  start({
+    goal,
+    budget,
+    days,
+    origin,
+    destination,
+    originCode,
+    destinationCode,
+    departureDate,
+    returnDate,
+    latitude,
+    longitude,
+    travelers = 1,
+    rooms = 1,
+    awaitApproval = true,
+    awaitChoice = true,
+  } = {}) {
     if (typeof goal !== "string" || goal.trim() === "") {
       throw new RunError("goal must be a non-empty string", "INVALID_GOAL");
     }
@@ -30,6 +48,15 @@ export class RunService {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new RunError("budget must be a positive number", "INVALID_BUDGET");
     }
+    if (this.active.size > 0) {
+      throw new RunError("Another browser run is active; wait for it to settle", "RUN_ALREADY_ACTIVE", 409);
+    }
+
+    const trip = validateTrip({
+      days, origin, destination, originCode, destinationCode,
+      departureDate, returnDate, travelers, rooms,
+      latitude, longitude,
+    });
 
     const runId = `run-${randomUUID().slice(0, 12)}`;
     const args = [
@@ -37,38 +64,154 @@ export class RunService {
       "--goal", goal.trim(),
       "--budget", String(amount),
       "--run-id", runId,
+      "--live-discovery",
+      "--trust",
     ];
+    pushArg(args, "--days", trip.days);
+    pushArg(args, "--origin", trip.origin);
+    pushArg(args, "--destination", trip.destination);
+    pushArg(args, "--origin-code", trip.originCode);
+    pushArg(args, "--destination-code", trip.destinationCode);
+    pushArg(args, "--departure-date", trip.departureDate);
+    pushArg(args, "--return-date", trip.returnDate);
+    pushArg(args, "--latitude", trip.latitude);
+    pushArg(args, "--longitude", trip.longitude);
+    pushArg(args, "--travelers", trip.travelers);
+    pushArg(args, "--rooms", trip.rooms);
     if (awaitApproval) args.push("--await-approval");
     if (awaitChoice) args.push("--await-choice");
+    if (this.env.OPENAI_API_KEY) args.push("--llm");
+    if (this.env.HUMSAFAR_LIVE_CARDS === "true") args.push("--live-cards");
+    if (this.env.HUMSAFAR_LIVE_CHECKOUT === "true") args.push("--live-checkout");
 
     const child = this.spawnImpl(this.python, args, {
       cwd: this.cwd,
-      env: process.env,
+      env: this.env,
       detached: false,
-      stdio: ["ignore", "pipe", "pipe"],
+      // The run is observed through typed events. Ignoring process output
+      // avoids both pipe backpressure deadlocks and accidental provider detail
+      // leakage into backend logs.
+      stdio: ["ignore", "ignore", "ignore"],
     });
 
-    // Only exit status is recorded. Agent stdout can carry option details and
-    // must not be echoed into server logs wholesale.
+    const record = { runId, status: "running", startedAt: new Date().toISOString(), trip };
+    this.runs.set(runId, record);
+    this.active.set(runId, child);
     child.on("exit", (code) => {
       this.active.delete(runId);
+      record.status = code === 0 ? "complete" : "failed";
+      record.exitCode = code;
+      record.finishedAt = new Date().toISOString();
       this.logger.info?.({ service: "run", runId, exit: code });
     });
     child.on("error", (error) => {
       this.active.delete(runId);
+      record.status = "failed";
+      record.errorCode = error?.code ?? "SPAWN_FAILED";
+      record.finishedAt = new Date().toISOString();
       this.logger.error?.({ service: "run", runId, code: error?.code ?? "SPAWN_FAILED" });
     });
 
-    this.active.set(runId, child);
-    return { runId, days: Number(days) || null };
+    return { runId, status: record.status, trip, modes: this.#modes() };
+  }
+
+  get(runId) {
+    const record = this.runs.get(runId);
+    if (!record) throw new RunError("Run was not found", "RUN_NOT_FOUND", 404);
+    return { ...record, modes: this.#modes() };
+  }
+
+  #modes() {
+    return {
+      discovery: "provider-with-disclosed-fixture-fallback",
+      reasoning: this.env.OPENAI_API_KEY ? "openai" : "deterministic",
+      cards: this.env.HUMSAFAR_LIVE_CARDS === "true" ? "prava-sandbox" : "simulated",
+      checkout: this.env.HUMSAFAR_LIVE_CHECKOUT === "true" ? "merchant-integration" : "simulated",
+    };
   }
 }
 
 export class RunError extends Error {
-  constructor(message, code) {
+  constructor(message, code, status = 400) {
     super(message);
     this.name = "RunError";
     this.code = code ?? "INVALID_RUN";
-    this.status = 400;
+    this.status = status;
   }
+}
+
+function validateTrip(input) {
+  const days = integer(input.days, "days", 1, 30, 3);
+  const travelers = integer(input.travelers, "travelers", 1, 9, 1);
+  const rooms = integer(input.rooms, "rooms", 1, 9, 1);
+  const originCode = airportCode(input.originCode, "originCode");
+  const destinationCode = airportCode(input.destinationCode, "destinationCode");
+  const departureDate = isoDate(input.departureDate, "departureDate");
+  const returnDate = isoDate(input.returnDate, "returnDate");
+  const latitude = coordinate(input.latitude, "latitude", -90, 90);
+  const longitude = coordinate(input.longitude, "longitude", -180, 180);
+  if ((latitude === null) !== (longitude === null)) {
+    throw new RunError("latitude and longitude must be supplied together", "INCOMPLETE_COORDINATES");
+  }
+  if (departureDate && returnDate && returnDate <= departureDate) {
+    throw new RunError("returnDate must be after departureDate", "INVALID_RETURN_DATE");
+  }
+  return {
+    days,
+    travelers,
+    rooms,
+    origin: optionalText(input.origin),
+    destination: optionalText(input.destination),
+    originCode,
+    destinationCode,
+    departureDate,
+    returnDate,
+    latitude,
+    longitude,
+  };
+}
+
+function integer(value, field, min, max, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new RunError(`${field} must be an integer from ${min} to ${max}`, `INVALID_${field.toUpperCase()}`);
+  }
+  return parsed;
+}
+
+function airportCode(value, field) {
+  if (value === undefined || value === null || value === "") return null;
+  const code = String(value).trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(code)) {
+    throw new RunError(`${field} must be a three-letter IATA code`, `INVALID_${field.toUpperCase()}`);
+  }
+  return code;
+}
+
+function isoDate(value, field) {
+  if (value === undefined || value === null || value === "") return null;
+  const date = String(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) {
+    throw new RunError(`${field} must be YYYY-MM-DD`, `INVALID_${field.toUpperCase()}`);
+  }
+  return date;
+}
+
+function optionalText(value) {
+  if (value === undefined || value === null || value === "") return null;
+  return String(value).trim().slice(0, 120) || null;
+}
+
+function coordinate(value, field, min, max) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    throw new RunError(`${field} must be between ${min} and ${max}`, `INVALID_${field.toUpperCase()}`);
+  }
+  return parsed;
+}
+
+function pushArg(args, flag, value) {
+  if (value !== null && value !== undefined) args.push(flag, String(value));
 }

@@ -287,8 +287,10 @@ class _FakeApproval:
         self.consumable = consumable
         self.record = record
         self.consumed = 0
+        self.choices = None
 
-    def request(self, run_id, allocations_paise):
+    def request(self, run_id, allocations_paise, choices=None):
+        self.choices = choices
         if not self.record:
             return None
         return ApprovalRecord("req-1", run_id, "digest-abc", "pending", "later")
@@ -361,7 +363,8 @@ class ApprovalGateTest(unittest.TestCase):
         self.assertLess(types.index("approval_given"), types.index("card_issued"))
 
     def test_approval_events_carry_the_run_and_digest(self):
-        _, emitter = self._run(_FakeApproval("approved"))
+        approval = _FakeApproval("approved")
+        _, emitter = self._run(approval)
 
         requested = next(e for e in emitter.sent if e["type"] == "approval_requested")
         given = next(e for e in emitter.sent if e["type"] == "approval_given")
@@ -370,6 +373,8 @@ class ApprovalGateTest(unittest.TestCase):
         self.assertEqual(requested["digest"], "digest-abc")
         self.assertEqual(given["digest"], "digest-abc")
         self.assertTrue(requested["runId"])
+        self.assertEqual(requested["choices"], approval.choices)
+        self.assertEqual(set(approval.choices), {"flights", "stay", "food", "guide"})
 
 
 class PolledApprovalTransportTest(unittest.TestCase):

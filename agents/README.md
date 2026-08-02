@@ -24,6 +24,7 @@ python3 -m humsafar --goal "Plan my Goa trip" --budget 30000 --demo
 | `--no-stream` | Don't POST events to the backend |
 | `--live-cards` | Mint through `POST /api/scoped-cards` instead of the stub |
 | `--live-discovery` | Discover options via `POST /api/discovery/:category` |
+| `--days`, `--origin`, `--destination`, airport/date/traveller flags | Structured context for destination-aware fallback and provider search |
 | `--trust` | Run the pre-purchase trust check via `POST /api/trust/check` |
 | `--llm` | Use OpenAI for agent dialogue (needs `OPENAI_API_KEY`) |
 | `--backend URL` | Backend base URL (default `http://127.0.0.1:3000`) |
@@ -115,12 +116,12 @@ disqualifier risk, so these are enforced in code rather than left to discipline:
   warning telling you not to present it as a blocked attempt.
 - Card tokens are never logged, printed, or placed in an event.
 
-## What's still stubbed
+## Provider and execution status
 
 | Piece | Status | Owner |
 |---|---|---|
 | Prava call under `mintScopedCard` | Live route exists, fails closed without `PRAVA_SECRET_KEY` | Preethesh |
-| Duffel flights/stay inventory | Fixture prices | Preethesh |
+| Duffel flights/stay inventory | Live test search when token/context exist; destination-aware fixture fallback otherwise | Preethesh |
 | Guide/food inventory | Fixture, Viator/OpenTable-shaped | Preethesh |
-| Merchant checkout | `SimulatedCheckout` | Preethesh |
+| Merchant checkout | `SimulatedCheckout` by default; no merchant order is claimed | Preethesh |
 | LLM dialogue | Wired, off by default (no key in the workspace) | Jeswin |

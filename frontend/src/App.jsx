@@ -1,12 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
 
 import Choose from "./pages/Choose.jsx";
 import Intake from "./pages/Intake.jsx";
@@ -51,7 +43,7 @@ const PHASE_LABEL = {
   [PHASES.COMPLETE]: "settled",
 };
 
-export function Dashboard({ state, connection, source, setSource }) {
+export function Dashboard({ state, connection, source, setSource, goal }) {
   const [receiptDismissed, setReceiptDismissed] = useState(false);
 
   const summary = useMemo(() => summarize(state), [state]);
@@ -105,7 +97,7 @@ export function Dashboard({ state, connection, source, setSource }) {
         <div className="command-row">
           <div className="input-shell">
             <IconSearch />
-            <span className="goal">Plan my Goa trip under ₹30,000</span>
+            <span className="goal">{goal || "Start a trip to create a live plan"}</span>
           </div>
 
           <div className={`input-shell ${summary.overBudget ? "over" : ""}`}>
@@ -229,52 +221,103 @@ export function Dashboard({ state, connection, source, setSource }) {
  * know which URL to visit next.
  */
 export default function App() {
+  const [runId, setRunId] = useState(() => readSession("humsafar.runId"));
+  const [goal, setGoal] = useState(() => readSession("humsafar.goal"));
   const [source, setSource] = useState(initialSource);
-  const { state, connection } = useEventStream(source);
-  const [runId, setRunId] = useState(null);
+  const { state, connection } = useEventStream(source, runId);
+  const { pathname, navigate } = useHistoryRoute();
 
-  return (
-    <BrowserRouter>
-      <AutoAdvance state={state} />
-      <Routes>
-        <Route path="/" element={<Intake onStarted={setRunId} />} />
-        <Route
-          path="/deliberate"
-          element={
-            <Dashboard
-              state={state}
-              connection={connection}
-              source={source}
-              setSource={setSource}
-            />
-          }
-        />
-        <Route
-          path="/choose"
-          element={<Choose state={state} runId={runId ?? state.runId} />}
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
-  );
+  const started = ({ runId: nextRunId, goal: nextGoal }) => {
+    setRunId(nextRunId);
+    setGoal(nextGoal);
+    setSource(SOURCE.LIVE);
+    writeSession("humsafar.runId", nextRunId);
+    writeSession("humsafar.goal", nextGoal);
+  };
+
+  let page;
+  if (pathname === "/deliberate") {
+    page = <Dashboard state={state} connection={connection} source={source} setSource={setSource} goal={goal} />;
+  } else if (pathname === "/choose") {
+    page = <Choose state={state} runId={runId ?? state.runId} />;
+  } else if (pathname === "/approve") {
+    page = <ApprovalPage state={state} source={source} />;
+  } else if (pathname === "/receipt") {
+    page = <ReceiptPage state={state} source={source} navigate={navigate} />;
+  } else {
+    page = <Intake onStarted={started} navigate={navigate} />;
+  }
+
+  return <><AutoAdvance state={state} pathname={pathname} navigate={navigate} />{page}</>;
 }
 
 /**
  * Moves the user forward as the run progresses, and never backward — a late
  * event must not yank someone off a page they navigated to deliberately.
  */
-function AutoAdvance({ state }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-
+function AutoAdvance({ state, pathname, navigate }) {
   useEffect(() => {
-    if (location.pathname === "/") return;
+    if (pathname === "/") return;
     const pending = Object.values(state.choice?.requested ?? {}).some(
       (row) => !state.choice?.made?.[row.agent],
     );
-    if (pending && location.pathname !== "/choose") navigate("/choose");
-    else if (!pending && location.pathname === "/choose") navigate("/deliberate");
-  }, [state.choice, location.pathname, navigate]);
+    if (state.receipt && pathname !== "/receipt") navigate("/receipt");
+    else if (state.approval?.requested && !state.approval?.given && pathname !== "/approve") navigate("/approve");
+    else if (pending && pathname !== "/choose") navigate("/choose");
+    else if (!pending && ["/choose", "/approve"].includes(pathname)) navigate("/deliberate");
+  }, [state.choice, state.approval, state.receipt, pathname, navigate]);
 
   return null;
+}
+
+function ApprovalPage({ state, source }) {
+  return (
+    <div className="page-empty">
+      <div className="eyebrow">Step 4 of 5 · approve</div>
+      <h2>Review the exact split and selected plan.</h2>
+      <p>The digest binds this decision to this run, these slices, and these option IDs.</p>
+      <ApprovalPanel approval={state.approval} isMock={source === SOURCE.MOCK} />
+    </div>
+  );
+}
+
+function ReceiptPage({ state, source, navigate }) {
+  const summary = useMemo(() => summarize(state), [state]);
+  if (!state.receipt) return <div className="page-empty"><h2>Waiting for the agents to settle…</h2></div>;
+  return (
+    <FinalReceipt
+      receipt={state.receipt}
+      summary={summary}
+      blockedAttempts={state.blockedAttempts}
+      renegotiations={state.renegotiations}
+      isMock={source === SOURCE.MOCK}
+      onDismiss={() => navigate("/deliberate")}
+    />
+  );
+}
+
+function useHistoryRoute() {
+  const [pathname, setPathname] = useState(() =>
+    typeof window === "undefined" ? "/" : window.location.pathname,
+  );
+  useEffect(() => {
+    const changed = () => setPathname(window.location.pathname);
+    window.addEventListener("popstate", changed);
+    return () => window.removeEventListener("popstate", changed);
+  }, []);
+  const navigate = useMemo(() => (to, { replace = false } = {}) => {
+    if (typeof window === "undefined") return;
+    window.history[replace ? "replaceState" : "pushState"]({}, "", to);
+    setPathname(window.location.pathname);
+  }, []);
+  return { pathname, navigate };
+}
+
+function readSession(key) {
+  if (typeof sessionStorage === "undefined") return null;
+  return sessionStorage.getItem(key);
+}
+
+function writeSession(key, value) {
+  if (typeof sessionStorage !== "undefined") sessionStorage.setItem(key, value);
 }

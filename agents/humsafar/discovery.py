@@ -35,8 +35,9 @@ class FixtureDiscovery:
     and it is what keeps the submission's disclosure section honest.
     """
 
-    def __init__(self, days: int = 3) -> None:
+    def __init__(self, days: int = 3, origin: str = "Bengaluru") -> None:
         self.days = days
+        self.origin = origin
 
     def discover(self, category: str, goal: str) -> list[Option]:
         # The goal is no longer ignored. It used to be: every request returned
@@ -44,7 +45,7 @@ class FixtureDiscovery:
         # BLR-GOI flights and a hotel in Anjuna. Discovery now answers the
         # question that was actually asked.
         destination = parse_destination(goal)
-        rows = build_inventory(destination, self.days).get(category, [])
+        rows = build_inventory(destination, self.days, self.origin).get(category, [])
         return [
             Option(
                 category=category,
@@ -85,12 +86,14 @@ class BackendDiscovery:
         token: Optional[str] = None,
         timeout: float = 15.0,
         fallback: Optional[DiscoveryProvider] = None,
+        query: Optional[dict] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
         self.fallback = fallback if fallback is not None else FixtureDiscovery()
         self.sources: dict[str, str] = {}
+        self.query = query or {}
 
     def discover(self, category: str, goal: str) -> list[Option]:
         headers = {"Content-Type": "application/json"}
@@ -99,7 +102,7 @@ class BackendDiscovery:
 
         request = urllib.request.Request(
             f"{self.base_url}/api/discovery/{category}",
-            data=json.dumps({"goal": goal}).encode("utf-8"),
+            data=json.dumps({"goal": goal, **self.query}).encode("utf-8"),
             headers=headers,
             method="POST",
         )
@@ -113,6 +116,12 @@ class BackendDiscovery:
 
         source = str(body.get("source", "fixture"))
         self.sources[category] = source
+
+        # The backend's shared fixtures are the pinned Goa demo ladder. For a
+        # different goal, use the destination-aware local fallback instead of
+        # silently showing Goa inventory. Both paths remain labelled fixture.
+        if source != "live":
+            return self.fallback.discover(category, goal)
 
         options = []
         for row in body.get("data", []) or []:
@@ -171,5 +180,6 @@ def categories_for_goal(goal: str) -> list[str]:
 
     # Non-travel goals still run through the same engine; they just field a
     # smaller roster. The wire projection fills the unused categories with 0.
+    text = goal.lower()
     selected = [c for c in ("food", "guide") if c in text]
     return selected or ["flights", "stay", "food", "guide"]

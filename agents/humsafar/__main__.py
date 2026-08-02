@@ -17,7 +17,7 @@ from .cards import ScopedCardClient, StubScopedCardClient
 from .choice import AutoChoice, PolledChoice
 from .checkout import LiveCheckout
 from .config import load_env
-from .discovery import BackendDiscovery
+from .discovery import BackendDiscovery, FixtureDiscovery
 from .events import EventEmitter
 from .llm import Narrator
 from .money import format_inr
@@ -34,6 +34,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="humsafar", description="Run a shared-budget agent team.")
     parser.add_argument("--goal", default="Plan my Goa trip", help="What the team should achieve")
     parser.add_argument("--budget", default="30000", help="Total budget in rupees")
+    parser.add_argument("--days", type=int, default=3)
+    parser.add_argument("--origin")
+    parser.add_argument("--destination")
+    parser.add_argument("--origin-code")
+    parser.add_argument("--destination-code")
+    parser.add_argument("--departure-date")
+    parser.add_argument("--return-date")
+    parser.add_argument("--latitude", type=float)
+    parser.add_argument("--longitude", type=float)
+    parser.add_argument("--travelers", type=int, default=1)
+    parser.add_argument("--rooms", type=int, default=1)
     parser.add_argument(
         "--backend",
         default=os.environ.get("HUMSAFAR_BACKEND_URL", "http://127.0.0.1:3000"),
@@ -100,7 +111,31 @@ def main(argv: list[str] | None = None) -> int:
         else StubScopedCardClient()
     )
     narrator = Narrator(enabled=args.llm)
-    provider = BackendDiscovery(base_url=args.backend, token=token) if args.live_discovery else None
+    discovery_query = {
+        "origin": args.origin_code,
+        "destination": args.destination_code,
+        "departureDate": args.departure_date,
+        "checkInDate": args.departure_date,
+        "checkOutDate": args.return_date,
+        "passengers": args.travelers,
+        "guests": args.travelers,
+        "rooms": args.rooms,
+        "originName": args.origin,
+        "destinationName": args.destination,
+        "latitude": args.latitude,
+        "longitude": args.longitude,
+    }
+    discovery_query = {key: value for key, value in discovery_query.items() if value is not None}
+    provider = (
+        BackendDiscovery(
+            base_url=args.backend,
+            token=token,
+            query=discovery_query,
+            fallback=FixtureDiscovery(days=args.days, origin=args.origin or "Bengaluru"),
+        )
+        if args.live_discovery
+        else FixtureDiscovery(days=args.days, origin=args.origin or "Bengaluru")
+    )
     trust = TrustClient(base_url=args.backend, token=token) if args.trust else None
     approval = (
         PolledApproval(base_url=args.backend, token=token, ttl_seconds=args.approval_ttl)
@@ -168,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     if authorized_only:
         print("  note: Prava sandbox credentials issued and merchant-locked; no merchant order placed")
-    if provider is not None and provider.sources:
+    if getattr(provider, "sources", None):
         # Print what each category actually resolved to, not what was asked
         # for — a live route that fell back to fixtures must not read as live.
         summary = ", ".join(f"{c}={s}" for c, s in sorted(provider.sources.items()))

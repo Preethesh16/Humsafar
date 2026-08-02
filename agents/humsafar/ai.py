@@ -179,7 +179,7 @@ class AgentRuntime:
             )
 
         self._agents["intent"] = Agent(
-            name="Intent Agent",
+            name="Budget Strategy Agent",
             instructions=INTENT_INSTRUCTIONS,
             model=self.reasoning_model,
             output_type=GoalPlan,

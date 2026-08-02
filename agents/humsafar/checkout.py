@@ -60,6 +60,7 @@ class LiveCheckout:
             return CheckoutResult(
                 status="failed",
                 source="sandbox",
+                outcome="checkout_failed",
                 detail=f"No usable card: {card.get('error', 'card was not issued')}",
             )
 
@@ -75,6 +76,7 @@ class LiveCheckout:
             return CheckoutResult(
                 status="success",
                 source="sandbox",
+                outcome="credential_issued",
                 authorized=True,
                 detail=(
                     f"Prava sandbox credential issued for {option.vendor}, merchant-locked and "
@@ -95,6 +97,7 @@ class LiveCheckout:
         return CheckoutResult(
             status="success" if outcome == "APPROVED" else "failed",
             source="sandbox",
+            outcome="checkout_completed" if outcome == "APPROVED" else "checkout_failed",
             authorized=True,
             detail=f"{detail}{'' if settled else ' (reconciliation call failed)'}",
         )
@@ -114,6 +117,7 @@ class SimulatedCheckout:
             return CheckoutResult(
                 status="failed",
                 source="fixture",
+                outcome="simulated",
                 detail=f"No usable card: {card.get('error', 'card was not issued')}",
             )
 
@@ -122,6 +126,7 @@ class SimulatedCheckout:
             return CheckoutResult(
                 status="failed",
                 source="fixture",
+                outcome="simulated",
                 detail=(
                     f"{option.vendor} released the hold before checkout completed "
                     f"(simulated failure — no live order was placed)"
@@ -131,6 +136,7 @@ class SimulatedCheckout:
         return CheckoutResult(
             status="success",
             source="fixture",
+            outcome="simulated",
             detail=(
                 f"Simulated booking with {option.vendor}: {option.description} "
                 f"(fixture data — not a live merchant order)"

@@ -41,7 +41,7 @@ Transport: **SSE (Server-Sent Events)**. Decision: this stream is one-directiona
 
 Locked backend endpoints:
 
-- `GET /api/events` — SSE stream for Deepthi. Events use `id:` plus one JSON `data:` line; reconnects may send `Last-Event-ID` and receive buffered events after that id.
+- `GET /api/events?runId=<runId>` — SSE stream for Deepthi. Events use `id:` plus one JSON `data:` line; reconnects may send `Last-Event-ID` and receive buffered events after that id. A supplied `runId` filters both replay and live delivery so one browser run cannot consume another run's events.
 - `POST /api/events` — server-to-server ingestion for Jeswin's agent layer. Body is exactly one event object from the shapes below; accepted events return `202`, invalid events return `400`.
 - `POST /api/scoped-cards` — server-to-server card issuance. Body: `{ mandateId: string, merchant: string, amountCap: number }`; response is the exact `mintScopedCard` result from Section 1 (`201` for `issued`, `422` for `failed`).
 - `POST /api/discovery/:category` — discovery for `flights`, `stay`, `food`, or `guide`; always returns the Section 4 `{ data, source }` envelope.
@@ -62,7 +62,9 @@ Locked backend endpoints:
 
 The two POST routes accept `Authorization: Bearer <INTERNAL_API_TOKEN>` when that environment variable is configured. A non-loopback deployment must configure it. Never put Prava credentials in these request bodies.
 
-Every event is a JSON object with a `type` field:
+Every event is a JSON object with a `type` field. Browser-started runs also carry
+the same non-empty `runId` on **every** event, not only approval and choice
+events, so the SSE hub can enforce run isolation:
 
 ```
 // An agent speaks during negotiation
@@ -84,7 +86,8 @@ Every event is a JSON object with a `type` field:
 
 // A purchase completed or failed
 { type: "purchase_result", agent: string, status: "success" | "failed", amount: number,
-  merchant: string, details: string, source: "fixture" | "sandbox" | "production" }
+  merchant: string, details: string, source: "fixture" | "sandbox" | "production",
+  outcome?: "simulated" | "credential_issued" | "checkout_completed" | "checkout_failed" }
 
 // Proof-shot events (for the two demo beats)
 { type: "blocked_attempt", agent: string, attemptedAmount: number, cap: number, reason: string }
@@ -105,7 +108,7 @@ shape above; legacy acceptance is removed after his branch lands.
 - `split_update.allocations` during rounds shows what the agents are *asking for*, which is deliberately allowed to exceed `totalBudget` in early rounds — that overflow is the negotiation beat and is worth showing visually. Only the final split is guaranteed to fit.
 - `final_receipt` is always the **last** event of a run and is safe to use as the "run finished" signal. Nothing is emitted after it.
 - Every category the goal did not use is sent as `0` rather than omitted, so all four keys are always present. Goals needing a category outside the locked four would arrive as an *extra* key alongside them; the current MVP goals never do this.
-- Each entry in `final_receipt.purchases` carries `source: "fixture" | "sandbox" | "production"` and a `details` string. `sandbox` says where the attempt happened, not whether it succeeded; status/details carry the observed outcome. Anything with `source: "fixture"` must be labelled as simulated — it is not a completed order.
+- Each entry in `final_receipt.purchases` carries `source: "fixture" | "sandbox" | "production"`, `outcome`, and a `details` string. `sandbox` says where the attempt happened, not whether it succeeded; `outcome: "credential_issued"` is authorization only and must never render as a checkout. Anything with `source: "fixture"` must be labelled as simulated — it is not a completed order.
 
 - Deepthi builds her dashboard against a **mocked stream** matching this exact shape first — don't wait for Preethesh's real backend.
 - If Preethesh needs to add a field mid-build, he edits this file, adds the field, and flags it in his progress.md — he does not silently ship a differently-shaped event.
@@ -219,7 +222,9 @@ One per category, after the split is final.
 
 ### 6.3 `POST /api/choices` — Preethesh implements, Deepthi calls
 
-Body: `{ runId: string, agent: string, optionId: string }`. Returns `202` on accept, `400` for an unknown `runId`/`optionId`, `409` if that category's choice is already settled.
+Body: `{ runId: string, agent: string, optionId: string }`. Returns `202` on accept, `400` for an option that was not offered, `404` for an unknown run/agent pair, and `409` if that category is expired, submitted, or settled.
+
+`GET /api/choices?runId&agent` returns `{ data: { optionId } }` after a browser selection and `204` while no selection exists. The backend opens this state only after accepting the corresponding validated `choice_requested` event and settles it on `choice_made`, including an agent timeout.
 
 Client-to-server needs its own POST because the SSE stream stays one-directional (§2). Preethesh's decision is explicit `runId` correlation rather than global single-active-run state, so a delayed click can never mutate a later run.
 

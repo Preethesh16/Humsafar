@@ -206,7 +206,8 @@ const intakeHtml = renderToStaticMarkup(<Intake onStarted={() => {}} navigate={(
 assert.ok(intakeHtml.includes("<form"), "the intake page renders a form");
 assert.ok(intakeHtml.includes('aria-label="Trip destination"'), "the current text answer has an accessible name");
 assert.ok(intakeHtml.includes('role="progressbar"'), "question progress is programmatic, not just visual");
-assert.ok(intakeHtml.includes("Milo:"), "the route cat gives a useful tip on every intake question");
+assert.ok(intakeHtml.includes("Milo · question 1"), "the full-size route cat gives a useful tip on every intake question");
+assert.ok(intakeHtml.includes('mascot-guide stage'), "intake renders Milo as a stage-size left companion");
 
 const mascotHtml = renderToStaticMarkup(<MascotGuide message="Pick the route." />);
 assert.ok(mascotHtml.includes("Humsafar&#x27;s cat travel concierge"), "the mascot image has useful alternative text");
@@ -224,6 +225,8 @@ assert.ok(questHtml.includes("Your next station"), "the completed plan becomes a
 assert.ok(questHtml.includes("Use my location"), "the quest offers browser-local geolocation");
 assert.ok(questHtml.includes("Virtual ride to stop 1"), "the quest offers a virtual vehicle progression");
 assert.ok(questHtml.includes("not turn-by-turn navigation"), "the game never claims to replace navigation");
+assert.ok(questHtml.includes("quest-track-depth"), "the route has a raised 3D track layer");
+assert.ok(questHtml.includes("quest-painted-segment active"), "the next real itinerary segment is ready to paint");
 
 // Place suggestions. Only one question renders at a time, so the first render
 // carries the destination list; the origin list appears on its own step. The

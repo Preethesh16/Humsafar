@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ItineraryPlan } from "../components/ItineraryPlan.jsx";
-import mascot from "../assets/humsafar-cat.png";
+import { MascotGuide } from "../components/MascotGuide.jsx";
 import { fetchPlaceSuggestions, itineraryRequest, previewItinerary } from "../lib/itinerary.js";
 import { suggestPlaces } from "../lib/places.js";
 
@@ -251,19 +251,18 @@ export default function Intake({ onStarted, navigate }) {
       </div>
 
       <form className="conversation" onSubmit={submit}>
-        <section className="assistant-prompt" aria-live="polite">
-          <span className="assistant-avatar assistant-avatar--cat">
-            <img src={mascot} alt="Milo, the Humsafar route cat" />
-          </span>
-          <div>
+        <div className="intake-stage">
+          <MascotGuide stage message={CAT_TIPS[step]} label={`Milo · question ${step + 1}`} />
+          <div className="intake-dialog">
+            <section className="assistant-prompt" aria-live="polite">
+              <div>
             <p className="assistant-kicker">Question {step + 1} of {QUESTIONS.length}</p>
             <h1>{question.title}</h1>
             <p>{question.helper}</p>
-            <p className="mascot-tip"><b>Milo:</b> {CAT_TIPS[step]}</p>
-          </div>
-        </section>
+              </div>
+            </section>
 
-        <section className="answer-card">
+            <section className="answer-card">
           {step === 0 && (
             <TextAnswer
               value={answers.destination}
@@ -484,17 +483,19 @@ export default function Intake({ onStarted, navigate }) {
             </>
           )}
 
-          {isReview && <TripReview answers={answers} days={days} goal={goal} itinerary={itinerary} planBusy={planBusy} onRetry={() => setPlanAttempt((value) => value + 1)} onEdit={setStep} />}
-        </section>
+              {isReview && <TripReview answers={answers} days={days} goal={goal} itinerary={itinerary} planBusy={planBusy} onRetry={() => setPlanAttempt((value) => value + 1)} onEdit={setStep} />}
+            </section>
 
-        {error && <p className="conversation-error" role="alert">{error}</p>}
+            {error && <p className="conversation-error" role="alert">{error}</p>}
 
-        <nav className="conversation-actions" aria-label="Trip questions">
-          <button className="back-action" type="button" onClick={back} disabled={step === 0 || busy}>Back</button>
-          <button className="primary next-action" type="submit" disabled={busy}>
-            {busy ? "Waking up the agents…" : isReview ? "Start planning agents" : "Continue"}
-          </button>
-        </nav>
+            <nav className="conversation-actions" aria-label="Trip questions">
+              <button className="back-action" type="button" onClick={back} disabled={step === 0 || busy}>Back</button>
+              <button className="primary next-action" type="submit" disabled={busy}>
+                {busy ? "Waking up the agents…" : isReview ? "Start planning agents" : "Continue"}
+              </button>
+            </nav>
+          </div>
+        </div>
       </form>
 
       <p className="intake-truth">Planning and negotiation are live. Free-data results and simulations are labelled; Humsafar never calls a link a booking.</p>

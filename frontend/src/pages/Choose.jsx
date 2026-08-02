@@ -176,7 +176,7 @@ export default function Choose({ state, runId, goal }) {
         Every option below already fits that agent's agreed slice — picking cannot push the
         plan over budget.
       </p>
-      <MascotGuide compact message="I checked the slice first. Pick what feels right; every visible card already fits." />
+      <MascotGuide message="I checked the slice first. Pick what feels right; every visible card already fits." />
 
       {Object.values(requested).map((row) => {
         const decided = made[row.agent];

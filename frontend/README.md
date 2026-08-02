@@ -51,9 +51,9 @@ npm run test:e2e  # full browser rehearsal; requires Chrome/Brave debugging on :
 | `src/lib/useEventStream.js` | Switches between the mock replay and `EventSource("/api/events")`. |
 | `src/pages/Intake.jsx` | One-question-at-a-time destination, origin, journey mode, dates/flexibility, party, budget and vibe intake. Provider codes and coordinates are deliberately absent from the user flow. |
 | `src/pages/Choose.jsx` | Affordable option selection with honest ranking and timeout labels. |
-| `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, truthful receipt, Milo guide and trip quest. |
-| `src/lib/journeyGame.js` | Pure itinerary-to-station mapping, schematic coordinates, distances and run-isolated progress keys. |
-| `e2e/browser-rehearsal.mjs` | Dependency-free Chrome DevTools rehearsal from intake through receipt, geolocation and the first virtual station. Set `HUMSAFAR_E2E_PAYMENT=true` only for a deliberate Prava proof run. |
+| `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, truthful receipt, full-size Milo guide and 3D trip quest. |
+| `src/lib/journeyGame.js` | Pure itinerary-to-station mapping, board coordinates, real-coordinate distances and run-isolated progress keys. |
+| `e2e/browser-rehearsal.mjs` | Dependency-free Chrome DevTools rehearsal from intake through receipt, geolocation and the first virtual station. It captures desktop intake, mid-ride, completion and 390px mobile evidence under `/tmp`. Set `HUMSAFAR_E2E_PAYMENT=true` only for a deliberate Prava proof run. |
 | `src/lib/icons.jsx` | Inline SVG glyphs. Presentation only. |
 | `src/styles.css` | The warm "paper" theme — canvas `#f3efe5`, forest `#1d3b2d`, coral `#e56b52`, mint `#c9f2dd`. |
 
@@ -70,6 +70,13 @@ purely from the `phase` the reducer already computes — it is a display mapping
 not a second state machine.
 
 `@media (prefers-reduced-motion: reduce)` disables every animation.
+
+Milo is intentionally a large character rail, not an avatar button: 255×350px
+on desktop intake/quest, a 170×210px companion on intermediate pages, and a
+130×160px horizontal companion on phones. The quest borrows the broad visual
+language of minimalist line-painting games—raised white track, bright completed
+trail, chunky runner and low-poly scenery—but uses original CSS/SVG and the
+traveller's actual itinerary order. No game asset or source code is copied.
 
 ## Two things that are deliberate, not accidental
 

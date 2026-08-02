@@ -91,7 +91,7 @@ export function Dashboard({ state, connection, source, setSource, goal, itinerar
         </p>
       </section>
 
-      <MascotGuide compact message={state.phase === PHASES.COMPLETE
+      <MascotGuide message={state.phase === PHASES.COMPLETE
         ? "The plan is ready. I have turned the itinerary into a playable route on the receipt page."
         : "I am watching the shared pot while the specialists negotiate. You still approve the exact result."} />
 
@@ -345,7 +345,7 @@ function ApprovalPage({ state, source }) {
       <div className="eyebrow">Step 4 of 5 · approve</div>
       <h2>Review the exact split and selected plan.</h2>
       <p>The digest binds this decision to this run, these slices, and these option IDs.</p>
-      <MascotGuide compact message="This is the only authorization gate. Check the total and selected options before you approve." />
+      <MascotGuide message="This is the only authorization gate. Check the total and selected options before you approve." />
       <ApprovalPanel approval={state.approval} isMock={source === SOURCE.MOCK} />
     </div>
   );
@@ -360,6 +360,7 @@ function ReceiptPage({ state, source, itinerary, onRestart, navigate }) {
         <div><span className="eyebrow">Step 5 of 5 · plan ready</span><h1>Your itinerary becomes a quest.</h1></div>
         <button type="button" className="secondary-action" onClick={onRestart}>Plan another trip</button>
       </div>
+      <TripQuest plan={itinerary} />
       <div className="completion-grid">
         <FinalReceipt
           receipt={state.receipt}
@@ -370,7 +371,6 @@ function ReceiptPage({ state, source, itinerary, onRestart, navigate }) {
           embedded
           onDismiss={() => navigate("/deliberate")}
         />
-        <TripQuest plan={itinerary} />
       </div>
       <ItineraryPlan plan={itinerary} />
     </main>

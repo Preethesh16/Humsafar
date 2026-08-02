@@ -11,6 +11,10 @@ import { writeFile } from "node:fs/promises";
 const devtools = process.env.HUMSAFAR_CDP_URL ?? "http://127.0.0.1:9222";
 const appUrl = process.env.HUMSAFAR_APP_URL ?? "http://127.0.0.1:5173/?source=live";
 const screenshotPath = process.env.HUMSAFAR_E2E_SCREENSHOT ?? "/tmp/humsafar-e2e-final.png";
+const intakeScreenshotPath = process.env.HUMSAFAR_E2E_INTAKE_SCREENSHOT ?? "/tmp/humsafar-e2e-intake.png";
+const ridingScreenshotPath = process.env.HUMSAFAR_E2E_RIDING_SCREENSHOT ?? "/tmp/humsafar-e2e-riding.png";
+const mobileIntakeScreenshotPath = process.env.HUMSAFAR_E2E_MOBILE_INTAKE_SCREENSHOT ?? "/tmp/humsafar-e2e-mobile-intake.png";
+const mobileReceiptScreenshotPath = process.env.HUMSAFAR_E2E_MOBILE_RECEIPT_SCREENSHOT ?? "/tmp/humsafar-e2e-mobile-receipt.png";
 const paymentProof = process.env.HUMSAFAR_E2E_PAYMENT === "true";
 
 const pages = await fetch(`${devtools}/json/list`).then((response) => response.json());
@@ -32,6 +36,13 @@ await cdp.send("Browser.grantPermissions", { origin: "http://127.0.0.1:5173", pe
 await cdp.send("Page.navigate", { url: appUrl });
 await waitFor(() => evaluate("document.readyState === 'complete' && document.querySelector('h1')?.textContent.includes('disappear')"));
 await evaluate("Object.keys(sessionStorage).filter((key) => key.startsWith('humsafar.quest:')).forEach((key) => sessionStorage.removeItem(key)); true");
+await capture(intakeScreenshotPath);
+const intakeMascot = await evaluate(`(() => {
+  const box = document.querySelector('.intake-stage .mascot-guide img').getBoundingClientRect();
+  return { width: box.width, height: box.height };
+})()`);
+assert.ok(intakeMascot.width >= 180 && intakeMascot.height >= 250, "Milo must be a full-size intake companion, not an avatar button");
+await mobileCapture(mobileIntakeScreenshotPath);
 
 await setInput('input[aria-label="Trip destination"]', "Goa");
 await clickText("button", "Continue");
@@ -110,10 +121,20 @@ assert.ok(!receipt.options.some((url) => /api[_-]?key|duffel_test_|sk_test_/i.te
 await clickText("button", "Use my location");
 await waitFor(() => evaluate("document.body.innerText.includes('Refresh my location')"), 10_000, "browser geolocation");
 await clickText("button", "Virtual ride to stop 1");
+await new Promise((resolve) => setTimeout(resolve, 850));
+const rideAnimation = await evaluate(`({
+  vehicle: getComputedStyle(document.querySelector('.quest-vehicle.moving')).animationName,
+  paint: getComputedStyle(document.querySelector('.quest-painted-segment.painting')).animationName,
+  boardWidth: document.querySelector('.quest-map--3d').getBoundingClientRect().width
+})`);
+assert.match(rideAnimation.vehicle, /quest-drive/, "the transport runner must animate along the active segment");
+assert.match(rideAnimation.paint, /quest-paint/, "the route must paint behind the runner");
+assert.ok(rideAnimation.boardWidth >= 450, "desktop trip game must be a large board, not a map thumbnail");
+await capture(ridingScreenshotPath);
 await waitFor(() => evaluate("document.querySelector('.quest-xp')?.textContent.includes('120 XP')"), 10_000, "virtual route progress");
 
-const screenshot = await cdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
-await writeFile(screenshotPath, Buffer.from(screenshot.data, "base64"));
+await capture(screenshotPath);
+await mobileCapture(mobileReceiptScreenshotPath);
 
 assert.deepEqual(browserErrors, [], `Browser errors: ${browserErrors.join(" | ")}`);
 console.log(JSON.stringify({
@@ -124,6 +145,10 @@ console.log(JSON.stringify({
   location: "verified with CDP geolocation override",
   progress: "120 XP",
   paymentProof,
+  intakeScreenshot: intakeScreenshotPath,
+  mobileIntakeScreenshot: mobileIntakeScreenshotPath,
+  ridingScreenshot: ridingScreenshotPath,
+  mobileReceiptScreenshot: mobileReceiptScreenshotPath,
   screenshot: screenshotPath,
 }));
 cdp.close();
@@ -143,6 +168,24 @@ async function setInput(selector, value) {
 async function clickText(selector, text) {
   await waitFor(() => evaluate(`Boolean([...document.querySelectorAll(${JSON.stringify(selector)})].find((node) => node.textContent.includes(${JSON.stringify(text)})))`), 20_000, text);
   await evaluate(`[...document.querySelectorAll(${JSON.stringify(selector)})].find((node) => node.textContent.includes(${JSON.stringify(text)})).click(); true`);
+}
+
+async function capture(path) {
+  const screenshot = await cdp.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+  await writeFile(path, Buffer.from(screenshot.data, "base64"));
+}
+
+async function mobileCapture(path) {
+  await cdp.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const layout = await evaluate(`(() => {
+    const mascot = document.querySelector('.mascot-guide img')?.getBoundingClientRect();
+    return { overflow: document.documentElement.scrollWidth - innerWidth, mascotWidth: mascot?.width ?? 0, mascotHeight: mascot?.height ?? 0 };
+  })()`);
+  assert.ok(layout.overflow <= 1, `mobile layout overflows horizontally by ${layout.overflow}px`);
+  assert.ok(layout.mascotWidth >= 120 && layout.mascotHeight >= 150, "Milo must remain prominent on mobile");
+  await capture(path);
+  await cdp.send("Emulation.clearDeviceMetricsOverride");
 }
 
 async function waitFor(check, timeout = 20_000, label = "condition") {

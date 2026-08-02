@@ -14,7 +14,7 @@ import {
   verifySessionToken,
 } from "./session.js";
 
-export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret, pravaCustomerId, pravaCustomerEmail } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -163,25 +163,6 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     return itineraryResponse(response, () => itineraryService.plan(request.body ?? {}));
   });
 
-  // Polled by the authorisation page. Prava offers no redirect-back for
-  // mandate setup, so this is how the UI learns the user finished — and it
-  // works whichever surface they used: the embedded frame, a new tab, or their
-  // phone. On completion the page re-syncs the mandate registry, which is what
-  // makes the merchant resolvable to the agents.
-  app.get("/api/prava/mandate-sessions/:sessionId/status", browserOrAgent, async (request, response) => {
-    if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
-    try {
-      return response.json(await mandateService.sessionStatus(request.params.sessionId));
-    } catch (error) {
-      return response.status(error.status ?? 502).json({
-        error: {
-          code: error.code ?? "PRAVA_SESSION_STATUS_FAILED",
-          message: error.message ?? "Could not read the authorisation status",
-        },
-      });
-    }
-  });
-
   app.post("/api/trust/check", agentOnly, async (request, response) => {
     if (!trustService) return response.status(503).json({ error: { code: "TRUST_UNAVAILABLE" } });
     try {
@@ -191,43 +172,9 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }
   });
 
-  // Browser-reachable, unlike the rest of /api/prava. Authorising a mandate is
-  // the one payment step that *must* involve the human: it is their card and
-  // their passkey. Prava returns an `iframe_url` for exactly this, so the
-  // approval happens inside our own page instead of as a link pasted into a
-  // phone.
-  //
-  // This does not widen what a browser can spend. The session only *offers* an
-  // authorisation; nothing is charged until the agent calls /api/scoped-cards,
-  // which remains agent-only. Card data never touches our origin — it is
-  // entered on Prava's page inside the frame, which is what keeps us out of PCI
-  // scope.
-  app.post("/api/prava/mandate-sessions", browserOrAgent, async (request, response) => {
+  app.post("/api/prava/mandate-sessions", agentOnly, async (request, response) => {
     if (!mandateService) return response.status(503).json({ error: { code: "PRAVA_UNAVAILABLE" } });
-    try {
-      // The identity is fixed server-side and whatever the browser sent is
-      // discarded. Now that this route is reachable from a page, accepting a
-      // caller-supplied `userId` would let anyone open an authorisation
-      // session against someone else's Prava customer. The browser chooses the
-      // merchant and the cap; it does not choose whose account is on the hook.
-      return response.status(201).json(
-        await mandateService.createSetupSession({
-          ...request.body,
-          userId: pravaCustomerId,
-          userEmail: pravaCustomerEmail,
-        }),
-      );
-    } catch (error) {
-      // A Prava rejection is a 502, not a 500: the request reached us fine and
-      // failed upstream. An unhandled throw here previously surfaced as a bare
-      // "Unexpected server error" with no clue which field Prava disliked.
-      return response.status(error.status ?? 502).json({
-        error: {
-          code: error.code ?? "PRAVA_SESSION_FAILED",
-          message: error.message ?? "Prava could not create the authorisation session",
-        },
-      });
-    }
+    return response.status(201).json(await mandateService.createSetupSession(request.body));
   });
 
   app.post("/api/prava/mandates/sync", agentOnly, async (request, response) => {

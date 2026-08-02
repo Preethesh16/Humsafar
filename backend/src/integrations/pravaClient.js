@@ -55,25 +55,6 @@ export class PravaClient {
     return { data: session, source: "live" };
   }
 
-  /**
-   * Whether a hosted authorisation session has been completed yet.
-   *
-   * Prava exposes no redirect-back for mandate setup, so the page cannot be
-   * told "the user finished". Polling this is how our UI notices and moves on,
-   * and it works no matter which surface the user completed it on — the frame,
-   * a new tab, or their phone.
-   */
-  async sessionStatus(sessionId) {
-    const payload = await this.request(
-      `/v1/sessions/${encodeURIComponent(sessionId)}/payment-result`,
-    );
-    const data = payload.data ?? {};
-    return {
-      data: { sessionId, status: data.status ?? "pending", orderId: data.order_id ?? null },
-      source: "live",
-    };
-  }
-
   async listMandates({ customerId, standingOnly = true }) {
     const query = new URLSearchParams({
       customer_id: customerId,

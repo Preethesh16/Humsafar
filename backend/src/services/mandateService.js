@@ -32,13 +32,6 @@ export class MandateService {
     });
   }
 
-  async sessionStatus(sessionId) {
-    if (typeof sessionId !== "string" || sessionId.trim() === "") {
-      throw new TypeError("sessionId must be a non-empty string");
-    }
-    return this.pravaClient.sessionStatus(sessionId.trim());
-  }
-
   async syncCustomerMandates(customerId) {
     const result = await this.pravaClient.listMandates({ customerId, standingOnly: true });
     for (const mandate of result.data.mandates) {

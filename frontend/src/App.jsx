@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Choose from "./pages/Choose.jsx";
-import MandateSetup from "./components/MandateSetup.jsx";
 import Intake from "./pages/Intake.jsx";
 
 import { ApprovalPanel } from "./components/ApprovalPanel.jsx";
@@ -282,92 +281,12 @@ export default function App() {
     page = <ApprovalPage state={state} source={source} />;
   } else if (pathname === "/receipt") {
     page = <ReceiptPage state={state} source={source} navigate={navigate} />;
-  } else if (pathname === "/authorise") {
-    // The one-time step that lets the agents spend at all. Kept on its own
-    // route rather than in the run flow, because a mandate is authorised once
-    // per merchant and then reused across every future run — putting it inside
-    // the run would imply the user has to approve their card each time, which
-    // is the opposite of what the product does.
-    page = <AuthorisePage state={state} />;
   } else {
     page = <Intake onStarted={started} navigate={navigate} />;
   }
 
   return <><AutoAdvance state={state} pathname={pathname} navigate={navigate} />{page}</>;
 }
-
-function AuthorisePage({ state }) {
-  const [done, setDone] = useState(() => new Set());
-
-  // Derived from the run the agents actually did — the vendors they chose and
-  // the amounts they settled on. An earlier version listed four merchants and
-  // prices hardcoded into this file, which both read as a booking page and was
-  // the exact thing this project refuses to do everywhere else: assert
-  // specifics nobody computed.
-  //
-  // This is also the correct moment in the flow. A mandate has to exist before
-  // its agent can mint, and only after the choice step do we know which
-  // merchant each agent is actually buying from.
-  const chosen = Object.values(state.choice?.made ?? {});
-
-  if (chosen.length === 0) {
-    return (
-      <div className="authorise">
-        <div className="eyebrow">Setup · one time per merchant</div>
-        <h2 className="page-title">
-          Nothing to authorise yet.
-        </h2>
-        <p className="page-lede">
-          The agents authorise spending at the merchants they choose, so there is nothing to
-          approve until they have negotiated and you have picked. Start a plan, and this page
-          fills in with the merchants your agents actually settled on.
-        </p>
-        <p className="page-lede">
-          <a href="/">Plan a trip →</a>
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="authorise">
-      <div className="eyebrow">Setup · one time per merchant</div>
-      <h2 className="page-title">
-        Authorise your agents. <span className="accent">Once.</span>
-      </h2>
-      <p className="page-lede">
-        Each agent gets spending authority capped at the amount it negotiated and locked to the
-        single merchant it chose. You approve with your passkey — after that the agents transact
-        on their own, and none can spend past its cap or reach another&apos;s money.
-      </p>
-
-      {chosen.map((pick) => (
-        <MandateSetup
-          key={pick.agent}
-          merchant={{
-            name: pick.vendor,
-            // Sandbox merchant details may be arbitrary — Prava states this
-            // explicitly, because no real storefront is contacted. Derived
-            // rather than invented per-vendor so nothing here claims to be a
-            // real merchant website.
-            url: `https://example.com/${encodeURIComponent(String(pick.vendor).toLowerCase().replace(/\s+/g, "-"))}`,
-            countryCode: "IN",
-          }}
-          amountCap={pick.price}
-          description={`${pick.agent} — chosen by ${pick.chosenBy === "user" ? "you" : "the agent"}`}
-          onAuthorized={() => setDone((prev) => new Set(prev).add(pick.vendor))}
-        />
-      ))}
-
-      {done.size > 0 && (
-        <p className="authorise__done">
-          {done.size} of {chosen.length} authorised.
-        </p>
-      )}
-    </div>
-  );
-}
-
 
 /**
  * Moves the user forward as the run progresses, and never backward — a late

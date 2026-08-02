@@ -68,6 +68,32 @@ reported `DECLINED` after the mints had already succeeded — mislabelling the
 result and consuming the mandates. Fixed in `9cc1bc2`. **The dashboard is
 authoritative; that run worked.**
 
+> **⚠️ This artefact no longer matches what the product does. Read before
+> demoing.**
+>
+> Since 2026-08-02 ~20:10 IST the `food` and `guide` categories are **advisory**
+> (`--advisory-categories`, `orchestrator._record_advisory`). They still take
+> part in the negotiation and still hold a share of the budget, but they mint no
+> card, reach no checkout and land on the receipt at ₹0. A current run produces
+> **two** credentials — flights and stay — not four.
+>
+> The reasoning is sound: no transactional provider exists for restaurants or
+> activities, so calling them booked would be a fabricated result, which the
+> handbook treats as a disqualifier. It is the same standard applied everywhere
+> else in this file.
+>
+> But the two artefacts now tell different stories, and a judge comparing this
+> table against a live run will see four credentials here and two on screen.
+> **Do not present §1.2 as "what the product does today."** It is an accurate
+> record of a run on 2 Aug at 15:30, when all four categories were
+> transactional, and should be described that way — as evidence that the
+> four-agent credential model works end to end, alongside a plain statement that
+> two categories were subsequently made advisory pending a real provider.
+>
+> The four mandates behind it are still live and still hold ₹28,800, so the
+> four-credential run is reproducible the moment the Visa cryptogram fault
+> clears — see §3.
+
 ### 1.3 A real merchant-scoped credential was issued
 
 `POST /v1/mandates/{id}/charge` for ₹100 returned:

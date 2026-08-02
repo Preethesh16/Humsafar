@@ -131,3 +131,24 @@ test("without a session secret the browser routes stay bearer-token-only", async
   });
   assert.equal(response.status, 401);
 });
+
+test("an unknown API route answers in JSON, not HTML", async (t) => {
+  const app = createApp({
+    eventHub: new EventHub(),
+    scopedCardService: { async mintScopedCard() {} },
+  });
+
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  t.after(() => new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  }));
+
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/nope`);
+
+  assert.equal(response.status, 404);
+  // Express's default is an HTML error page, which a fetch() caller reports as
+  // "unexpected token <" — making a mistyped route look like a parsing bug.
+  assert.match(response.headers.get("content-type") ?? "", /application\/json/);
+  assert.equal((await response.json()).error.code, "NOT_FOUND");
+});

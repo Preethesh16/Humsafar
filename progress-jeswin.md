@@ -244,3 +244,26 @@ Also added a `Dockerfile` (Node 22 + Python 3, frontend built in, healthcheck) a
 - Needs from the team: someone with a Render or Railway account to connect the repo. Everything else is done — env vars are documented in `DEPLOY.md`.
 - Blocked on: nothing.
 - Commit: pending
+
+### [2026-08-02 22:20 IST] — merged main, container verified, evidence reconciled
+- Prompt: "pull now check whats there update from others", then continue.
+- Files changed: `backend/src/app.js`, `backend/test/session.test.js`, `agents/PRAVA-EVIDENCE.md`, `.env.example`, `DEPLOY.md`.
+
+**Merged `origin/main`** — Preethesh's mapped itinerary (Geoapify/Open-Meteo, day clustering, advisory categories) and Deepthi's venue pinning. One conflict, in `app.js`, where his two itinerary routes landed in the same region as my session layer.
+
+**Resolved so `/api/itineraries/*` use `browserOrAgent`, not the agent-only token.** `frontend/src/lib/itinerary.js` calls both directly from the intake page, so on the agent token they would have returned 401 to every visitor once deployed — and looked perfectly healthy in development, where the Vite proxy supplies the token. Same failure class as the `HUMSAFAR_BACKEND_URL` bug.
+
+**The Docker image was built and run, not just written.** Full agent run inside the container: 45 events terminating in `final_receipt`, Python spawned correctly, healthcheck reports `healthy`, SPA fallback serves deep routes, static assets served. Deployment is now genuinely login-and-go.
+
+Found and fixed while doing it: an unmatched `/api/*` path returned Express's default **HTML** error page, so a `fetch()` caller would report "unexpected token <" and a mistyped route would look like a serialisation bug. Now a JSON 404.
+
+**Two environment gaps that will silently break the deployed demo**, both documented in `DEPLOY.md`:
+* `GEOAPIFY_API_KEY` is unset, so both itinerary routes return `503 GEOAPIFY_NOT_CONFIGURED` — verified against the running server. The intake suggestions and the whole mapped plan are dead without it.
+* `GOOGLE_MAPS_API_KEY` is still unset (Deepthi's note), so every map link is a search rather than a pin.
+
+**Flagged a contradiction between our strongest artefact and the product.** `food` and `guide` are now advisory: they negotiate and hold budget but mint no card and land at ₹0, so a current run issues **two** credentials while `PRAVA-EVIDENCE.md` §1.2 documents four. Preethesh's reasoning is right — no transactional provider exists for restaurants or activities, and calling them booked would be a fabricated result. But the two artefacts now disagree, and a judge will compare them. I have annotated §1.2 rather than deleted it: it remains an accurate record of a 15:30 run when all four were transactional, and must be presented as that rather than as current behaviour. **This is Preethesh's call to confirm.**
+
+- Validation: **213 Python, 168 Node** (1 new), 81 frontend, build and render smoke pass. Verified end to end twice — against the merged production build on the host, and inside the Docker container.
+- Needs from Preethesh: confirm the advisory framing for the demo script, and set `GEOAPIFY_API_KEY`.
+- Blocked on: nothing in code. Deployment needs an account; the card needs Prava.
+- Commit: pending

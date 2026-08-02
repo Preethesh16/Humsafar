@@ -242,6 +242,17 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     app.get(/^\/(?!api\/|health$|a2a\/|\.well-known\/).*/, serveApp);
   }
 
+  // An unmatched API path must answer in JSON. Express's default is an HTML
+  // error page, which a fetch() caller parses as JSON and reports as
+  // "unexpected token <" — a mistyped route then looks like a serialisation bug
+  // rather than a 404. Registered after every route and after the static
+  // handler, so it only catches genuine misses.
+  app.use("/api", (_request, response) => {
+    response.status(404).json({
+      error: { code: "NOT_FOUND", message: "No such API route" },
+    });
+  });
+
   app.use((error, _request, response, _next) => {
     if (error instanceof SyntaxError && error.status === 400 && "body" in error) {
       return response.status(400).json({

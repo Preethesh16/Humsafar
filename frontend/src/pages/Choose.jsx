@@ -58,7 +58,10 @@ function Countdown({ seconds, onExpire }) {
 
 function OptionCard({ option, chosen, disabled, onPick, place }) {
   const rated = option.rating !== null && option.rating !== undefined;
-  const map = mapsUrl(option.vendor, place, option.placeId);
+  // `area` is the locality the row itself states ("Anjuna", "Vagator"). It
+  // narrows the fallback search when there is no place id — "The Hosteller
+  // Vagator Goa" finds one hostel where "The Hosteller" finds a chain.
+  const map = mapsUrl(option.vendor, [option.area, place].filter(Boolean).join(" "), option.placeId);
   // Only a place id pins the link to one location. Without one Google can only
   // search, and a generic venue name returns a list — so the label says
   // "Search on map" rather than promising a single result it cannot deliver.

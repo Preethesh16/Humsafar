@@ -361,3 +361,17 @@
 - Blocked on: nothing of mine.
 - Needs from Preethesh: review the scaling assumptions in `tripScope.js` — the baseline is documented as 3 days / 2 nights / 1 traveller / 1 room, which is what your fixture prices appear to describe. Correct me if the rows were priced for something else.
 - Commit: `92a3361` (pushed to `deepthi/frontend-demo`, merged to `main`)
+
+### [2026-08-02 IST] — Map links pin one place instead of returning a list
+- Prompt: reported that the map button opened a list of results rather than the one place the agent booked, and asked for the exact location.
+- Files changed: `backend/src/integrations/googleMapsClient.js`, `backend/src/services/discoveryService.js`, `backend/src/fixtures/discovery.js`, `backend/test/googleMapsPlaceId.test.js` (new), `frontend/src/lib/maps.js`, `frontend/src/pages/Choose.jsx`, `frontend/test/{maps,render.ssr}`, `.env.example`, `progress-deepthi.md`.
+- **Two separate causes, only one of them the URL.** `?api=1&query=` is Google's *search* endpoint and returns a list by design — only a `place_id` resolves to one location. And `GOOGLE_MAPS_API_KEY` is empty, so nothing could be resolved at all.
+- Changed: added `GoogleMapsClient.findPlaceId`, resolved **server-side** because it needs the API key and a key in browser JavaScript is public to every visitor. Discovery attaches `placeId` to stay/food/guide rows; the frontend emits the `/maps/place/` endpoint with `query_place_id`.
+- Decision — **every failure path returns null rather than throwing**: no key, an invented venue, quota, `REQUEST_DENIED`, a network error, malformed JSON. Lookups run in parallel and never reject, so a maps problem cannot slow or break discovery, which is the actual product. Seven failure modes are pinned by tests.
+- Decision — **when it cannot pin, the label changes to "Search on map".** The UI must not promise one location it cannot deliver. This caught my own render assertion, which was still expecting the old "View on map" wording — the honesty rule failing its own test was the right outcome.
+- Decision — **`area` added only where the row already states its locality.** Three rows qualified; the rest already carry their area in the vendor name. I could have guessed areas for the others and made the demo look better, but a wrong area pins the map to the **wrong place**, which is worse than a search — the same rule as never inventing a rating.
+- Validation: 148/148 tests, clean build, and the whole pin path proven end to end with a stand-in for a configured key — real venues (Zostel Goa, Taj Holiday Village, Gunpowder Assagao, Thalassa Vagator) resolved to a place id and pin; invented ones (Local shacks, Anjuna Beach Resort) returned null and fell back to a labelled search.
+- **Outstanding and not mine to decide:** `GOOGLE_MAPS_API_KEY` is still empty, so every link is a search today. Setting it, with **Places API** enabled and not just Geocoding, makes real venues pin with no code change — documented in `.env.example`. Separately, the invented fixture vendor names can never pin, because no API can find a place that does not exist; replacing them with real Goa venues is a content decision in Preethesh's file.
+- Blocked on: nothing of mine.
+- Needs from Preethesh: set the key with Places enabled if we want pins in the demo, and decide whether the invented vendor names should become real venues.
+- Commit: `8791e17` (pushed to `deepthi/frontend-demo`, merged to `main`)

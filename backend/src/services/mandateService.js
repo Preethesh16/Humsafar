@@ -11,7 +11,14 @@ export class MandateService {
       // to our app instead of stranding them on Prava's domain. `return_url`
       // and `redirect_url` are accepted and silently ignored — the field is
       // `callback_url`.
-      ...(callbackUrl ? { callback_url: callbackUrl } : {}),
+      //
+      // Prava rejects a non-https value outright ("callback_url must use https
+      // protocol"), so an http origin must omit it rather than send one and
+      // take a 400. PUBLIC_BASE_URL is http on every local dev server, so
+      // without this guard the phone-approval ceremony fails locally.
+      ...(typeof callbackUrl === "string" && callbackUrl.startsWith("https://")
+        ? { callback_url: callbackUrl }
+        : {}),
       user_id: userId,
       user_email: userEmail,
       total_amount: money(amountCap),
@@ -38,38 +45,8 @@ export class MandateService {
     });
   }
 
-  async createCheckoutSession({ userId, userEmail, amountCap, currency = "INR", merchant, product, callbackUrl }) {
-    return this.pravaClient.createMandateSession({
-      user_id: userId,
-      user_email: userEmail,
-      total_amount: money(amountCap),
-      currency,
-      // Documented in Prava's REST checkout walkthrough as the field that
-      // returns the cardholder to us once the hosted page is done —
-      // `return_url` and `redirect_url` are accepted and silently ignored.
-      // Prava rejects a non-https value outright, so an http origin omits it
-      // rather than sending one and taking a 400.
-      ...(typeof callbackUrl === "string" && callbackUrl.startsWith("https://")
-        ? { callback_url: callbackUrl }
-        : {}),
-      purchase_context: [{
-        merchant_details: {
-          name: merchant.name,
-          url: merchant.url,
-          country_code_iso2: merchant.countryCode,
-        },
-        product_details: [{
-          description: product.description,
-          unit_price: money(product.unitPrice),
-          quantity: product.quantity ?? 1,
-        }],
-      }],
-      integration_type: "full_checkout",
-    });
-  }
-
-  async getCheckoutStatus(sessionId) {
-    return this.pravaClient.getSessionPaymentResult(sessionId);
+  async listCustomerMandates(customerId) {
+    return this.pravaClient.listMandates({ customerId, standingOnly: true });
   }
 
   async syncCustomerMandates(customerId) {

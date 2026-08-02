@@ -1,15 +1,15 @@
 const SANDBOX_COLLECT_ORIGIN = "https://sandbox.collect.prava.space";
 const SESSION_FALLBACK_MS = 15 * 60 * 1000;
 
-/** Creates and observes one phone-completable checkout without exposing credentials. */
+/** Creates and observes one phone-completable budget authorization. */
 export class PravaApprovalService {
   constructor({ mandateService, resolvePlan, enabled = false, config = {}, now = () => Date.now() } = {}) {
     if (
       !mandateService
-      || typeof mandateService.createCheckoutSession !== "function"
-      || typeof mandateService.getCheckoutStatus !== "function"
+      || typeof mandateService.createSetupSession !== "function"
+      || typeof mandateService.listCustomerMandates !== "function"
     ) {
-      throw new TypeError("A mandate service with checkout session support is required");
+      throw new TypeError("A mandate service with setup and listing support is required");
     }
     if (typeof resolvePlan !== "function") throw new TypeError("A plan resolver is required");
     this.mandateService = mandateService;
@@ -44,7 +44,7 @@ export class PravaApprovalService {
       return publicApproval(this.current, { reused: true });
     }
 
-    const result = await this.mandateService.createCheckoutSession({
+    const result = await this.mandateService.createSetupSession({
       userId: this.config.customerId,
       userEmail: this.config.customerEmail,
       amountCap,
@@ -79,6 +79,7 @@ export class PravaApprovalService {
       iframeUrl,
       expiresAt,
       stage: "waiting_for_cardholder",
+      authorizeOnly: true,
     };
     return publicApproval(this.current, { reused: false });
   }
@@ -88,11 +89,15 @@ export class PravaApprovalService {
       throw approvalError("PRAVA_PHONE_APPROVAL_DISABLED", "Phone approval is disabled on this server");
     }
     if (!this.current || this.current.runId !== runId) {
-      throw approvalError("PRAVA_APPROVAL_NOT_FOUND", "No active Prava checkout exists for this trip");
+      throw approvalError("PRAVA_APPROVAL_NOT_FOUND", "No active Prava authorization exists for this trip");
     }
 
-    const result = await this.mandateService.getCheckoutStatus(this.current.sessionId);
-    const stage = stageFor(result?.data?.status);
+    const result = await this.mandateService.listCustomerMandates(this.config.customerId);
+    const authorized = result?.data?.mandates?.some((mandate) =>
+      isMatchingAuthorization(mandate, this.current),
+    );
+    const expired = Date.parse(this.current.expiresAt) <= this.now();
+    const stage = authorized ? "authorized" : expired ? "expired" : "waiting_for_cardholder";
     this.current.stage = stage;
     return {
       runId: this.current.runId,
@@ -101,8 +106,9 @@ export class PravaApprovalService {
       amountCap: this.current.amountCap,
       currency: this.current.currency,
       stage,
-      terminal: new Set(["completed", "failed", "expired"]).has(stage),
-      paid: stage === "completed",
+      authorizeOnly: true,
+      terminal: new Set(["authorized", "expired"]).has(stage),
+      paid: false,
       checkedAt: new Date(this.now()).toISOString(),
     };
   }
@@ -158,20 +164,23 @@ function publicApproval(current, { reused }) {
     iframeUrl: current.iframeUrl,
     expiresAt: current.expiresAt,
     stage: current.stage,
+    authorizeOnly: true,
     reused,
   };
 }
 
-function stageFor(status) {
-  switch (String(status ?? "").toLowerCase()) {
-    case "pending": return "waiting_for_cardholder";
-    case "awaiting_result": return "checkout_ready";
-    case "completed": return "completed";
-    case "failed": return "failed";
-    case "expired":
-    case "cancelled": return "expired";
-    default: return "checking";
-  }
+function isMatchingAuthorization(mandate, current) {
+  const approvedAmount = Number(mandate?.approvedAmount);
+  return mandate?.status === "active"
+    && mandate?.state === "available"
+    && mandate?.merchantScope === "listed"
+    && normalize(mandate?.merchantName) === normalize(current.merchant)
+    && Number.isFinite(approvedAmount)
+    && Math.abs(approvedAmount - current.amountCap) < 0.005;
+}
+
+function normalize(value) {
+  return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function assertHostedUrl(value) {

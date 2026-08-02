@@ -47,7 +47,7 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
         };
       },
       async status({ runId }) {
-        return { runId, environment: "sandbox", merchant: "Humsafar", amountCap: 13800, currency: "INR", stage: "checkout_ready", terminal: false, paid: false, checkedAt: "2026-08-03T00:05:00.000Z" };
+        return { runId, environment: "sandbox", merchant: "Humsafar", amountCap: 13800, currency: "INR", stage: "authorized", authorizeOnly: true, terminal: true, paid: false, checkedAt: "2026-08-03T00:05:00.000Z" };
       },
     },
   });
@@ -171,7 +171,7 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
     headers: { authorization: "Bearer internal-test-token" },
   });
   assert.equal(phoneStatus.status, 200);
-  assert.equal((await phoneStatus.json()).stage, "checkout_ready");
+  assert.equal((await phoneStatus.json()).stage, "authorized");
 
   const choiceEvent = {
     type: "choice_requested",

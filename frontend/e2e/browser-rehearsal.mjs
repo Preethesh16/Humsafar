@@ -115,7 +115,7 @@ assert.match(receipt.mascot, /cat travel concierge/i);
 assert.match(receipt.text, /fixture|sandbox|payment evidence/i, "receipt must state provenance");
 assert.match(
   receipt.text,
-  /Continue with Prava sandbox[\s\S]*Pay ₹[\d,]+ on phone/i,
+  /Authorize your trip budget with Prava sandbox[\s\S]*Authorize ₹[\d,]+ on phone/i,
   "receipt must offer the explicit phone handoff without starting it automatically",
 );
 if (paymentProof) {

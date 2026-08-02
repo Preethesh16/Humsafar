@@ -168,6 +168,14 @@ an unanswered Discord question into an implementation assumption.
 - [ ] `FETCH_AGENTIC_CREDS_ERROR` happens before credentials exist. Record it as
   a credential-generation failure, leave checkout/report untouched, and do not
   hide it with an automatic retry—sandbox attempts are scarce.
+- [ ] The assigned sandbox card ending `2341` has repeatedly completed identity
+  and mandate setup but failed credential generation across ₹50–₹28,800, INR/USD
+  and both mandate-charge/full-checkout paths. Do not diagnose it as an amount
+  problem or spend more attempts on client-side permutations; request a
+  replacement test card from Prava with the sanitized response ID.
+- [ ] The receipt phone QR is deliberately mandate setup. It may say “Trip budget
+  authorized” only after an exact active/available mandate appears. It must never
+  say paid, charged or booked until a real merchant/test processor outcome exists.
 
 ## Approval and multi-process precautions
 

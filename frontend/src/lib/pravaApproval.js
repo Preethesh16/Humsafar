@@ -62,6 +62,7 @@ function validateApproval(payload, runId) {
   if (
     payload?.environment !== "sandbox"
     || payload?.runId !== runId
+    || payload?.authorizeOnly !== true
     || hostedUrl.origin !== PRAVA_SANDBOX_ORIGIN
   ) {
     throw approvalError("PRAVA_INVALID_APPROVAL_URL", "Prava returned an unexpected approval link");
@@ -87,6 +88,7 @@ function validateApproval(payload, runId) {
     iframeUrl: hostedUrl.href,
     expiresAt: new Date(payload.expiresAt).toISOString(),
     stage: validStage(payload.stage),
+    authorizeOnly: true,
     reused: payload.reused === true,
   };
 }
@@ -96,6 +98,7 @@ function validateStatus(payload, runId) {
   if (
     payload?.environment !== "sandbox"
     || payload?.runId !== runId
+    || payload?.authorizeOnly !== true
     || !Number.isFinite(amountCap)
     || amountCap <= 0
     || typeof payload?.merchant !== "string"
@@ -112,6 +115,7 @@ function validateStatus(payload, runId) {
     amountCap,
     currency: payload.currency,
     stage,
+    authorizeOnly: true,
     terminal: payload.terminal === true,
     paid: stage === "completed" && payload.paid === true,
     checkedAt: payload.checkedAt,
@@ -122,9 +126,7 @@ function validStage(stage) {
   const allowed = new Set([
     "waiting_for_cardholder",
     "checking",
-    "checkout_ready",
-    "completed",
-    "failed",
+    "authorized",
     "expired",
   ]);
   if (!allowed.has(stage)) {

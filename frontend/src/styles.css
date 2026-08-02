@@ -555,7 +555,7 @@ h1 em {
   background: #fff4d7;
   font: 750 9px/1.2 var(--mono);
 }
-.prava-phone__state--checkout_ready { color: #18554a; border-color: #83c8b8; background: #e6f7f1; }
+.prava-phone__state--authorized { color: #18554a; border-color: #83c8b8; background: #e6f7f1; }
 .prava-phone__state--completed { color: #fff; border-color: var(--forest); background: var(--forest); }
 .prava-phone__state--failed,
 .prava-phone__state--expired { color: var(--coral-ink); border-color: #e6afa3; background: #fff0ec; }

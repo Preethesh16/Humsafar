@@ -119,6 +119,45 @@ class _ScriptedChoice:
         return Choice(match, self.chosen_by) if match else None
 
 
+class DestinationAwarenessTest(unittest.TestCase):
+    """Discovery used to ignore the goal entirely: a Jaipur request returned
+    BLR-GOI flights and a hotel in Anjuna. That is worse than static — it
+    claimed to have searched somewhere it had not."""
+
+    def test_a_different_destination_returns_different_inventory(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        goa = FixtureDiscovery().discover("flights", "Plan my Goa trip")
+        jaipur = FixtureDiscovery().discover("flights", "Plan my Jaipur trip")
+
+        self.assertIn("BLR-GOI", goa[0].description)
+        self.assertIn("BLR-JAI", jaipur[0].description)
+
+    def test_goa_stays_pinned_so_live_mandates_keep_resolving(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        stay = FixtureDiscovery().discover("stay", "Plan my Goa trip")
+        merchants = {o.merchant for o in stay}
+
+        self.assertIn("Anjuna Beach Resort", merchants)
+        self.assertIn("Taj Holiday Village", merchants)
+
+    def test_the_same_destination_is_deterministic(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        first = FixtureDiscovery().discover("stay", "trip to Udaipur")
+        second = FixtureDiscovery().discover("stay", "trip to Udaipur")
+
+        self.assertEqual([o.price_paise for o in first], [o.price_paise for o in second])
+
+    def test_an_unknown_city_still_produces_a_runnable_roster(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        for category in ("flights", "stay", "food", "guide"):
+            options = FixtureDiscovery().discover(category, "trip to Ziro")
+            self.assertTrue(options, f"{category} produced nothing")
+
+
 class ChoiceDrivesThePurchaseTest(unittest.TestCase):
     def _run(self, choice):
         emitter = EventEmitter(enabled=False)

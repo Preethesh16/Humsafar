@@ -3,7 +3,7 @@ import express from "express";
 import { validateEvent } from "./events/eventSchema.js";
 import { ApprovalError } from "./services/approvalService.js";
 
-export function createApp({ eventHub, scopedCardService, discoveryService, mandateService, approvalService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, discoveryService, mandateService, approvalService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -81,6 +81,17 @@ export function createApp({ eventHub, scopedCardService, discoveryService, manda
       ...request.body,
       approvalRequestId: request.params.approvalRequestId,
     }));
+  });
+
+  app.post("/api/runs", authorize(internalApiToken), (request, response) => {
+    if (!runService) return response.status(503).json({ error: { code: "RUN_UNAVAILABLE" } });
+    try {
+      return response.status(202).json(runService.start(request.body ?? {}));
+    } catch (error) {
+      return response.status(error.status ?? 400).json({
+        error: { code: error.code ?? "INVALID_RUN", message: error.message },
+      });
+    }
   });
 
   app.post("/api/discovery/:category", authorize(internalApiToken), async (request, response) => {

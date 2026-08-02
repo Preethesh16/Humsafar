@@ -1,4 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
+import Choose from "./pages/Choose.jsx";
+import Intake from "./pages/Intake.jsx";
 
 import { ApprovalPanel } from "./components/ApprovalPanel.jsx";
 import { AuditLog } from "./components/AuditLog.jsx";
@@ -40,9 +51,7 @@ const PHASE_LABEL = {
   [PHASES.COMPLETE]: "settled",
 };
 
-export default function App() {
-  const [source, setSource] = useState(initialSource);
-  const { state, connection } = useEventStream(source);
+export function Dashboard({ state, connection, source, setSource }) {
   const [receiptDismissed, setReceiptDismissed] = useState(false);
 
   const summary = useMemo(() => summarize(state), [state]);
@@ -208,4 +217,64 @@ export default function App() {
       )}
     </div>
   );
+}
+
+
+/**
+ * Router shell.
+ *
+ * The stream is opened once here and shared by every page, so navigating does
+ * not drop the SSE connection or lose folded state mid-run. Pages advance
+ * automatically as the reducer's phase changes — a judge should never have to
+ * know which URL to visit next.
+ */
+export default function App() {
+  const [source, setSource] = useState(initialSource);
+  const { state, connection } = useEventStream(source);
+  const [runId, setRunId] = useState(null);
+
+  return (
+    <BrowserRouter>
+      <AutoAdvance state={state} />
+      <Routes>
+        <Route path="/" element={<Intake onStarted={setRunId} />} />
+        <Route
+          path="/deliberate"
+          element={
+            <Dashboard
+              state={state}
+              connection={connection}
+              source={source}
+              setSource={setSource}
+            />
+          }
+        />
+        <Route
+          path="/choose"
+          element={<Choose state={state} runId={runId ?? state.runId} />}
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+/**
+ * Moves the user forward as the run progresses, and never backward — a late
+ * event must not yank someone off a page they navigated to deliberately.
+ */
+function AutoAdvance({ state }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname === "/") return;
+    const pending = Object.values(state.choice?.requested ?? {}).some(
+      (row) => !state.choice?.made?.[row.agent],
+    );
+    if (pending && location.pathname !== "/choose") navigate("/choose");
+    else if (!pending && location.pathname === "/choose") navigate("/deliberate");
+  }, [state.choice, location.pathname, navigate]);
+
+  return null;
 }

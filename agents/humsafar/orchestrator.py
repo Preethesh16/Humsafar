@@ -21,6 +21,7 @@ from uuid import uuid4
 
 from .approval import AutoApproval
 from .cards import ScopedCard, StubScopedCardClient
+from .choice import AutoChoice, option_id
 from .checkout import Checkout, SimulatedCheckout
 from .discovery import DiscoveryProvider, FixtureDiscovery
 from .intent import GoalIntent, parse_intent
@@ -78,6 +79,7 @@ class Orchestrator:
         narrator=None,
         trust=None,
         approval=None,
+        choice=None,
     ) -> None:
         self.emitter = emitter
         self.card_client = card_client or StubScopedCardClient()
@@ -86,6 +88,9 @@ class Orchestrator:
         self.narrator = narrator
         self.trust = trust
         self.approval = approval or AutoApproval()
+        # AutoChoice keeps the pre-§6 behaviour exactly and reports
+        # 'agent-timeout', never 'user'.
+        self.choice = choice or AutoChoice()
         self.mediator = Mediator()
         self.intent = GoalIntent(categories=[])
 
@@ -244,7 +249,27 @@ class Orchestrator:
         config: RunConfig,
         report: RunReport,
     ) -> None:
-        option = specialist.cheapest_within(slice_paise)
+        # §6: the agents decided the money, the user decides the taste. This
+        # sits before minting so a credential is never issued for an option
+        # that is about to change.
+        picked = self.choice.choose(specialist.category, specialist.options, slice_paise)
+        if picked is not None:
+            self.emitter.choice_made(
+                config.run_id,
+                specialist.category,
+                option_id(specialist.category, picked.option),
+                picked.option.vendor,
+                picked.option.price_paise,
+                picked.chosen_by,
+            )
+            if picked.by_user:
+                self._say(
+                    specialist.category,
+                    f"You chose {picked.option.vendor} — {picked.option.description} at "
+                    f"{format_inr(picked.option.price_paise)}. Buying exactly that.",
+                )
+
+        option = picked.option if picked is not None else specialist.cheapest_within(slice_paise)
         if option is None:
             self._say(
                 specialist.category,

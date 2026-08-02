@@ -36,6 +36,8 @@ VALID_EVENT_TYPES = {
     "blocked_attempt",
     "renegotiation_triggered",
     "final_receipt",
+    "choice_requested",
+    "choice_made",
 }
 
 
@@ -108,6 +110,10 @@ def validate_event(event: dict) -> Optional[str]:
         if not _non_negative(event.get("cap")):
             return "blocked_attempt.cap is invalid"
         return None if _non_empty(event.get("reason")) else "blocked_attempt.reason is required"
+    if kind in ("choice_requested", "choice_made"):
+        # Additive §6 events. Validated loosely here because eventSchema.js does
+        # not know them yet; tightened when Preethesh adds them.
+        return None if _non_empty(event.get("runId")) else f"{kind}.runId is required"
     if kind == "renegotiation_triggered":
         if not _non_empty(event.get("agent")):
             return "renegotiation_triggered.agent is required"
@@ -257,6 +263,27 @@ class EventEmitter:
                 "attemptedAmount": to_rupees(attempted_paise),
                 "cap": to_rupees(cap_paise),
                 "reason": reason,
+            }
+        )
+
+    def choice_requested(self, run_id: str, payload: dict) -> None:
+        """INTERFACES.md §6.1. Not in eventSchema.js yet, so it is additive."""
+        self.emit({"type": "choice_requested", "runId": run_id, **payload})
+
+    def choice_made(
+        self, run_id: str, agent: str, option_id: str, vendor: str, price_paise: int, chosen_by: str
+    ) -> None:
+        """§6.2. `chosenBy` is not decoration: a timed-out auto-pick must never
+        be presented as a human decision."""
+        self.emit(
+            {
+                "type": "choice_made",
+                "runId": run_id,
+                "agent": agent,
+                "optionId": option_id,
+                "vendor": vendor,
+                "price": to_rupees(price_paise),
+                "chosenBy": chosen_by,
             }
         )
 

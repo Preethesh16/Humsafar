@@ -204,3 +204,31 @@ class ChoiceDrivesThePurchaseTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NonTravelGoalTest(unittest.TestCase):
+    """Regression: `categories_for_goal` lost its `text` local when
+    `is_travel_goal` was extracted, so every non-travel goal raised NameError
+    and killed the run. Every existing test used a travel goal, so nothing
+    caught it — a judge typing "furnish my apartment" would have seen a crash.
+    """
+
+    def _run(self, goal):
+        from humsafar.events import EventEmitter
+        from humsafar.orchestrator import run_goal
+
+        return run_goal(goal, "20000", EventEmitter(enabled=False))
+
+    def test_a_non_travel_goal_completes_instead_of_crashing(self):
+        for goal in ("Furnish my first apartment", "Throw a birthday party", "Stock my kitchen"):
+            with self.subTest(goal=goal):
+                report = self._run(goal)
+                self.assertTrue(report.purchases)
+                self.assertTrue(report.within_budget)
+
+    def test_a_narrow_goal_fields_a_narrow_roster(self):
+        report = self._run("A food tour of Lisbon")
+        self.assertEqual({p.agent for p in report.purchases}, {"food"})
+
+    def test_an_empty_goal_does_not_crash(self):
+        self.assertTrue(self._run("").purchases)

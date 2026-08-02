@@ -101,3 +101,37 @@ class LiveCheckoutWithProcessorTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SimulatedMerchantTest(unittest.TestCase):
+    """Prava's sanctioned route for steps 4-5: no sandbox merchant exists, so
+    the merchant step is simulated. The parts either side are real."""
+
+    def test_it_can_only_ever_decline(self):
+        from humsafar.processor import SimulatedMerchant
+
+        outcome, _ = SimulatedMerchant("Example Store").charge(option(), card())
+        self.assertEqual(outcome, "DECLINED")
+
+    def test_every_detail_says_simulated_and_names_the_merchant(self):
+        from humsafar.processor import SimulatedMerchant
+
+        _, detail = SimulatedMerchant("Example Store").charge(option(), card())
+        self.assertIn("SIMULATED", detail)
+        self.assertIn("Example Store", detail)
+        self.assertIn("the storefront is not", detail)
+
+    def test_a_blank_merchant_is_refused_even_simulated(self):
+        from humsafar.processor import SimulatedMerchant
+
+        with self.assertRaises(ValueError):
+            SimulatedMerchant("   ")
+
+    def test_it_reports_declined_to_prava(self):
+        from humsafar.processor import SimulatedMerchant
+
+        reporter = NullReporter()
+        LiveCheckout(reporter=reporter, processor=SimulatedMerchant("Example Store")).pay(
+            option(), card()
+        )
+        self.assertEqual([c["outcome"] for c in reporter.calls], ["DECLINED"])

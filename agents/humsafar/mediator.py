@@ -131,6 +131,19 @@ class Mediator:
                     gain = option.rating - current_rating
                     if extra <= 0 or extra > leftover or gain <= 0:
                         continue
+                    # Never spend an agent past the option it opened on. An
+                    # opening ask is a statement of what that agent wants; going
+                    # beyond it hands over money nobody asked for.
+                    #
+                    # Under the engine's heuristic this is a no-op — the opening
+                    # ask *is* the best-rated option, and `gain <= 0` already
+                    # stops there. It matters once the specialists choose their
+                    # own openings: without it, an agent that deliberately
+                    # opened cheap gets upgraded back to the priciest thing on
+                    # its list, and its choice disappears from the receipt. That
+                    # is the difference between agency and decoration.
+                    if option.price_paise > specialist.opening_ask_paise:
+                        continue
                     # Rating gained per rupee, tilted by how much the user
                     # emphasised this category. A neutral priority multiplies by
                     # 1.0, so surplus behaves exactly as before when no goal

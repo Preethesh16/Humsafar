@@ -178,7 +178,21 @@ class Orchestrator:
             f"[intent: {self.intent.source}]",
         )
 
-        specialists = build_specialists(categories, self.provider, config.goal)
+        # Each specialist picks the option it opens the negotiation fighting
+        # for, rather than the engine assuming it wants the best-rated thing on
+        # its list. This is the only point where model output changes an
+        # amount, and it does so by choosing among real options — see
+        # `build_specialists` and `schemas.OpeningPosition` for why that is
+        # safe. Without a narrator, `strategy` is None and the heuristic
+        # applies exactly as before.
+        strategy = getattr(self.narrator, "opening_positions", None)
+        specialists = build_specialists(
+            categories,
+            self.provider,
+            config.goal,
+            ask_strategy=strategy,
+            on_position=self._say,
+        )
         for specialist in specialists:
             sources = {o.source for o in specialist.options}
             self._say(

@@ -197,3 +197,26 @@ The change is still in, on its own merits: the credential is now minted at the o
 - Needs from Preethesh: nothing blocking. `DUFFEL_ACCESS_TOKEN` is still the only reason inventory is fixture — the live path is wired and is already the default.
 - Blocked on: Prava issuing a replacement test card. Everything else in the agent core is done.
 - Commit: pending
+
+### [2026-08-02 21:40 IST] — the specialists now genuinely drive allocation
+- Prompt: continuing the plan; the multi-agent claim was the weakest part of the submission.
+- Files changed: `agents/humsafar/schemas.py`, `ai.py`, `llm.py`, `negotiation.py`, `mediator.py`, `orchestrator.py`, `agents/tests/test_negotiation.py`.
+
+**The problem.** The four specialists never moved a rupee. Their output went only to `_say()`, and their own test asserted it (`test_narration_does_not_change_a_single_rupee`). Asked *"show me where an agent's output changes an amount"*, the only honest answer was the Intent Agent's bounded weight. `build_specialists(ask_strategy=…)` existed for exactly this and had **zero callers**.
+
+**Each specialist now chooses which option it opens the negotiation fighting for** — and it does so without breaking the rule that no model-facing schema may contain a money field. The agent returns an **index** into its own shortlist, not an amount (`schemas.OpeningPosition`). The price attached to that index is ours. A hallucinated figure therefore cannot become an opening ask: there is nowhere to put one. The rejected design had the agent state its ask as a number, which would have needed a money field and moved the guarantee from *unrepresentable* to *validated afterwards*.
+
+Out-of-range indices are **discarded, not clamped** — clamping would silently invent a choice nobody made — and fall back to the engine's heuristic. A strategy that raises is caught. The batched call runs all four agents concurrently at **2.1s**.
+
+Live, the personas diverge exactly as written: the Journey Agent opened on the **cheapest** flight (IndiGo ₹5,700 of a ₹5,700–10,400 range) reasoning about cost versus rating, while the Stay Agent opened on the **most expensive** room (Taj ₹13,100 of ₹4,700–13,100). The engine's heuristic would have opened all four at their best-rated option.
+
+**The finding that mattered more than the feature.** Wiring it up was not enough: I measured it and the choice changed the final split in only **2 of 28 budget bands**. `allocate_surplus` was upgrading every agent back toward its best-rated option, so an agent that deliberately opened cheap was pushed straight back up and its decision vanished from the receipt. Agency that does not survive to the receipt is decoration wearing a better name.
+
+The mediator now **refuses to fund an agent above the option it opened on**. That is a no-op under the heuristic — the opening ask *is* the best-rated option, and the existing rating-gain check already stopped there, which is why every pre-existing surplus and forced-compromise test still passes untouched. With agents choosing, it is what makes the choice stick: **24 of 28 budget bands** now differ. Verified end to end against live OpenAI — at ₹25,000 the Food Agent picked Goa Kitchen (₹4,200) over Gunpowder (₹5,500), a ₹1,300 difference visible in the receipt.
+
+Also resolved: `llm.py` claimed the engine decides every amount while `intent.py` documented a weight that moves money. The rule is now stated once and accurately — *model output may influence allocation only through bounded, validated parameters, never as an amount* — and the opening-position call is the clearest instance of it.
+
+- Validation: **211 Python, 139 Node, frontend build and render smoke all pass** (11 new tests, including a budget sweep re-run with agents driving the asks, and an invariant that no agent is ever funded above its own opening ask). Budget safety is unchanged.
+- Needs from Deepthi: the transcript now carries an opening line per agent (*"I'm opening on Taj Udaipur at ₹13,100. …"*) before the first negotiation round. Worth showing — it is the moment the agents commit to a position.
+- Blocked on: nothing.
+- Commit: pending

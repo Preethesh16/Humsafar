@@ -288,7 +288,7 @@ export default function App() {
     // per merchant and then reused across every future run — putting it inside
     // the run would imply the user has to approve their card each time, which
     // is the opposite of what the product does.
-    page = <AuthorisePage />;
+    page = <AuthorisePage state={state} />;
   } else {
     page = <Intake onStarted={started} navigate={navigate} />;
   }
@@ -296,21 +296,38 @@ export default function App() {
   return <><AutoAdvance state={state} pathname={pathname} navigate={navigate} />{page}</>;
 }
 
-/**
- * The merchants the live Prava mandates cover, and the amounts they were
- * approved at. Listed explicitly rather than derived from a run: a mandate is
- * authorised per merchant ahead of time, which is how Prava's `listed` scope
- * works, and pretending otherwise would misrepresent the model.
- */
-const AUTHORISABLE = [
-  { name: "Air India Express", url: "https://airindiaexpress.com", countryCode: "IN", cap: 9800, what: "IX-1128 BLR-GOI return, direct" },
-  { name: "Anjuna Beach Resort", url: "https://anjunabeachresort.com", countryCode: "IN", cap: 11200, what: "2 nights, pool-view room" },
-  { name: "Gunpowder Assagao", url: "https://gunpowder.co.in", countryCode: "IN", cap: 4200, what: "dinner for two + one lunch" },
-  { name: "Dudhsagar Day Trip", url: "https://goatourism.gov.in", countryCode: "IN", cap: 3600, what: "guided full-day trip, shared jeep" },
-];
-
-function AuthorisePage() {
+function AuthorisePage({ state }) {
   const [done, setDone] = useState(() => new Set());
+
+  // Derived from the run the agents actually did — the vendors they chose and
+  // the amounts they settled on. An earlier version listed four merchants and
+  // prices hardcoded into this file, which both read as a booking page and was
+  // the exact thing this project refuses to do everywhere else: assert
+  // specifics nobody computed.
+  //
+  // This is also the correct moment in the flow. A mandate has to exist before
+  // its agent can mint, and only after the choice step do we know which
+  // merchant each agent is actually buying from.
+  const chosen = Object.values(state.choice?.made ?? {});
+
+  if (chosen.length === 0) {
+    return (
+      <div className="authorise">
+        <div className="eyebrow">Setup · one time per merchant</div>
+        <h2 className="page-title">
+          Nothing to authorise yet.
+        </h2>
+        <p className="page-lede">
+          The agents authorise spending at the merchants they choose, so there is nothing to
+          approve until they have negotiated and you have picked. Start a plan, and this page
+          fills in with the merchants your agents actually settled on.
+        </p>
+        <p className="page-lede">
+          <a href="/">Plan a trip →</a>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="authorise">
@@ -319,30 +336,38 @@ function AuthorisePage() {
         Authorise your agents. <span className="accent">Once.</span>
       </h2>
       <p className="page-lede">
-        Each agent gets its own spending authority, capped and locked to a single merchant.
-        You approve it here with your passkey — after that the agents transact on their own,
-        and no agent can spend past its cap or reach another&apos;s money.
+        Each agent gets spending authority capped at the amount it negotiated and locked to the
+        single merchant it chose. You approve with your passkey — after that the agents transact
+        on their own, and none can spend past its cap or reach another&apos;s money.
       </p>
 
-      {AUTHORISABLE.map((merchant) => (
+      {chosen.map((pick) => (
         <MandateSetup
-          key={merchant.name}
-          merchant={merchant}
-          amountCap={merchant.cap}
-          description={merchant.what}
-          onAuthorized={() => setDone((prev) => new Set(prev).add(merchant.name))}
+          key={pick.agent}
+          merchant={{
+            name: pick.vendor,
+            // Sandbox merchant details may be arbitrary — Prava states this
+            // explicitly, because no real storefront is contacted. Derived
+            // rather than invented per-vendor so nothing here claims to be a
+            // real merchant website.
+            url: `https://example.com/${encodeURIComponent(String(pick.vendor).toLowerCase().replace(/\s+/g, "-"))}`,
+            countryCode: "IN",
+          }}
+          amountCap={pick.price}
+          description={`${pick.agent} — chosen by ${pick.chosenBy === "user" ? "you" : "the agent"}`}
+          onAuthorized={() => setDone((prev) => new Set(prev).add(pick.vendor))}
         />
       ))}
 
       {done.size > 0 && (
         <p className="authorise__done">
-          {done.size} of {AUTHORISABLE.length} authorised. The agents can now spend at{" "}
-          {[...done].join(", ")}.
+          {done.size} of {chosen.length} authorised.
         </p>
       )}
     </div>
   );
 }
+
 
 /**
  * Moves the user forward as the run progresses, and never backward — a late

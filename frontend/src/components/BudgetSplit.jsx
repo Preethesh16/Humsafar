@@ -10,6 +10,12 @@ import { metaFor, money } from "../lib/agents.js";
 export function BudgetSplit({ allocations, summary, round }) {
   const { budget, allocated, unallocated, overBudget } = summary;
   const scale = Math.max(budget, allocated) || 1;
+  // The wire schema always carries all four keys. Once a split exists, zero
+  // means the user disabled that specialist—not an empty ₹0 allocation to
+  // advertise in the UI.
+  const visibleAgents = allocated > 0
+    ? AGENTS.filter((agent) => (allocations[agent] ?? 0) > 0)
+    : AGENTS;
 
   return (
     <section className="panel rail-card">
@@ -30,7 +36,7 @@ export function BudgetSplit({ allocations, summary, round }) {
         role="img"
         aria-label={`Allocated ${money(allocated)} of ${money(budget)}`}
       >
-        {AGENTS.map((agent) => {
+        {visibleAgents.map((agent) => {
           const value = allocations[agent] ?? 0;
           if (value <= 0) return null;
           const meta = metaFor(agent);
@@ -54,7 +60,7 @@ export function BudgetSplit({ allocations, summary, round }) {
       </p>
 
       <div className="legend">
-        {AGENTS.map((agent) => {
+        {visibleAgents.map((agent) => {
           const meta = metaFor(agent);
           const value = allocations[agent] ?? 0;
           return (

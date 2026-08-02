@@ -7,7 +7,7 @@ export const AGENT_META = {
   flights: { label: "Journey", color: "#547ca8", soft: "#e6eef8", key: "flights" },
   stay: { label: "Stay", color: "#765b92", soft: "#eee6f6", key: "stay" },
   food: { label: "Food", color: "#a16b18", soft: "#fff0cc", key: "food" },
-  guide: { label: "Guide", color: "#2e5a42", soft: "#c9f2dd", key: "guide" },
+  guide: { label: "Things to do", color: "#2e5a42", soft: "#c9f2dd", key: "guide" },
   mediator: { label: "Mediator", color: "#17221b", soft: "#e8e0d2", key: "mediator" },
   orchestrator: { label: "Orchestrator", color: "#667169", soft: "#f9f5ec", key: "orchestrator" },
 };

@@ -34,6 +34,8 @@ const trip = {
   rooms: 1,
   travelMode: "train",
   dateFlexibility: "exact",
+  includedCategories: ["flights", "stay", "food"],
+  stayStyle: "home",
 };
 
 test("RunService launches provider-backed agents with structured trip context", () => {
@@ -48,6 +50,9 @@ test("RunService launches provider-backed agents with structured trip context", 
   assert.equal(args[args.indexOf("--destination-code") + 1], "GOI");
   assert.equal(args[args.indexOf("--travelers") + 1], "2");
   assert.equal(args[args.indexOf("--travel-mode") + 1], "train");
+  assert.equal(args[args.indexOf("--categories") + 1], "flights,stay,food");
+  assert.equal(args[args.indexOf("--stay-style") + 1], "home");
+  assert.deepEqual(started.trip.includedCategories, ["flights", "stay", "food"]);
   assert.equal(started.trip.dateFlexibility, "exact");
   assert.deepEqual(options.stdio, ["ignore", "ignore", "ignore"]);
   assert.equal(service.get(started.runId).status, "running");
@@ -61,6 +66,18 @@ test("RunService rejects unknown travel modes", () => {
   assert.throws(
     () => service.start({ ...trip, travelMode: "teleport" }),
     (error) => error.code === "INVALID_TRAVELMODE",
+  );
+});
+
+test("RunService rejects an empty or unknown specialist scope", () => {
+  const { service } = harness();
+  assert.throws(
+    () => service.start({ ...trip, includedCategories: [] }),
+    (error) => error.code === "INVALID_INCLUDEDCATEGORIES",
+  );
+  assert.throws(
+    () => service.start({ ...trip, includedCategories: ["stay", "shopping"] }),
+    (error) => error.code === "INVALID_INCLUDEDCATEGORIES",
   );
 });
 

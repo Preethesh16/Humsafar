@@ -40,10 +40,16 @@ class FixtureDiscovery:
         days: int = 3,
         origin: str = "Bengaluru",
         travel_mode: str = "flight",
+        travelers: int = 1,
+        rooms: int = 1,
+        stay_style: str = "hotel",
     ) -> None:
         self.days = days
         self.origin = origin
         self.travel_mode = travel_mode
+        self.travelers = travelers
+        self.rooms = rooms
+        self.stay_style = stay_style
 
     def discover(self, category: str, goal: str) -> list[Option]:
         # The goal is no longer ignored. It used to be: every request returned
@@ -56,6 +62,9 @@ class FixtureDiscovery:
             self.days,
             self.origin,
             travel_mode=self.travel_mode,
+            travelers=self.travelers,
+            rooms=self.rooms,
+            stay_style=self.stay_style,
         ).get(category, [])
         return [
             Option(

@@ -10,6 +10,8 @@ const answers = {
   dateMode: "flexible",
   flexibleDays: 4,
   travelers: 2,
+  categories: ["flights", "stay", "food"],
+  stayStyle: "home",
   budget: 30000,
   vibes: ["food", "chill"],
   note: "Avoid red-eye travel",
@@ -21,6 +23,9 @@ test("a conversational intake becomes one explicit agent goal", () => {
   assert.match(goal, /compare everything/);
   assert.match(goal, /eat really well/);
   assert.match(goal, /flexible dates/);
+  assert.match(goal, /agents requested: journey, stay, food/);
+  assert.match(goal, /explicitly skip: things to do/);
+  assert.match(goal, /stay preference: entire home \/ villa/);
   assert.match(goal, /Avoid red-eye travel/);
 });
 
@@ -32,7 +37,9 @@ test("exact and flexible trip lengths are deterministic", () => {
 test("the wizard validates only the answer currently being requested", () => {
   assert.match(validateStep(0, { ...answers, destination: "" }), /where/);
   assert.match(validateStep(3, { ...answers, dateMode: "exact", departureDate: "2026-08-10", returnDate: "2026-08-09" }), /after/);
+  assert.match(validateStep(5, { ...answers, categories: [] }), /at least one/);
   assert.equal(validateStep(5, answers), "");
+  assert.equal(validateStep(6, answers), "");
 });
 
 test("room suggestions stay conservative", () => {

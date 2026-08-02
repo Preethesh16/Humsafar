@@ -74,6 +74,14 @@ class EndToEndTest(unittest.TestCase):
         self.assertNotIn("cardToken", blob)
         self.assertNotIn("stub-token", blob)
 
+    def test_user_scope_removes_an_agent_from_negotiation_and_checkout(self):
+        report, emitter = run(categories=("flights", "stay", "food"))
+
+        self.assertEqual({purchase.agent for purchase in report.purchases}, {"flights", "stay", "food"})
+        self.assertNotIn("guide", report.negotiation.allocations_paise)
+        messages = [event for event in emitter.sent if event["type"] == "agent_message"]
+        self.assertFalse(any(event["agent"] == "guide" for event in messages))
+
 
 class OverspendTest(unittest.TestCase):
     def test_an_over_slice_charge_is_refused(self):

@@ -28,7 +28,9 @@ external APIs; it is no longer a handoff checklist.
 | **`POST` / `GET /api/choices`** | **Preethesh** | **Done** — offered-option validation, one-shot settlement, timeout conflicts |
 | Duffel real inventory | Preethesh | Needs `DUFFEL_ACCESS_TOKEN` |
 | Five-page journey | Deepthi + Preethesh | **Done** — native History API, no router dependency |
-| Conversational destination, origin, transport, flexible/exact dates, party, budget and vibe | Preethesh | **Done** — eight prompts, no IATA/coordinate knowledge required |
+| Conversational destination, origin, transport, flexible/exact dates, party, trip scope, budget and vibe | Preethesh | **Done** — nine prompts, no IATA/coordinate knowledge required |
+| User-controlled specialist roster | Preethesh + Jeswin | **Done** — Journey/Stay/Food/Things-to-do can be disabled; omitted agents receive no allocation, choice or checkout |
+| Group-aware accommodation | Preethesh | **Done** — compare hotel rooms, hostels, homestays and whole-home/villa estimates using travellers and rooms |
 | Cross-mode journey preference | Preethesh + Jeswin | **Done** — flight/train/bus/road/compare reaches the Journey Agent and mode-aware fallback |
 | Keyless destination geocoding | Preethesh | **Done** — policy-compliant cached Nominatim fallback; Google is optional |
 | Real merchant order creation | External/provider boundary | **Not done** — needs Duffel booking credentials, traveller details and processor integration |
@@ -46,7 +48,7 @@ mandate.
 ```
 POST /api/runs
 { goal, budget, days, origin, destination, travelMode, dateFlexibility,
-  departureDate?, returnDate?, travelers, rooms,
+  departureDate?, returnDate?, travelers, rooms, includedCategories, stayStyle,
   originCode?, destinationCode?, latitude?, longitude? }
 -> 202 { runId, status, trip, modes }
 
@@ -82,8 +84,10 @@ dependency and its unresolved 2026 advisory chain while preserving back/forward
 navigation and direct URLs.
 
 **`/` — concierge intake.** Humsafar asks destination, origin, travel mode,
-dates/flexibility, party, hard budget and trip vibe one at a time. The user never
-needs IATA codes or coordinates. A final plain-language brief is shown before
+dates/flexibility, party, which trip parts it should handle, accommodation style,
+hard budget and trip vibe one at a time. Journey, Stay, Food and Things-to-do
+are independent toggles; at least one must remain enabled. The user never needs
+IATA codes or coordinates. A final plain-language brief is shown before
 `POST /api/runs`, then the UI navigates to `/deliberate?runId=…`.
 
 **`/deliberate`** — the current dashboard, unchanged. Auto-advance to `/choose`
@@ -112,7 +116,14 @@ also travel as validated structured fields: origin/destination names,
 travel-mode preference, exact or flexible dates, travellers and rooms. Airport
 codes are optional provider details, never user requirements. The local fallback
 uses requested origin, destination, duration and journey mode instead of
-returning Bengaluru–Goa flights for every goal.
+returning Bengaluru–Goa flights for every goal. `includedCategories` is an exact
+user-owned roster override, so intent inference cannot silently restore an agent
+the traveller disabled. Stay fixtures price hotel rooms by room count, hostel
+beds by party size and entire homes/villas by whole-property capacity.
+
+“Entire home / villa” means an **Airbnb-style search category**, not live Airbnb
+inventory. Without an authorized property provider the cards remain labelled
+fixture/search handoff and cannot be described as available or booked.
 
 ---
 

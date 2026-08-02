@@ -23,7 +23,8 @@ injection can drain everything.
 ## The mechanic
 
 1. The **Budget Strategy Agent** interprets the goal and preference weights; the
-   orchestrator spins up four specialists — Flights, Stay, Food, Guide.
+   orchestrator spins up only the specialists the traveller requested — Journey,
+   Stay, Food and/or Things to do.
 2. Specialists use provider discovery when configured and an explicitly labelled,
    destination-aware fixture fallback otherwise, then argue for the share they need.
 3. They **negotiate over the same finite pot**. Round one deliberately overshoots: the
@@ -57,7 +58,9 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Negotiation, mediation, convergence | **Working.** Deterministic, tested, terminates by construction. |
 | Scoped-card abstraction and cap enforcement | **Working**, against a stub credential issuer by default. |
 | Live dashboard over SSE | **Working**, including reconnect replay. |
-| Conversational trip concierge | **Working.** Eight one-question prompts collect ordinary city names, journey mode, flexible/exact dates, party, budget and vibe—no IATA codes or coordinates. |
+| Conversational trip concierge | **Working.** Nine one-question prompts collect ordinary city names, journey mode, flexible/exact dates, party, optional trip parts, accommodation style, budget and vibe—no IATA codes or coordinates. |
+| Flexible specialist scope | **Working.** Travellers can disable Journey, Stay, Food or Things to do; disabled agents do not negotiate, receive a slice, offer choices or execute. |
+| Group accommodation | **Working in concierge mode.** Party/room-aware comparisons include hotel rooms, hostels, homestays and entire-home/villa estimates. Whole-home rows are labelled search handoffs/fixtures, not live Airbnb inventory. |
 | Human option choice | **Working.** Only offered affordable options are accepted, once; selections are bound into approval. |
 | Run-scoped approval protocol | **Working** and verified end to end. |
 | Prava sandbox authentication | **Verified.** `npm run prava:verify` returns authentication OK. |

@@ -288,8 +288,10 @@ class _FakeApproval:
         self.record = record
         self.consumed = 0
         self.choices = None
+        self.allocations = None
 
     def request(self, run_id, allocations_paise, choices=None):
+        self.allocations = allocations_paise
         self.choices = choices
         if not self.record:
             return None
@@ -375,6 +377,22 @@ class ApprovalGateTest(unittest.TestCase):
         self.assertTrue(requested["runId"])
         self.assertEqual(requested["choices"], approval.choices)
         self.assertEqual(set(approval.choices), {"flights", "stay", "food", "guide"})
+
+    def test_a_narrow_roster_projects_zeroes_into_the_locked_approval_contract(self):
+        approval = _FakeApproval("approved")
+        emitter = EventEmitter(enabled=False)
+        report = Orchestrator(emitter, approval=approval).run(
+            RunConfig(
+                goal="Plan my Goa trip without a guide",
+                budget_paise=to_paise(30000),
+                categories=("flights", "stay", "food"),
+            )
+        )
+
+        self.assertEqual(set(approval.allocations), {"flights", "stay", "food", "guide"})
+        self.assertEqual(approval.allocations["guide"], 0)
+        self.assertEqual(set(approval.choices), {"flights", "stay", "food"})
+        self.assertNotIn("guide", {purchase.agent for purchase in report.purchases})
 
 
 class PolledApprovalTransportTest(unittest.TestCase):

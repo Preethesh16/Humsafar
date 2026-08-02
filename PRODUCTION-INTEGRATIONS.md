@@ -56,7 +56,7 @@ levels:
    Humsafar can hold/create/cancel an order and then use a production payment
    credential. Only that provider-confirmed response may be called a booking.
 
-This is still valuable for a lazy traveller: they answer eight simple prompts
+This is still valuable for a lazy traveller: they answer nine simple prompts
 instead of comparing twenty tabs. The system does the thinking, budgeting and
 shortlisting; the final external checkout remains honest until partner access
 exists.
@@ -64,11 +64,14 @@ exists.
 ## Current agent and money architecture
 
 1. Budget Strategy Agent interprets intent and bounded category priorities.
-2. Journey Agent handles flight, train, bus, road, or cross-mode comparison.
-3. Stay Agent handles accommodation.
-4. Food Agent handles meals and restaurant priorities.
-5. Guide Agent handles activities and local transport.
-6. Mediator explains the deterministic settlement.
+2. The traveller selects which of Journey, Stay, Food and Things-to-do should
+   participate; a disabled agent receives no slice and performs no checkout.
+3. Journey Agent handles flight, train, bus, road, or cross-mode comparison.
+4. Stay Agent handles hotels, hostels, homestays and group-aware entire-home or
+   villa search handoffs. There is no live Airbnb claim without partner access.
+5. Food Agent handles meals and restaurant priorities.
+6. Things-to-do Agent handles activities, optional guides and local transport.
+7. Mediator explains the deterministic settlement.
 
 The model never creates rupee amounts. Provider prices/estimates enter as
 integer paise; the deterministic engine allocates the exact shared ceiling.

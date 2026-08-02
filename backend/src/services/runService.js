@@ -43,6 +43,8 @@ export class RunService {
     rooms = 1,
     travelMode = "compare",
     dateFlexibility = "flexible",
+    includedCategories = ["flights", "stay", "food", "guide"],
+    stayStyle = "compare",
     awaitApproval = true,
     awaitChoice = true,
   } = {}) {
@@ -61,6 +63,7 @@ export class RunService {
       days, origin, destination, originCode, destinationCode,
       departureDate, returnDate, travelers, rooms,
       latitude, longitude, travelMode, dateFlexibility,
+      includedCategories, stayStyle,
     });
 
     const runId = `run-${randomUUID().slice(0, 12)}`;
@@ -86,6 +89,8 @@ export class RunService {
     pushArg(args, "--travelers", trip.travelers);
     pushArg(args, "--rooms", trip.rooms);
     pushArg(args, "--travel-mode", trip.travelMode);
+    pushArg(args, "--categories", trip.includedCategories.join(","));
+    pushArg(args, "--stay-style", trip.stayStyle);
     if (awaitApproval) args.push("--await-approval");
     if (awaitChoice) args.push("--await-choice");
     if (this.env.OPENAI_API_KEY) args.push("--llm");
@@ -160,6 +165,8 @@ function validateTrip(input) {
   const longitude = coordinate(input.longitude, "longitude", -180, 180);
   const travelMode = oneOf(input.travelMode, "travelMode", ["compare", "flight", "train", "bus", "drive"], "compare");
   const dateFlexibility = oneOf(input.dateFlexibility, "dateFlexibility", ["exact", "flexible"], "flexible");
+  const includedCategories = categoryList(input.includedCategories);
+  const stayStyle = oneOf(input.stayStyle, "stayStyle", ["compare", "hotel", "hostel", "home", "homestay"], "compare");
   if ((latitude === null) !== (longitude === null)) {
     throw new RunError("latitude and longitude must be supplied together", "INCOMPLETE_COORDINATES");
   }
@@ -180,7 +187,22 @@ function validateTrip(input) {
     longitude,
     travelMode,
     dateFlexibility,
+    includedCategories,
+    stayStyle,
   };
+}
+
+function categoryList(value) {
+  const allowed = ["flights", "stay", "food", "guide"];
+  if (value === undefined || value === null) return allowed;
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new RunError("includedCategories must contain at least one trip category", "INVALID_INCLUDEDCATEGORIES");
+  }
+  const normalized = [...new Set(value.map((item) => String(item).trim().toLowerCase()))];
+  if (normalized.some((item) => !allowed.includes(item))) {
+    throw new RunError(`includedCategories may only contain: ${allowed.join(", ")}`, "INVALID_INCLUDEDCATEGORIES");
+  }
+  return allowed.filter((item) => normalized.includes(item));
 }
 
 function integer(value, field, min, max, fallback) {

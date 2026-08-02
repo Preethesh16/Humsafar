@@ -52,6 +52,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="User's preferred intercity mode; compare lets the journey specialist weigh all modes",
     )
     parser.add_argument(
+        "--categories",
+        default="flights,stay,food,guide",
+        help="Comma-separated specialists to include: flights, stay, food, guide",
+    )
+    parser.add_argument(
+        "--stay-style",
+        choices=("compare", "hotel", "hostel", "home", "homestay"),
+        default="compare",
+        help="Preferred accommodation type for group-aware discovery",
+    )
+    parser.add_argument(
         "--backend",
         default=os.environ.get("HUMSAFAR_BACKEND_URL", "http://127.0.0.1:3000"),
         help="Base URL of the Node backend",
@@ -109,6 +120,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    allowed_categories = ("flights", "stay", "food", "guide")
+    requested_categories = tuple(
+        category.strip().lower() for category in args.categories.split(",") if category.strip()
+    )
+    if not requested_categories or len(set(requested_categories)) != len(requested_categories):
+        raise SystemExit("--categories must contain one or more unique category names")
+    unknown_categories = set(requested_categories) - set(allowed_categories)
+    if unknown_categories:
+        raise SystemExit(f"unknown --categories value: {', '.join(sorted(unknown_categories))}")
+    categories = tuple(category for category in allowed_categories if category in requested_categories)
 
     overspend = args.overspend or ("stay" if args.demo else None)
     fail = args.fail or ("guide" if args.demo else None)
@@ -131,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         "guests": args.travelers,
         "rooms": args.rooms,
         "travelMode": args.travel_mode,
+        "stayStyle": args.stay_style,
         "originName": args.origin,
         "destinationName": args.destination,
         "latitude": args.latitude,
@@ -146,6 +168,9 @@ def main(argv: list[str] | None = None) -> int:
                 days=args.days,
                 origin=args.origin or "Bengaluru",
                 travel_mode=args.travel_mode,
+                travelers=args.travelers,
+                rooms=args.rooms,
+                stay_style=args.stay_style,
             ),
         )
         if not args.local_discovery
@@ -153,6 +178,9 @@ def main(argv: list[str] | None = None) -> int:
             days=args.days,
             origin=args.origin or "Bengaluru",
             travel_mode=args.travel_mode,
+            travelers=args.travelers,
+            rooms=args.rooms,
+            stay_style=args.stay_style,
         )
     )
     trust = TrustClient(base_url=args.backend, token=token) if args.trust else None
@@ -183,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
         f"  approval    : {'HUMAN via approval API' if args.await_approval else 'auto (no human decision)'}\n"
         f"  checkout    : {'LIVE Prava credential + reconciliation' if args.live_checkout else 'SIMULATED (fixture)'}\n"
         f"  reasoning   : {'OpenAI Agents SDK' if narrator.available else 'deterministic templates'}\n"
+        f"  specialists : {', '.join(categories)}\n"
         f"  streaming   : {'off' if args.no_stream else args.backend}\n",
         file=sys.stderr,
     )
@@ -201,6 +230,7 @@ def main(argv: list[str] | None = None) -> int:
         run_id=args.run_id,
         overspend_agent=overspend,
         fail_agent=fail,
+        categories=categories,
     )
 
     print("\n  ── RECEIPT ─────────────────────────────────────────────")

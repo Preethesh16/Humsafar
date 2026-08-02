@@ -22,6 +22,7 @@ the negotiation still has genuine contention wherever the user goes.
 """
 
 import hashlib
+import math
 import re
 
 # Airports for the destinations most likely in an Indian demo. Anything else
@@ -157,6 +158,9 @@ def build_inventory(
     days: int = 3,
     origin_city: str = "Bengaluru",
     travel_mode: str = "flight",
+    travelers: int = 1,
+    rooms: int = 1,
+    stay_style: str = "hotel",
 ) -> dict[str, list[tuple]]:
     """Fixture options shaped for one destination.
 
@@ -172,6 +176,9 @@ def build_inventory(
         and city.lower() == "goa"
         and days == 3
         and origin_city.strip().lower() in {"bengaluru", "bangalore"}
+        and travelers == 1
+        and rooms == 1
+        and stay_style == "hotel"
     ):
         return GOA_INVENTORY
 
@@ -180,6 +187,8 @@ def build_inventory(
     route = f"{origin}-{code}"
     factor = price_factor(city)
     nights = nights_for(days)
+    party = max(1, int(travelers))
+    room_count = max(1, int(rooms))
 
     def rupees(base: float) -> str:
         # Round to the nearest 100 so amounts read like real fares rather than
@@ -187,28 +196,30 @@ def build_inventory(
         return f"{round(base * factor / 100) * 100:.2f}"
 
     stay_unit = 2700 * nights / 2  # the tuned ladder assumed 2 nights
-    food_unit = 1200 * days / 2
+    food_unit = 600 * days * party
 
     inventory = {
         "flights": [
-            ("IndiGo", f"6E-6423 {route} return, 1 checked bag", "IndiGo", rupees(6500), 4.1),
-            ("SpiceJet", f"SG-482 {route} return, late arrival", "SpiceJet", rupees(7400), 3.8),
-            ("Akasa Air", f"QP-1382 {route} return, morning out", "Akasa Air", rupees(8200), 4.3),
-            ("Air India Express", f"IX-1128 {route} return, direct", "Air India Express", rupees(9800), 4.4),
-            ("Air India", f"{route} return, flexible fare", "Air India", rupees(11800), 4.6),
+            ("IndiGo", f"6E-6423 {route} return for {party} traveller{'s' if party != 1 else ''}, 1 checked bag each", "IndiGo", rupees(6500 * party), 4.1),
+            ("SpiceJet", f"SG-482 {route} return for {party} traveller{'s' if party != 1 else ''}, late arrival", "SpiceJet", rupees(7400 * party), 3.8),
+            ("Akasa Air", f"QP-1382 {route} return for {party} traveller{'s' if party != 1 else ''}, morning out", "Akasa Air", rupees(8200 * party), 4.3),
+            ("Air India Express", f"IX-1128 {route} return for {party} traveller{'s' if party != 1 else ''}, direct", "Air India Express", rupees(9800 * party), 4.4),
+            ("Air India", f"{route} return for {party} traveller{'s' if party != 1 else ''}, flexible fare", "Air India", rupees(11800 * party), 4.6),
         ],
-        "stay": [
-            (f"Zostel {city}", f"{nights} nights, private twin", f"Zostel {city}", rupees(stay_unit * 2.0), 4.0),
-            (f"The Hosteller {city}", f"{nights} nights, deluxe double", f"The Hosteller {city}", rupees(stay_unit * 3.3), 4.2),
-            (f"{city} Beach Resort" if code == "GOI" else f"{city} Grand", f"{nights} nights, premium room", f"{city} Grand", rupees(stay_unit * 4.1), 4.5),
-            (f"Casa {city}", f"{nights} nights, suite with breakfast", f"Casa {city}", rupees(stay_unit * 5.4), 4.7),
-            (f"Taj {city}", f"{nights} nights, heritage room", f"Taj {city}", rupees(stay_unit * 5.9), 4.8),
-        ],
+        "stay": accommodation_inventory(
+            city=city,
+            nights=nights,
+            travelers=party,
+            rooms=room_count,
+            style=stay_style,
+            rupees=rupees,
+            stay_unit=stay_unit,
+        ),
         "food": [
-            ("Local shacks", f"{days} days, street and cafe meals for two", "Local Shacks", rupees(food_unit * 2.0), 3.9),
-            (f"{city} Kitchen", "lunch and dinner for two", f"{city} Kitchen", rupees(food_unit * 2.7), 4.1),
-            ("Gunpowder", "dinner for two + one lunch", "Gunpowder", rupees(food_unit * 3.5), 4.5),
-            ("Thalassa", "sunset dinner for two, reserved", "Thalassa", rupees(food_unit * 4.3), 4.4),
+            ("Local shacks", f"{days} days, street and cafe meal budget for {party} travellers", "Local Shacks", rupees(food_unit * 2.0), 3.9),
+            (f"{city} Kitchen", f"meal budget for {party} travellers", f"{city} Kitchen", rupees(food_unit * 2.7), 4.1),
+            ("Gunpowder", f"restaurant meal budget for {party} travellers", "Gunpowder", rupees(food_unit * 3.5), 4.5),
+            ("Thalassa", f"sunset meal estimate for {party} travellers", "Thalassa", rupees(food_unit * 4.3), 4.4),
         ],
         "guide": [
             (f"{city} Bikes", f"{days}-day scooter rental + fuel", f"{city} Bikes", rupees(1800), 4.0),
@@ -224,8 +235,64 @@ def build_inventory(
         route=route,
         rupees=rupees,
         flight_rows=inventory["flights"],
+        travelers=party,
     )
     return inventory
+
+
+def accommodation_inventory(
+    city: str,
+    nights: int,
+    travelers: int,
+    rooms: int,
+    style: str,
+    rupees,
+    stay_unit: float,
+) -> list[tuple]:
+    """Group-aware, honestly-labelled accommodation estimates.
+
+    The entire-home rows are search handoffs, not claims of Airbnb inventory.
+    Their prices cover the whole property; hotel prices scale with the room
+    count and hostel prices scale with travellers. This makes comparing a villa
+    with several hotel rooms meaningful for a group instead of cosmetic.
+    """
+    style = style if style in {"compare", "hotel", "hostel", "home", "homestay"} else "compare"
+    guest_text = f"{travelers} guest{'s' if travelers != 1 else ''}"
+    room_text = f"{rooms} room{'s' if rooms != 1 else ''}"
+    home_units = max(1, math.ceil(travelers / 5))
+
+    hotels = [
+        (f"{city} Budget Hotel", f"{nights} nights, {room_text} for {guest_text}", f"{city} Budget Hotel", rupees(stay_unit * 2.0 * rooms), 4.0),
+        (f"{city} Grand", f"{nights} nights, {room_text} for {guest_text}, breakfast included", f"{city} Grand", rupees(stay_unit * 3.5 * rooms), 4.4),
+        (f"Taj {city}", f"{nights} nights, {room_text} for {guest_text}, full-service hotel", f"Taj {city}", rupees(stay_unit * 5.5 * rooms), 4.8),
+    ]
+    hostels = [
+        (f"Zostel {city}", f"{nights} nights, dorm beds for {guest_text}", f"Zostel {city}", rupees(550 * nights * travelers), 4.0),
+        (f"The Hosteller {city}", f"{nights} nights, hostel private rooms for {guest_text}", f"The Hosteller {city}", rupees(900 * nights * travelers), 4.2),
+        (f"{city} Social Hostel", f"{nights} nights, premium dorm beds for {guest_text}", f"{city} Social Hostel", rupees(1200 * nights * travelers), 4.4),
+    ]
+    homes = [
+        (f"{city} Entire-home search", f"{nights} nights, whole apartment estimate for {guest_text}", f"{city} Entire-home search", rupees(3200 * nights * home_units), 4.2),
+        (f"{city} Villa search", f"{nights} nights, whole villa estimate for {guest_text}", f"{city} Villa search", rupees(4700 * nights * home_units), 4.5),
+        (f"{city} Pool Villa search", f"{nights} nights, private whole-property estimate for {guest_text}", f"{city} Pool Villa search", rupees(6800 * nights * home_units), 4.7),
+    ]
+    homestays = [
+        (f"{city} Family Homestay", f"{nights} nights, {room_text} for {guest_text}", f"{city} Family Homestay", rupees(stay_unit * 1.8 * rooms), 4.1),
+        (f"{city} Heritage Homestay", f"{nights} nights, {room_text} with breakfast", f"{city} Heritage Homestay", rupees(stay_unit * 2.7 * rooms), 4.5),
+        (f"{city} Farmstay", f"{nights} nights, private stay for {guest_text}", f"{city} Farmstay", rupees(stay_unit * 3.4 * rooms), 4.6),
+    ]
+
+    if style == "hotel":
+        return hotels
+    if style == "hostel":
+        return hostels
+    if style == "home":
+        return homes
+    if style == "homestay":
+        return homestays
+    if travelers >= 3:
+        return [hotels[0], hotels[1], homes[0], homes[1], homes[2]]
+    return [hostels[0], hotels[0], homestays[0], hotels[1], homes[0]]
 
 
 def journey_inventory(
@@ -235,6 +302,7 @@ def journey_inventory(
     route: str,
     rupees,
     flight_rows: list[tuple],
+    travelers: int = 1,
 ) -> list[tuple]:
     """Synthetic, disclosed transport choices matching the user's mode.
 
@@ -244,26 +312,30 @@ def journey_inventory(
     """
     mode = mode if mode in {"compare", "flight", "train", "bus", "drive"} else "compare"
     route_words = f"{origin_city.strip().title()} to {destination}"
+    party = max(1, int(travelers))
+    party_text = f"for {party} traveller{'s' if party != 1 else ''}"
+    car_count = max(1, math.ceil(party / 4))
+    bike_count = max(1, math.ceil(party / 2))
     if mode == "flight":
         return flight_rows
 
     trains = [
-        ("Rail search handoff", f"{route_words} return, sleeper estimate", "Rail search handoff", rupees(1800), 3.7),
-        ("Rail search handoff", f"{route_words} return, AC 3-tier estimate", "Rail search handoff", rupees(2800), 4.1),
-        ("Rail search handoff", f"{route_words} return, AC 2-tier estimate", "Rail search handoff", rupees(4300), 4.3),
-        ("Rail search handoff", f"{route_words} return, first AC estimate", "Rail search handoff", rupees(6500), 4.5),
+        ("Rail search handoff", f"{route_words} return, sleeper estimate {party_text}", "Rail search handoff", rupees(1800 * party), 3.7),
+        ("Rail search handoff", f"{route_words} return, AC 3-tier estimate {party_text}", "Rail search handoff", rupees(2800 * party), 4.1),
+        ("Rail search handoff", f"{route_words} return, AC 2-tier estimate {party_text}", "Rail search handoff", rupees(4300 * party), 4.3),
+        ("Rail search handoff", f"{route_words} return, first AC estimate {party_text}", "Rail search handoff", rupees(6500 * party), 4.5),
     ]
     buses = [
-        ("Intercity bus handoff", f"{route_words} return, non-AC seater estimate", "Intercity bus handoff", rupees(1600), 3.5),
-        ("Intercity bus handoff", f"{route_words} return, AC sleeper estimate", "Intercity bus handoff", rupees(2600), 4.0),
-        ("Intercity bus handoff", f"{route_words} return, premium sleeper estimate", "Intercity bus handoff", rupees(3800), 4.3),
-        ("Intercity bus handoff", f"{route_words} return, flexible cancellation estimate", "Intercity bus handoff", rupees(4700), 4.4),
+        ("Intercity bus handoff", f"{route_words} return, non-AC seater estimate {party_text}", "Intercity bus handoff", rupees(1600 * party), 3.5),
+        ("Intercity bus handoff", f"{route_words} return, AC sleeper estimate {party_text}", "Intercity bus handoff", rupees(2600 * party), 4.0),
+        ("Intercity bus handoff", f"{route_words} return, premium sleeper estimate {party_text}", "Intercity bus handoff", rupees(3800 * party), 4.3),
+        ("Intercity bus handoff", f"{route_words} return, flexible cancellation estimate {party_text}", "Intercity bus handoff", rupees(4700 * party), 4.4),
     ]
     road = [
-        ("Own vehicle estimate", f"{route_words} return, fuel and toll estimate", "Road trip handoff", rupees(3200), 4.0),
-        ("Bike rental estimate", f"{route_words} return, rental, fuel and tolls", "Road trip handoff", rupees(4200), 4.1),
-        ("Self-drive rental estimate", f"{route_words} return, compact car, fuel and tolls", "Road trip handoff", rupees(6800), 4.3),
-        ("Cab handoff", f"{route_words} return, private cab estimate", "Road trip handoff", rupees(9800), 4.4),
+        ("Own vehicle estimate", f"{route_words} return, fuel and toll estimate for {car_count} vehicle{'s' if car_count != 1 else ''}", "Road trip handoff", rupees(3200 * car_count), 4.0),
+        ("Bike rental estimate", f"{route_words} return, {bike_count} bike{'s' if bike_count != 1 else ''}, fuel and tolls", "Road trip handoff", rupees(4200 * bike_count), 4.1),
+        ("Self-drive rental estimate", f"{route_words} return, {car_count} car{'s' if car_count != 1 else ''}, fuel and tolls", "Road trip handoff", rupees(6800 * car_count), 4.3),
+        ("Cab handoff", f"{route_words} return, {car_count} private cab{'s' if car_count != 1 else ''} estimate", "Road trip handoff", rupees(9800 * car_count), 4.4),
     ]
     if mode == "train":
         return trains

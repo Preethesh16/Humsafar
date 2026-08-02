@@ -4,8 +4,10 @@ import { suggestPlaces } from "../lib/places.js";
 
 import {
   buildTripGoal,
+  STAY_STYLES,
   suggestedRooms,
   TRAVEL_MODES,
+  TRIP_PARTS,
   TRIP_VIBES,
   tripDays,
   validateStep,
@@ -17,6 +19,7 @@ const QUESTIONS = [
   { title: "How do you feel about getting there?", helper: "If you do not care, let the Journey Agent compare the trade-offs." },
   { title: "When can you go?", helper: "Exact dates are useful, but flexible is completely fine." },
   { title: "Who is coming?", helper: "This changes transport, rooms, meals and the total plan." },
+  { title: "What should Humsafar handle?", helper: "Switch off anything you have already sorted. You stay in control of the trip scope." },
   { title: "What is the hard spending limit?", helper: "One shared pot. The agents can trade slices, never cross it." },
   { title: "What would make this trip feel right?", helper: "Pick as many as you care about. You can also say it in your own words." },
   { title: "Did I understand you correctly?", helper: "Nothing is booked yet. This sends the brief to the agent team." },
@@ -38,6 +41,8 @@ export default function Intake({ onStarted, navigate }) {
     returnDate: futureDate(10),
     travelers: 1,
     rooms: 1,
+    categories: TRIP_PARTS.map((part) => part.id),
+    stayStyle: "compare",
     budget: 30000,
     vibes: [],
     note: "",
@@ -73,6 +78,16 @@ export default function Intake({ onStarted, navigate }) {
     }));
   }
 
+  function togglePart(id) {
+    setAnswers((current) => ({
+      ...current,
+      categories: current.categories.includes(id)
+        ? current.categories.filter((item) => item !== id)
+        : [...current.categories, id],
+    }));
+    setError("");
+  }
+
   async function submit(event) {
     event.preventDefault();
     if (!isReview) {
@@ -101,6 +116,8 @@ export default function Intake({ onStarted, navigate }) {
           rooms: Number(answers.rooms),
           travelMode: answers.travelMode,
           dateFlexibility: answers.dateMode,
+          includedCategories: answers.categories,
+          stayStyle: answers.stayStyle,
         }),
       });
       const payload = await response.json();
@@ -222,17 +239,62 @@ export default function Intake({ onStarted, navigate }) {
 
           {step === 5 && (
             <>
+              <div className="scope-grid" aria-label="Parts of the trip Humsafar should handle">
+                {TRIP_PARTS.map((part) => (
+                  <button
+                    type="button"
+                    className={`scope-option ${answers.categories.includes(part.id) ? "selected" : ""}`}
+                    key={part.id}
+                    onClick={() => togglePart(part.id)}
+                    aria-pressed={answers.categories.includes(part.id)}
+                  >
+                    <span className="scope-check" aria-hidden="true">{answers.categories.includes(part.id) ? "✓" : "–"}</span>
+                    <strong>{part.label}</strong>
+                    <span>{part.note}</span>
+                  </button>
+                ))}
+              </div>
+
+              {answers.categories.includes("stay") && (
+                <div className="stay-preference">
+                  <div>
+                    <strong>What kind of stay?</strong>
+                    <span>{Number(answers.travelers) >= 3 ? "For your group, comparing an entire home or villa can beat multiple hotel rooms." : "Choose one, or compare all property types."}</span>
+                  </div>
+                  <div className="answer-options stay-options">
+                    {STAY_STYLES.map((style) => (
+                      <button
+                        className={`answer-option ${answers.stayStyle === style.id ? "selected" : ""}`}
+                        type="button"
+                        key={style.id}
+                        onClick={() => update("stayStyle", style.id)}
+                        aria-pressed={answers.stayStyle === style.id}
+                      >
+                        <strong>{style.label}</strong>
+                        <span>{style.note}</span>
+                        {style.id === "home" && Number(answers.travelers) >= 3 && <em>Good for this group</em>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="answer-note">A disabled specialist gets ₹0 and will not appear in negotiation or checkout.</p>
+            </>
+          )}
+
+          {step === 6 && (
+            <>
               <div className="quick-row budget-options" aria-label="Budget suggestions">
                 {BUDGETS.map((amount) => (
                   <button type="button" className={Number(answers.budget) === amount ? "selected" : ""} key={amount} onClick={() => update("budget", amount)}>{money(amount)}</button>
                 ))}
               </div>
               <label className="money-answer"><span>₹</span><input type="number" min="5000" step="500" value={answers.budget} onChange={(event) => update("budget", event.target.value)} aria-label="Custom total budget in rupees" /></label>
-              <p className="answer-note">Includes the journey, stay, food and things to do for the whole group.</p>
+              <p className="answer-note">This ceiling covers only the parts you selected, for the whole group.</p>
             </>
           )}
 
-          {step === 6 && (
+          {step === 7 && (
             <>
               <div className="vibe-grid">
                 {TRIP_VIBES.map((vibe) => (
@@ -302,12 +364,16 @@ function PlaceSuggestions({ id, query }) {
 }
 
 function TripReview({ answers, days, goal, onEdit }) {
+  const handled = TRIP_PARTS.filter((part) => answers.categories.includes(part.id)).map((part) => part.label).join(", ");
+  const stay = STAY_STYLES.find((item) => item.id === answers.stayStyle)?.label;
   const rows = [
     ["Trip", `${answers.origin} → ${answers.destination}`, 0],
     ["Travel", TRAVEL_MODES.find((item) => item.id === answers.travelMode)?.label, 2],
     ["When", answers.dateMode === "exact" ? `${answers.departureDate} → ${answers.returnDate}` : `Flexible · about ${days} days`, 3],
     ["People", `${answers.travelers} traveller${Number(answers.travelers) === 1 ? "" : "s"} · ${answers.rooms} room${answers.rooms === 1 ? "" : "s"}`, 4],
-    ["Ceiling", money(Number(answers.budget)), 5],
+    ["Handling", handled, 5],
+    ...(answers.categories.includes("stay") ? [["Stay", stay, 5]] : []),
+    ["Ceiling", money(Number(answers.budget)), 6],
   ];
   return (
     <>

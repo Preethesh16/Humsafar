@@ -20,6 +20,21 @@ export const TRIP_VIBES = [
   { id: "workation", label: "Workation" },
 ];
 
+export const TRIP_PARTS = [
+  { id: "flights", label: "Journey", note: "Compare flight, train, bus and road options." },
+  { id: "stay", label: "Stay", note: "Hotels, hostels, homestays and entire homes." },
+  { id: "food", label: "Food", note: "Meal budget and useful places to eat." },
+  { id: "guide", label: "Things to do", note: "Activities, local transport and optional guides." },
+];
+
+export const STAY_STYLES = [
+  { id: "compare", label: "Compare all", note: "Let the Stay Agent compare property types." },
+  { id: "hotel", label: "Hotel", note: "Private rooms with hotel services." },
+  { id: "hostel", label: "Hostel", note: "Dorms or simple private rooms." },
+  { id: "home", label: "Entire home / villa", note: "Airbnb-style whole-property search, useful for groups." },
+  { id: "homestay", label: "Homestay", note: "A smaller local stay with a host." },
+];
+
 export function tripDays({ dateMode, departureDate, returnDate, flexibleDays }) {
   if (dateMode !== "exact") return clampInteger(flexibleDays, 1, 30, 3);
   const difference = Date.parse(returnDate) - Date.parse(departureDate);
@@ -38,11 +53,19 @@ export function buildTripGoal(answers) {
   const vibes = answers.vibes?.length
     ? answers.vibes.map((id) => TRIP_VIBES.find((item) => item.id === id)?.label.toLowerCase()).filter(Boolean)
     : [];
+  const selectedParts = answers.categories ?? TRIP_PARTS.map((part) => part.id);
+  const skippedParts = TRIP_PARTS.filter((part) => !selectedParts.includes(part.id));
+  const selectedLabels = TRIP_PARTS.filter((part) => selectedParts.includes(part.id)).map((part) => part.label.toLowerCase());
+  const stayStyle = STAY_STYLES.find((item) => item.id === answers.stayStyle)?.label.toLowerCase()
+    ?? "compare all";
 
   return [
     `Plan a ${days}-day trip from ${answers.origin.trim()} to ${answers.destination.trim()} for ${people}`,
     timing,
     `travel preference: ${mode}`,
+    `agents requested: ${selectedLabels.join(", ")}`,
+    skippedParts.length ? `explicitly skip: ${skippedParts.map((part) => part.label.toLowerCase()).join(", ")}` : null,
+    selectedParts.includes("stay") ? `stay preference: ${stayStyle}` : null,
     vibes.length ? `priorities: ${vibes.join(", ")}` : "keep the plan balanced",
     answers.note?.trim() || null,
   ].filter(Boolean).join("; ");
@@ -63,7 +86,10 @@ export function validateStep(step, answers) {
   if (step === 4 && (!Number.isInteger(Number(answers.travelers)) || Number(answers.travelers) < 1)) {
     return "At least one traveller is required.";
   }
-  if (step === 5 && (!Number.isFinite(Number(answers.budget)) || Number(answers.budget) < 5000)) {
+  if (step === 5 && (!Array.isArray(answers.categories) || answers.categories.length === 0)) {
+    return "Choose at least one thing for Humsafar to handle.";
+  }
+  if (step === 6 && (!Number.isFinite(Number(answers.budget)) || Number(answers.budget) < 5000)) {
     return "Use a trip budget of at least ₹5,000.";
   }
   return "";

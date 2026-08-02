@@ -29,7 +29,7 @@ from .intent import GoalIntent, parse_intent
 from .events import EventEmitter
 from .guardian import Guardian
 from .mediator import Mediator
-from .models import NegotiationResult, Option, Purchase, Specialist
+from .models import WIRE_CATEGORIES, NegotiationResult, Option, Purchase, Specialist
 from .money import format_inr, to_paise, to_rupees
 from .negotiation import NegotiationEngine, build_specialists
 
@@ -42,6 +42,10 @@ OVERSPEND_MULTIPLIER = 1.6
 class RunConfig:
     goal: str
     budget_paise: int
+    # When supplied by the conversational intake this is the user's exact
+    # scope. It overrides roster inference, so "no guide" cannot be undone by
+    # an LLM or the travel-goal safety restoration in intent.py.
+    categories: Optional[tuple[str, ...]] = None
     overspend_agent: Optional[str] = None
     fail_agent: Optional[str] = None
     auto_approve: bool = True
@@ -155,6 +159,13 @@ class Orchestrator:
         # where a model earns its place. Everything it returns is validated, and
         # a failure falls back to the keyword parser rather than blocking.
         self.intent = parse_intent(config.goal, getattr(self.narrator, "runtime", None))
+        if config.categories is not None:
+            self.intent = GoalIntent(
+                categories=list(config.categories),
+                weights={category: self.intent.weight_for(category) for category in config.categories},
+                summary=self.intent.summary,
+                source=f"{self.intent.source}+user-scope",
+            )
         categories = self.intent.categories
 
         emphasis = ", ".join(
@@ -251,19 +262,26 @@ class Orchestrator:
         self, allocations: dict[str, int], choices: dict[str, object], config: RunConfig
     ) -> bool:
         """Run the §7 approval protocol. Nothing is minted without it."""
+        # Negotiation contains only active specialists, while the locked
+        # approval contract always carries all four keys. Preserve the user's
+        # narrow roster and project omitted categories as explicit zeroes only
+        # at this wire boundary.
+        approval_allocations = {
+            category: allocations.get(category, 0) for category in WIRE_CATEGORIES
+        }
         choice_ids = {
             category: option_id(category, picked.option)
             for category, picked in choices.items()
         }
         request_parameters = signature(self.approval.request).parameters
         if len(request_parameters) >= 3:
-            record = self.approval.request(config.run_id, allocations, choice_ids)
+            record = self.approval.request(config.run_id, approval_allocations, choice_ids)
         else:
             # Compatibility for small offline/test approval adapters written
             # against the original two-argument protocol. The production
             # PolledApproval always takes the choices and binds them in the
             # backend digest.
-            record = self.approval.request(config.run_id, allocations)
+            record = self.approval.request(config.run_id, approval_allocations)
         if record is None:
             self._say(
                 "orchestrator",
@@ -273,7 +291,7 @@ class Orchestrator:
             return False
 
         self.emitter.approval_requested(
-            allocations,
+            approval_allocations,
             choices=choice_ids,
             run_id=record.run_id,
             approval_request_id=record.approval_request_id,
@@ -714,6 +732,7 @@ def run_goal(
     config = RunConfig(
         goal=goal,
         budget_paise=to_paise(budget_rupees),
+        categories=kwargs.pop("categories", None),
         overspend_agent=kwargs.pop("overspend_agent", None),
         fail_agent=kwargs.pop("fail_agent", None),
         auto_approve=kwargs.pop("auto_approve", True),

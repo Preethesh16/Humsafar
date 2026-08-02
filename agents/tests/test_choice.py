@@ -168,6 +168,44 @@ class DestinationAwarenessTest(unittest.TestCase):
         self.assertTrue(any("Air" in option.vendor or option.vendor == "IndiGo" for option in compare))
         self.assertTrue(all(option.source == "fixture" for option in compare))
 
+    def test_groups_can_compare_whole_homes_with_multiple_hotel_rooms(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        stays = FixtureDiscovery(
+            travelers=6,
+            rooms=3,
+            stay_style="compare",
+        ).discover("stay", "trip to Goa")
+
+        self.assertTrue(any("Entire-home" in option.vendor or "Villa" in option.vendor for option in stays))
+        self.assertTrue(any("3 rooms" in option.description for option in stays))
+        self.assertTrue(all("6 guests" in option.description for option in stays))
+
+    def test_group_transport_and_food_are_not_priced_as_solo_options(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        solo = FixtureDiscovery(travel_mode="train", travelers=1).discover("flights", "trip to Jaipur")
+        group_provider = FixtureDiscovery(travel_mode="train", travelers=6)
+        group_journey = group_provider.discover("flights", "trip to Jaipur")
+        group_food = group_provider.discover("food", "trip to Jaipur")
+
+        self.assertGreater(group_journey[0].price_paise, solo[0].price_paise * 5.5)
+        self.assertIn("6 travellers", group_journey[0].description)
+        self.assertTrue(all("6 travellers" in option.description for option in group_food))
+
+    def test_an_entire_home_preference_does_not_claim_live_airbnb_inventory(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        stays = FixtureDiscovery(
+            travelers=5,
+            rooms=3,
+            stay_style="home",
+        ).discover("stay", "trip to Jaipur")
+
+        self.assertTrue(all("whole" in option.description for option in stays))
+        self.assertTrue(all(option.source == "fixture" for option in stays))
+        self.assertNotIn("Airbnb", " ".join(option.vendor for option in stays))
+
 
 class ChoiceDrivesThePurchaseTest(unittest.TestCase):
     def _run(self, choice):

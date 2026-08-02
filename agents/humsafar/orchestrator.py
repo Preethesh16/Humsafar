@@ -46,6 +46,10 @@ class RunConfig:
     # scope. It overrides roster inference, so "no guide" cannot be undone by
     # an LLM or the travel-goal safety restoration in intent.py.
     categories: Optional[tuple[str, ...]] = None
+    # Categories that negotiate a reserve but must never mint or checkout.
+    # Browser trips use this for food and activities: the itinerary suggests
+    # mapped possibilities and costs while the reserve remains unspent.
+    advisory_categories: tuple[str, ...] = ()
     overspend_agent: Optional[str] = None
     fail_agent: Optional[str] = None
     auto_approve: bool = True
@@ -219,6 +223,13 @@ class Orchestrator:
         """Settle every affordable option before the plan is approved."""
         chosen = {}
         for specialist in specialists:
+            if specialist.category in config.advisory_categories:
+                self._say(
+                    specialist.category,
+                    f"Reserved {format_inr(allocations[specialist.category])} for flexible, "
+                    "unbooked suggestions. No provider choice will enter approval.",
+                )
+                continue
             slice_paise = allocations[specialist.category]
             picked = self.choice.choose(
                 specialist.category, specialist.options, slice_paise
@@ -346,6 +357,10 @@ class Orchestrator:
         config: RunConfig,
         report: RunReport,
     ) -> None:
+        if specialist.category in config.advisory_categories:
+            self._record_advisory(specialist, slice_paise, report)
+            return
+
         option = picked.option if picked is not None else specialist.cheapest_within(slice_paise)
         if option is None:
             self._say(
@@ -474,6 +489,33 @@ class Orchestrator:
             f"{action} {option.vendor} at "
             f"{format_inr(option.price_paise)} on a card capped at {format_inr(slice_paise)}.",
         )
+
+    def _record_advisory(
+        self, specialist: Specialist, slice_paise: int, report: RunReport
+    ) -> None:
+        """Carry an approved reserve to the receipt without claiming spend."""
+        category_label = "food" if specialist.category == "food" else "activity"
+        detail = (
+            f"Advisory reserve of {format_inr(slice_paise)} for flexible {category_label} suggestions. "
+            "No card was minted, no reservation or order was created, and no money moved."
+        )
+        report.purchases.append(
+            Purchase(
+                agent=specialist.category,
+                merchant="none",
+                description=f"Flexible {category_label} reserve — suggestions only",
+                amount_paise=0,
+                status="success",
+                card_id="",
+                source="fixture",
+                detail=detail,
+                outcome="advisory",
+            )
+        )
+        self.emitter.purchase_result(
+            specialist.category, "success", 0, "none", detail, "fixture", "advisory"
+        )
+        self._say(specialist.category, detail)
 
     def _apply_trust(
         self, specialist: Specialist, option: Option, slice_paise: int
@@ -733,6 +775,7 @@ def run_goal(
         goal=goal,
         budget_paise=to_paise(budget_rupees),
         categories=kwargs.pop("categories", None),
+        advisory_categories=kwargs.pop("advisory_categories", ()),
         overspend_agent=kwargs.pop("overspend_agent", None),
         fail_agent=kwargs.pop("fail_agent", None),
         auto_approve=kwargs.pop("auto_approve", True),

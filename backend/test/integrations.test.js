@@ -40,6 +40,50 @@ test("Duffel flight search sends the official v2 request shape", async () => {
   assert.deepEqual(JSON.parse(request.options.body).data.passengers, [{ type: "adult" }, { type: "adult" }]);
 });
 
+test("Duffel resolves a typed city through its official place suggestions endpoint", async () => {
+  let request;
+  const client = new DuffelClient({
+    token: "duffel-token",
+    fetchImpl: async (url, options) => {
+      request = { url: new URL(url), options };
+      return new Response(JSON.stringify({ data: [
+        { type: "airport", name: "Dabolim", city_name: "Goa", iata_code: "GOI" },
+      ] }), { status: 200 });
+    },
+  });
+  assert.deepEqual(await client.suggestPlace("Goa"), { code: "GOI", name: "Dabolim", type: "airport" });
+  assert.equal(request.url.pathname, "/places/suggestions");
+  assert.equal(request.url.searchParams.get("query"), "Goa");
+  assert.equal(request.options.headers["Duffel-Version"], "v2");
+  assert.equal(request.options.body, undefined);
+});
+
+test("flight discovery resolves conversational city names before live search", async () => {
+  const resolved = [];
+  let searchInput;
+  const service = new DiscoveryService({
+    duffelClient: {
+      async suggestPlace(name) {
+        resolved.push(name);
+        return { code: name === "Mangaluru" ? "IXE" : "GOI" };
+      },
+      async searchFlights(input) {
+        searchInput = input;
+        return { offers: [] };
+      },
+    },
+    logger,
+  });
+  const result = await service.search("flights", {
+    originName: "Mangaluru", destinationName: "Goa",
+    departureDate: "2026-08-10", returnDate: "2026-08-13",
+  });
+  assert.equal(result.source, "live");
+  assert.deepEqual(resolved, ["Mangaluru", "Goa"]);
+  assert.equal(searchInput.origin, "IXE");
+  assert.equal(searchInput.destination, "GOI");
+});
+
 test("DiscoveryService degrades missing Duffel credentials to labeled fixtures", async () => {
   const service = new DiscoveryService({ duffelClient: new DuffelClient({ token: "" }), logger });
   const result = await service.search("flights", { origin: "BLR", destination: "GOI", departureDate: "2026-08-02" });
@@ -86,6 +130,36 @@ test("stay discovery geocodes the destination before calling Duffel", async () =
   assert.equal(result.source, "live");
   assert.equal(duffelInput.latitude, 15.2993);
   assert.equal(duffelInput.longitude, 74.124);
+});
+
+test("stay discovery accepts the conversational destination field", async () => {
+  let geocoded;
+  const service = new DiscoveryService({
+    googleMapsClient: { async geocode(value) { geocoded = value; return { latitude: 15, longitude: 74 }; } },
+    duffelClient: { async searchStays() { return { results: [] }; } },
+    logger,
+  });
+  const result = await service.search("stay", { destinationName: "Goa" });
+  assert.equal(result.source, "live");
+  assert.equal(geocoded, "Goa");
+});
+
+test("Duffel inventory in a non-INR billing currency fails closed", async () => {
+  const warnings = [];
+  const service = new DiscoveryService({
+    duffelClient: {
+      async suggestPlace(query) { return { code: query === "Bengaluru" ? "BLR" : "GOI" }; },
+      async searchFlights() {
+        return { offers: [{ id: "off_1", total_amount: "100.00", total_currency: "GBP", owner: { name: "Test Air" }, slices: [] }] };
+      },
+    },
+    logger: { warn(event) { warnings.push(event); } },
+  });
+  const result = await service.search("flights", {
+    originName: "Bengaluru", destinationName: "Goa", travelMode: "flight",
+  });
+  assert.equal(result.source, "fixture");
+  assert.ok(warnings.some((event) => event.code === "DUFFEL_CURRENCY_UNSUPPORTED"));
 });
 
 test("Nominatim provides cached, identified, keyless geocoding", async () => {

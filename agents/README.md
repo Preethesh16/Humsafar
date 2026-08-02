@@ -36,6 +36,7 @@ python3 -m humsafar --goal "Plan my Goa trip" --budget 30000 --demo
 | `--days`, `--origin`, `--destination`, airport/date/traveller flags | Structured context for destination-aware fallback and provider search |
 | `--trust` | Run the pre-purchase trust check via `POST /api/trust/check` |
 | `--llm` | Use OpenAI for agent dialogue (needs `OPENAI_API_KEY`) |
+| `--advisory-categories food,guide` | Reserve budget and emit an advisory receipt line, but never mint a card or call checkout for those categories |
 | `--backend URL` | Backend base URL (default `http://127.0.0.1:3000`) |
 
 By default, the run uses backend discovery and prints what each category *actually* resolved
@@ -131,6 +132,6 @@ disqualifier risk, so these are enforced in code rather than left to discipline:
 |---|---|---|
 | Prava call under `mintScopedCard` | Live route exists, fails closed without `PRAVA_SECRET_KEY` | Preethesh |
 | Duffel flights/stay inventory | Live test search when token/context exist; destination-aware fixture fallback otherwise | Preethesh |
-| Guide/food inventory | Fixture, Viator/OpenTable-shaped | Preethesh |
+| Guide/food planning | Real mapped Geoapify possibilities in the browser itinerary; agent discovery estimates remain disclosed and advisory | Preethesh |
 | Merchant checkout | `SimulatedCheckout` by default; no merchant order is claimed | Preethesh |
 | LLM dialogue | Wired, off by default (no key in the workspace) | Jeswin |

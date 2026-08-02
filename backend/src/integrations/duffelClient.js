@@ -16,6 +16,25 @@ export class DuffelClient {
     });
   }
 
+  async suggestPlace(query) {
+    if (typeof query !== "string" || query.trim() === "") {
+      const error = new Error("A city or airport name is required");
+      error.code = "DUFFEL_PLACE_QUERY_REQUIRED";
+      throw error;
+    }
+    const payload = await this.get("/places/suggestions", { query: query.trim() });
+    const wanted = query.trim().toLowerCase();
+    const ranked = [...(Array.isArray(payload) ? payload : [])]
+      .sort((left, right) => placeScore(right, wanted) - placeScore(left, wanted));
+    const place = ranked.find((row) => /^[A-Z]{3}$/.test(row?.iata_code ?? ""));
+    if (!place) {
+      const error = new Error(`Duffel found no flight origin/destination for ${query}`);
+      error.code = "DUFFEL_PLACE_NOT_FOUND";
+      throw error;
+    }
+    return { code: place.iata_code, name: place.name, type: place.type };
+  }
+
   async searchStays({ latitude, longitude, checkInDate, checkOutDate, guests = 1, rooms = 1 }) {
     return this.request("/stays/search", {
       check_in_date: checkInDate,
@@ -51,4 +70,34 @@ export class DuffelClient {
     }
     return payload.data;
   }
+
+  async get(path, params = {}) {
+    if (!this.token) {
+      const error = new Error("DUFFEL_ACCESS_TOKEN is not configured");
+      error.code = "DUFFEL_NOT_CONFIGURED";
+      throw error;
+    }
+    const url = new URL(`https://api.duffel.com${path}`);
+    Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, String(value)));
+    const response = await this.fetchImpl(url, {
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        Accept: "application/json",
+        "Duffel-Version": "v2",
+      },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      const error = new Error(payload?.errors?.[0]?.message ?? `Duffel failed with ${response.status}`);
+      error.code = payload?.errors?.[0]?.code ?? "DUFFEL_REQUEST_FAILED";
+      throw error;
+    }
+    return payload.data;
+  }
+}
+
+function placeScore(place, wanted) {
+  const values = [place?.name, place?.city_name].map((value) => String(value ?? "").toLowerCase());
+  return (values.includes(wanted) ? 10 : 0) + (place?.type === "city" ? 3 : 0);
 }

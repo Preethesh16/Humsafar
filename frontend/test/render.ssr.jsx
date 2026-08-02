@@ -310,7 +310,7 @@ for (const [needle, description] of [
 for (const [needle, description] of [
   ["Where do you want to disappear to?", "first conversational question"],
   ["A city, state, beach, mountains", "plain-language destination prompt"],
-  ["Question 1 of 9", "question progress"],
+  ["Question 1 of 10", "question progress"],
   ["trip concierge", "concierge mode label"],
   ["Planning and negotiation are live", "honest capability boundary"],
 ]) {

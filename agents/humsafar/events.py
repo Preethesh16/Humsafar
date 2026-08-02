@@ -102,7 +102,7 @@ def validate_event(event: dict) -> Optional[str]:
         if not _non_empty(event.get("merchant")):
             return "purchase_result.merchant is required"
         if event.get("outcome") is not None and event.get("outcome") not in {
-            "simulated", "credential_issued", "checkout_completed", "checkout_failed"
+            "simulated", "credential_issued", "checkout_completed", "checkout_failed", "advisory"
         }:
             return "purchase_result.outcome is invalid"
         return None if _non_empty(event.get("details")) else "purchase_result.details is required"

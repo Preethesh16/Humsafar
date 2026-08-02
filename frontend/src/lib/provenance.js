@@ -55,6 +55,14 @@ export function labelForPurchase(line = {}) {
   let tone;
   let proven = false;
 
+  if (line.outcome === "advisory") {
+    return {
+      text: "advisory reserve; no card or payment",
+      tone: "neutral",
+      proven: false,
+    };
+  }
+
   switch (source) {
     case PROVENANCE.FIXTURE:
       text = "fixture / simulated; no payment attempted";

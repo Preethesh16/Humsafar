@@ -46,7 +46,10 @@ export class DiscoveryService {
       return withFixtureFallback({
         integration: "duffel-flights",
         logger: this.logger,
-        live: async () => normalizeFlights(await this.duffelClient.searchFlights(input)),
+        live: async () => {
+          const resolved = await this.#flightCodes(input);
+          return normalizeFlights(await this.duffelClient.searchFlights({ ...input, ...resolved }));
+        },
         fixture: async () => scaleFixtures(flightFixtures, "flights", input),
       });
     }
@@ -79,12 +82,23 @@ export class DiscoveryService {
       error.code = "STAY_COORDINATES_UNAVAILABLE";
       throw error;
     }
-    return this.googleMapsClient.geocode(input.destination);
+    return this.googleMapsClient.geocode(input.destinationName ?? input.destination);
+  }
+
+  async #flightCodes(input) {
+    const origin = /^[A-Z]{3}$/i.test(input.origin ?? "")
+      ? input.origin.toUpperCase()
+      : (await this.duffelClient.suggestPlace(input.originName)).code;
+    const destination = /^[A-Z]{3}$/i.test(input.destination ?? "")
+      ? input.destination.toUpperCase()
+      : (await this.duffelClient.suggestPlace(input.destinationName)).code;
+    return { origin, destination };
   }
 }
 
 function normalizeFlights(data) {
   const offers = data?.offers ?? [];
+  assertInr(offers.map((offer) => offer.total_currency), "flight");
   return offers.map((offer) => ({
     id: offer.id,
     category: "flights",
@@ -97,7 +111,9 @@ function normalizeFlights(data) {
 }
 
 function normalizeStays(data) {
-  return (data?.results ?? data ?? []).map((result) => ({
+  const results = data?.results ?? data ?? [];
+  assertInr(results.map((result) => result.cheapest_rate_currency ?? result.cheapest_rate?.total_currency), "stay");
+  return results.map((result) => ({
     id: result.id,
     category: "stay",
     vendor: result.accommodation?.name ?? "Accommodation",
@@ -107,4 +123,18 @@ function normalizeStays(data) {
     rating: result.accommodation?.rating,
     source: "live",
   }));
+}
+
+/**
+ * Agent allocations and Prava caps are denominated in INR. Treating a GBP or
+ * USD provider amount as rupees would make the budget proof meaningless, so a
+ * differently configured Duffel organisation must fail closed. The fallback
+ * layer will then disclose fixture data instead of relabelling the currency.
+ */
+function assertInr(currencies, inventory) {
+  const unsupported = currencies.find((currency) => currency && currency !== "INR");
+  if (!unsupported) return;
+  const error = new Error(`Duffel ${inventory} inventory returned ${unsupported}; Humsafar requires INR billing`);
+  error.code = "DUFFEL_CURRENCY_UNSUPPORTED";
+  throw error;
 }

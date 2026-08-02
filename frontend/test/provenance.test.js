@@ -34,6 +34,12 @@ test("a fixture purchase never claims a payment was attempted", () => {
   }
 });
 
+test("an advisory reserve is never counted as a payment", () => {
+  const label = labelForPurchase({ source: "fixture", status: "success", outcome: "advisory" });
+  assert.equal(label.text, "advisory reserve; no card or payment");
+  assert.equal(label.proven, false);
+});
+
 test("legacy source \"live\" describes data, not payment, so stays unproven", () => {
   const label = labelForPurchase({ source: "live", status: "success" });
   assert.equal(label.text, "live integration data; payment evidence unverified");

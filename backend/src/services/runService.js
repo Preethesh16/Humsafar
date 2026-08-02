@@ -90,6 +90,14 @@ export class RunService {
     pushArg(args, "--rooms", trip.rooms);
     pushArg(args, "--travel-mode", trip.travelMode);
     pushArg(args, "--categories", trip.includedCategories.join(","));
+    const advisoryCategories = trip.includedCategories.filter((category) => ["food", "guide"].includes(category));
+    if (advisoryCategories.length > 0) {
+      // Food and activity discovery participate in budget negotiation but are
+      // intentionally never card-minted or called booked until a real
+      // transactional provider is connected. The mapped itinerary supplies
+      // real nearby suggestions; provider estimates remain advisory.
+      pushArg(args, "--advisory-categories", advisoryCategories.join(","));
+    }
     pushArg(args, "--stay-style", trip.stayStyle);
     if (awaitApproval) args.push("--await-approval");
     if (awaitChoice) args.push("--await-choice");

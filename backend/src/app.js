@@ -4,7 +4,7 @@ import { validateEvent } from "./events/eventSchema.js";
 import { ApprovalError } from "./services/approvalService.js";
 import { ChoiceError } from "./services/choiceService.js";
 
-export function createApp({ eventHub, scopedCardService, runService, discoveryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -130,6 +130,16 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }
   });
 
+  app.post("/api/itineraries/suggestions", authorize(internalApiToken), async (request, response) => {
+    if (!itineraryService) return response.status(503).json({ error: { code: "ITINERARY_UNAVAILABLE" } });
+    return itineraryResponse(response, () => itineraryService.suggestions(request.body ?? {}));
+  });
+
+  app.post("/api/itineraries/preview", authorize(internalApiToken), async (request, response) => {
+    if (!itineraryService) return response.status(503).json({ error: { code: "ITINERARY_UNAVAILABLE" } });
+    return itineraryResponse(response, () => itineraryService.plan(request.body ?? {}));
+  });
+
   app.post("/api/trust/check", authorize(internalApiToken), async (request, response) => {
     if (!trustService) return response.status(503).json({ error: { code: "TRUST_UNAVAILABLE" } });
     try {
@@ -188,6 +198,20 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
   });
 
   return app;
+}
+
+async function itineraryResponse(response, operation) {
+  try {
+    return response.json(await operation());
+  } catch (error) {
+    const providerUnavailable = [
+      "GEOAPIFY_NOT_CONFIGURED", "GEOAPIFY_NETWORK_ERROR", "GEOAPIFY_REQUEST_FAILED",
+      "OPEN_METEO_NETWORK_ERROR", "OPEN_METEO_REQUEST_FAILED",
+    ].includes(error.code);
+    return response.status(providerUnavailable ? 503 : 400).json({
+      error: { code: error.code ?? "INVALID_ITINERARY", message: error.message },
+    });
+  }
 }
 
 function choiceResponse(response, operation, successStatus = 200) {

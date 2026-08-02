@@ -337,4 +337,4 @@
 - Why: the dashboard manages keys/activity; sensitive card entry and WebAuthn approval are isolated on Prava's hosted surface.
 - Blocked on: the human completing the hosted browser flow.
 - Needs from Jeswin/Deepthi: none.
-- Commit: pending (hosted-page clarification on `preethesh/integrations-backend`)
+- Commit: `24e5bff` (hosted-page clarification committed on `preethesh/integrations-backend`)

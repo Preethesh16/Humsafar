@@ -176,3 +176,135 @@ Reordering exposed a modelling flaw in my own offline stub: it inferred the mand
 - Blocked on: nothing for the cap proof. A *completed merchant checkout* still requires a checkout target; the charge sits at `awaiting_result` and must not be reported `APPROVED` without a genuine processor result.
 - Needs from Deepthi: the receipt can now show a genuine `sandbox` line for the stay category. Everything else in a default run remains `fixture`, so the run is mixed-mode and must be labelled per line.
 - Commit: `5bceb6a` (pushed to `jeswin/agent-core`)
+
+### [2026-08-02 20:55 IST] — credential least-privilege, a retracted audit finding, and the payment blocker identified
+- Prompt: Preethesh asked me to figure out payment; the user supplied a Discord dump from another team.
+- Files changed: `agents/humsafar/orchestrator.py`, `agents/humsafar/events.py`, `agents/humsafar/llm.py`, `agents/humsafar/negotiation.py`, `agents/tests/test_orchestrator.py`, `INTERFACES.md`, `agents/PRAVA-EVIDENCE.md`.
+
+**The payment blocker is our card, not our code.** `FETCH_AGENTIC_CREDS_ERROR — "Visa 400 — Fetching cryptogram failed"` is now reproduced across every axis we can vary: both Prava flows (mandate charge and standard checkout), both currencies (INR and USD), both merchant countries (IN and US), and amounts from ₹50 to ₹28,800. The passkey ceremony succeeds and Visa's own threshold checks succeed — an over-cap attempt declines correctly with `visaCorrelationId=1785678386_7`. Only cryptogram issuance fails, and `token`, `dynamic_cvv` and `expiry` all come back null.
+
+Another team (`_Devastation__`) hit the **identical error string** on Prava's own Playground. Prava staff called it Visa sandbox flakiness and advised retrying; retrying 4–5 times did not fix it. What fixed it was Yash issuing a **replacement card**. That is the ask now outstanding with Prava for `CARD-17` / `...2341`.
+
+**Corroboration worth recording:** Prava staff stated on the record that reaching `Creds_Generated` **is** the intended outcome at this stage — Birdie: *"working exactly as intended for this stage of the flow"*; Yash: *"that was the expected scenario. Congrats 🔥"*. Our evidence file claims exactly that milestone and no more, so the submission stands whether or not the card is replaced.
+
+**I retracted an audit finding rather than shipping the fix as a bug fix.** An audit flagged `mint(slice_paise)` against `buy(option.price_paise)` as a live money discrepancy — the mandate charged more than the receipt reported. **It is not reachable.** I swept ₹13,000–₹200,000 across the converged, recovery and forced-compromise paths and found **zero** runs where the two differed: allocation already clamps every slice to the price of the option that slice buys. Reporting it as a discovered-and-fixed bug would have been a fabricated finding.
+
+The change is still in, on its own merits: the credential is now minted at the option price, so least privilege is a property of the design rather than a coincidence of the allocator, and the first thing that would have broken the accidental equality is live Duffel inventory. The **mandate** ceiling is untouched at the slice — that is what the over-cap proof fires against. `card_issued` now carries both: `amountCap` (credential) and the additive `mandateCap` (slice), with `amountCap <= mandateCap` asserted.
+
+**Docstring contradiction resolved.** `llm.py` claimed "the engine decides what an agent GETS"; `intent.py` documented two modules away that a parsed priority weight genuinely moves money. The real rule is now stated once: *model output may influence allocation only through bounded, validated parameters — never as an amount.* Also deleted `_argue`, unreachable since batching landed.
+
+- Validation: **202 Python, 139 Node, frontend build and render smoke all pass** (3 new tests). No credential value was printed, logged or committed at any point.
+- Needs from Preethesh: nothing blocking. `DUFFEL_ACCESS_TOKEN` is still the only reason inventory is fixture — the live path is wired and is already the default.
+- Blocked on: Prava issuing a replacement test card. Everything else in the agent core is done.
+- Commit: pending
+
+### [2026-08-02 21:40 IST] — the specialists now genuinely drive allocation
+- Prompt: continuing the plan; the multi-agent claim was the weakest part of the submission.
+- Files changed: `agents/humsafar/schemas.py`, `ai.py`, `llm.py`, `negotiation.py`, `mediator.py`, `orchestrator.py`, `agents/tests/test_negotiation.py`.
+
+**The problem.** The four specialists never moved a rupee. Their output went only to `_say()`, and their own test asserted it (`test_narration_does_not_change_a_single_rupee`). Asked *"show me where an agent's output changes an amount"*, the only honest answer was the Intent Agent's bounded weight. `build_specialists(ask_strategy=…)` existed for exactly this and had **zero callers**.
+
+**Each specialist now chooses which option it opens the negotiation fighting for** — and it does so without breaking the rule that no model-facing schema may contain a money field. The agent returns an **index** into its own shortlist, not an amount (`schemas.OpeningPosition`). The price attached to that index is ours. A hallucinated figure therefore cannot become an opening ask: there is nowhere to put one. The rejected design had the agent state its ask as a number, which would have needed a money field and moved the guarantee from *unrepresentable* to *validated afterwards*.
+
+Out-of-range indices are **discarded, not clamped** — clamping would silently invent a choice nobody made — and fall back to the engine's heuristic. A strategy that raises is caught. The batched call runs all four agents concurrently at **2.1s**.
+
+Live, the personas diverge exactly as written: the Journey Agent opened on the **cheapest** flight (IndiGo ₹5,700 of a ₹5,700–10,400 range) reasoning about cost versus rating, while the Stay Agent opened on the **most expensive** room (Taj ₹13,100 of ₹4,700–13,100). The engine's heuristic would have opened all four at their best-rated option.
+
+**The finding that mattered more than the feature.** Wiring it up was not enough: I measured it and the choice changed the final split in only **2 of 28 budget bands**. `allocate_surplus` was upgrading every agent back toward its best-rated option, so an agent that deliberately opened cheap was pushed straight back up and its decision vanished from the receipt. Agency that does not survive to the receipt is decoration wearing a better name.
+
+The mediator now **refuses to fund an agent above the option it opened on**. That is a no-op under the heuristic — the opening ask *is* the best-rated option, and the existing rating-gain check already stopped there, which is why every pre-existing surplus and forced-compromise test still passes untouched. With agents choosing, it is what makes the choice stick: **24 of 28 budget bands** now differ. Verified end to end against live OpenAI — at ₹25,000 the Food Agent picked Goa Kitchen (₹4,200) over Gunpowder (₹5,500), a ₹1,300 difference visible in the receipt.
+
+Also resolved: `llm.py` claimed the engine decides every amount while `intent.py` documented a weight that moves money. The rule is now stated once and accurately — *model output may influence allocation only through bounded, validated parameters, never as an amount* — and the opening-position call is the clearest instance of it.
+
+- Validation: **211 Python, 139 Node, frontend build and render smoke all pass** (11 new tests, including a budget sweep re-run with agents driving the asks, and an invariant that no agent is ever funded above its own opening ask). Budget safety is unchanged.
+- Needs from Deepthi: the transcript now carries an opening line per agent (*"I'm opening on Taj Udaipur at ₹13,100. …"*) before the first negotiation round. Worth showing — it is the moment the agents commit to a position.
+- Blocked on: nothing.
+- Commit: pending
+
+### [2026-08-02 21:45 IST] — the app can actually be deployed now
+- Prompt: "can u fix it i want it to be proper" — a hosted link is required and nothing was hosted.
+- Files changed: `backend/src/session.js` (new), `backend/src/app.js`, `backend/src/server.js`, `backend/src/services/runService.js`, `backend/test/session.test.js` (new), `Dockerfile`, `.dockerignore`, `DEPLOY.md`.
+
+**The blocker was authentication, not hosting.** In development Vite proxies `/api` and injects `INTERNAL_API_TOKEN` on the way through; `vite.config.js` warns explicitly against ever putting that token in client code. Deployed there is no dev server, so the browser had no way to reach the API at all.
+
+The browser now gets a **signed, httpOnly session cookie**, issued by the server when it serves the app shell. The internal token never leaves the server. Routes are split by who legitimately needs them:
+
+| Caller | Reaches |
+|---|---|
+| Browser session cookie | start/read a run, choose an option, decide an approval, read the stream |
+| `Bearer INTERNAL_API_TOKEN` | all of the above **plus** card minting, event publishing, approval create/consume, discovery, trust, every Prava route |
+
+**This is narrower than what development has.** The dev proxy hands the browser the *full* internal token, so anyone with dev tools open can mint a scoped card or publish a forged event into the SSE stream. A session cookie can do neither, and `session.test.js` asserts it route by route.
+
+**A fatal deployment bug found only by running the production build.** `runService` never set `HUMSAFAR_BACKEND_URL`, so the spawned agent used its own default of `http://127.0.0.1:3000`. Render and Railway both *assign* `PORT` — so on any managed host the agent would have posted every event into the void and the dashboard would have sat blank through a complete, successful run. The server now derives the URL from the port it actually bound. Reading the code would not have caught this; the first run against the production build produced **zero events**, which is what exposed it.
+
+Also added a `Dockerfile` (Node 22 + Python 3, frontend built in, healthcheck) and `DEPLOY.md` with Render/Railway steps and a verification recipe.
+
+- Validation: **211 Python, 143 Node** (4 new), frontend build and render smoke pass. Verified end to end against the real production build: intake → choose → approve → receipt, **52 events terminating in `final_receipt`**, 4 `card_issued`, 4 `purchase_result`, ₹19,200 of ₹25,000 — driven entirely through cookie auth with no token in the browser. Confirmed `/api/scoped-cards` returns 401 to a browser session.
+- Needs from the team: someone with a Render or Railway account to connect the repo. Everything else is done — env vars are documented in `DEPLOY.md`.
+- Blocked on: nothing.
+- Commit: pending
+
+### [2026-08-02 22:20 IST] — merged main, container verified, evidence reconciled
+- Prompt: "pull now check whats there update from others", then continue.
+- Files changed: `backend/src/app.js`, `backend/test/session.test.js`, `agents/PRAVA-EVIDENCE.md`, `.env.example`, `DEPLOY.md`.
+
+**Merged `origin/main`** — Preethesh's mapped itinerary (Geoapify/Open-Meteo, day clustering, advisory categories) and Deepthi's venue pinning. One conflict, in `app.js`, where his two itinerary routes landed in the same region as my session layer.
+
+**Resolved so `/api/itineraries/*` use `browserOrAgent`, not the agent-only token.** `frontend/src/lib/itinerary.js` calls both directly from the intake page, so on the agent token they would have returned 401 to every visitor once deployed — and looked perfectly healthy in development, where the Vite proxy supplies the token. Same failure class as the `HUMSAFAR_BACKEND_URL` bug.
+
+**The Docker image was built and run, not just written.** Full agent run inside the container: 45 events terminating in `final_receipt`, Python spawned correctly, healthcheck reports `healthy`, SPA fallback serves deep routes, static assets served. Deployment is now genuinely login-and-go.
+
+Found and fixed while doing it: an unmatched `/api/*` path returned Express's default **HTML** error page, so a `fetch()` caller would report "unexpected token <" and a mistyped route would look like a serialisation bug. Now a JSON 404.
+
+**Two environment gaps that will silently break the deployed demo**, both documented in `DEPLOY.md`:
+* `GEOAPIFY_API_KEY` is unset, so both itinerary routes return `503 GEOAPIFY_NOT_CONFIGURED` — verified against the running server. The intake suggestions and the whole mapped plan are dead without it.
+* `GOOGLE_MAPS_API_KEY` is still unset (Deepthi's note), so every map link is a search rather than a pin.
+
+**Flagged a contradiction between our strongest artefact and the product.** `food` and `guide` are now advisory: they negotiate and hold budget but mint no card and land at ₹0, so a current run issues **two** credentials while `PRAVA-EVIDENCE.md` §1.2 documents four. Preethesh's reasoning is right — no transactional provider exists for restaurants or activities, and calling them booked would be a fabricated result. But the two artefacts now disagree, and a judge will compare them. I have annotated §1.2 rather than deleted it: it remains an accurate record of a 15:30 run when all four were transactional, and must be presented as that rather than as current behaviour. **This is Preethesh's call to confirm.**
+
+- Validation: **213 Python, 168 Node** (1 new), 81 frontend, build and render smoke pass. Verified end to end twice — against the merged production build on the host, and inside the Docker container.
+- Needs from Preethesh: confirm the advisory framing for the demo script, and set `GEOAPIFY_API_KEY`.
+- Blocked on: nothing in code. Deployment needs an account; the card needs Prava.
+- Commit: pending
+
+### [2026-08-02 23:30 IST] — the Visa window opened, and steps 1-5 completed
+- Files changed: `agents/humsafar/destinations.py`, `agents/tests/test_choice.py`, `PAYMENT-PLAN.md`.
+
+**The credential fault is intermittent, not persistent.** At 21:59 the watcher caught a charge returning `fetchStatus: SUCCESS` with real credentials; by 23:20 it was failing again. Yash's "just retry" advice was literally correct — the task is to catch a window, not to wait one out.
+
+**Prava's five-step flow is now complete for a real transaction.** I reported the successful charge's outcome and Prava accepted it:
+
+```
+txn_01KZ1MYSM8AMTXQJNVH5RDEPXX
+status: failed | mandateStatus: active | visaConfirmation: SUCCESS
+```
+
+`failed` is the correct terminal state — we reported DECLINED, because a sandbox test card cannot be approved by a real processor. Step 5 was the gap all evening, and it is closed: the transaction is settled rather than stranded at `awaiting_result`.
+
+**Reporting DECLINED restores the mandate.** Observed directly: guide went `available` → `consumed` (₹0) → reported → `available` at the full ₹3,600. Exercising the flow is free, and all four mandates remain live at ₹28,800.
+
+**A regression that broke live cards without any code in my file changing.** The pinned `GOA_INVENTORY` is only returned verbatim when `travel_mode == "flight"` and `stay_style == "hotel"`. Both defaults moved to `"compare"` elsewhere, so a default run generated merchants like "Goa Grand" and "Goa Day Trip", no mandate resolved, and all four mints were refused with *"No approved mandate registered for merchant"*. The existing pin test passed throughout, because `FixtureDiscovery`'s **own** defaults are flight/hotel — the test and the real path had drifted apart. Added a test pinning all four mandate-backed merchant names, and one that fails loudly if the pin's conditions drift again.
+
+- Validation: **215 Python** (2 new), 168 Node, 81 frontend. Live run verified against real Prava: mandate resolution succeeds for all four merchants; mints fail only while the Visa window is shut.
+- Blocked on: the window. `catch_window.py` probes every 4 minutes and launches the full four-agent live run on the first success.
+- Commit: pending
+
+### [2026-08-02 23:50 IST] — env updated, Duffel answered, submission pack written
+- Prompt: Preethesh's `.env` was pasted in chat with real keys; then continue.
+- Files changed: `.env` (untracked), `agents/.venv` (created, ignored), `SUBMISSION.md` (new).
+
+**`.env` updated from the pasted block**, with three corrections rather than a blind overwrite:
+* The paste dropped the whole agent-core section, including the three `OPENAI_AGENTS_*` flags that keep model and tool payloads out of OpenAI traces. Dropping those would have been a quiet credential leak, so they were carried over along with the tuned model choices.
+* `SESSION_SECRET` added (empty is fine locally; required on a deployed host or a restart logs judges out).
+* `HUMSAFAR_PYTHON=.venv/bin/python` **pointed at a venv that did not exist here** — Preethesh's local path. `runService` spawns with `cwd: agents/`, so every browser-started run would have died with `SPAWN_FAILED` and the site would have looked dead while the API returned 202. Created the venv and installed the pinned requirements; 215 tests pass under it.
+
+**The keys are now chat-exposed and must be rotated after the hackathon.** Preethesh's own log says the same.
+
+**Why inventory is fixture — answered definitively, and it is no longer "no Duffel token".** The token works: a direct BLR→GOI query returned **89 real offers**. They are priced in **USD** (Air India $37.50, British Airways $47.04) and our entire budget model plus every Prava mandate is INR. Preethesh's guard fails closed on non-INR rather than invalidating the rupee budget proof, which is the right call — converting at a rate we invented would be fabricating data. So the honest disclosure changes from "we had no token" to "the token works, the test account prices in USD, and we refuse to fake an exchange rate."
+
+**Wrote `SUBMISSION.md`** — the Devfolio fields, the Prava integration section with the completed five-step transaction and the over-cap decline, a full disclosure table, a timed demo-video script, and a say-this-not-that table for the narration. The video and the Devfolio publish are the two remaining critical-path items and both need a person.
+
+- Validation: 215 Python under the new venv, backend live against the updated env.
+- Blocked on: deployment needs an account; the four-agent live run needs a Visa window (watcher running, 7 attempts, still shut).
+- Commit: pending

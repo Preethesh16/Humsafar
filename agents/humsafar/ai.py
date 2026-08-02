@@ -27,7 +27,7 @@ from typing import Optional, TypeVar
 
 from pydantic import BaseModel
 
-from .schemas import AgentArgument, GoalPlan, MediatorSummary
+from .schemas import AgentArgument, GoalPlan, MediatorSummary, OpeningPosition
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -98,6 +98,19 @@ _SHARED_RULES = (
     "CRITICAL: use ONLY the figures given to you. Never invent, estimate, round "
     "or calculate an amount. You do not decide allocations; a deterministic "
     "engine does. Never mention being an AI. No preamble, no quotes."
+)
+
+_POSITION_RULES = (
+    "You are one specialist in a team of buying agents sharing ONE fixed budget. "
+    "Before the negotiation starts, choose which option from your own shortlist "
+    "you will open by fighting for.\n"
+    "Reply with the NUMBER of that option and one sentence of justification.\n"
+    "Open at the option you would genuinely defend — you will have to concede "
+    "ground later, and opening at the cheapest thing on your list leaves you "
+    "nothing to trade. Opening at the most expensive when it is barely better "
+    "than a cheaper one wastes the team's money and you will lose the argument. "
+    "Weigh quality against cost honestly.\n"
+    "Name no rupee amounts in your reason. Never mention being an AI."
 )
 
 INTENT_INSTRUCTIONS = (
@@ -176,6 +189,16 @@ class AgentRuntime:
                 instructions=f"{persona}\n\n{_SHARED_RULES}",
                 model=self.specialist_model,
                 output_type=AgentArgument,
+            )
+            # Same persona, different job and a different output type. This one
+            # decides what the agent is fighting for before any argument is
+            # written — it is the call that actually moves money, so it gets its
+            # own instructions rather than sharing the narration prompt.
+            self._agents[f"{category}:position"] = Agent(
+                name=f"{name} (opening position)",
+                instructions=f"{persona}\n\n{_POSITION_RULES}",
+                model=self.specialist_model,
+                output_type=OpeningPosition,
             )
 
         self._agents["intent"] = Agent(

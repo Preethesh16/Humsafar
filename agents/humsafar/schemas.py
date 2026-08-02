@@ -48,6 +48,29 @@ class GoalPlan(BaseModel):
     summary: str = Field(description="One sentence restating the goal in plain words.")
 
 
+class OpeningPosition(BaseModel):
+    """Which option a specialist opens the negotiation fighting for.
+
+    This is the one place a model genuinely drives allocation, and it obeys the
+    no-money rule by *construction* rather than by instruction: the agent picks
+    an **option**, not an amount. The engine reads that option's price from its
+    own inventory. There is no field here a rupee figure could go in, so a
+    hallucinated number cannot become an opening ask — the worst a bad pick can
+    do is name an option that exists, at a price we already knew.
+
+    Contrast the rejected design, where the agent stated its ask as a number.
+    That needed a money field, and every guarantee would then have rested on
+    validating the figure afterwards instead of on it being unrepresentable.
+    """
+
+    option: int = Field(
+        description="The number of the option you are fighting for, from the list given to you."
+    )
+    reason: str = Field(
+        description="One sentence on why this option and not a cheaper one. Name no amounts."
+    )
+
+
 class AgentArgument(BaseModel):
     """A specialist agent's negotiating line.
 

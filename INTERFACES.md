@@ -81,8 +81,15 @@ events, so the SSE hub can enforce run isolation:
 { type: "approval_given", runId: string, approvalRequestId: string,
   digest: string, timestamp: string }
 
-// A scoped card was minted for an agent
-{ type: "card_issued", agent: string, cardId: string, amountCap: number }
+// A scoped card was minted for an agent.
+// `amountCap` is the credential's own ceiling — the price of the option being
+// bought, i.e. the least privilege that can complete the purchase.
+// `mandateCap` is the slice the mandate was approved at, and is optional and
+// additive: the validator checks required fields and ignores extras, so a
+// caller that only knows one ceiling still validates.
+// The invariant is `amountCap <= mandateCap`.
+{ type: "card_issued", agent: string, cardId: string, amountCap: number,
+  mandateCap?: number }
 
 // A purchase completed or failed
 { type: "purchase_result", agent: string, status: "success" | "failed", amount: number,

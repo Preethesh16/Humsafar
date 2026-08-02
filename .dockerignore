@@ -1,0 +1,11 @@
+node_modules
+frontend/node_modules
+frontend/dist
+frontend/.ssr-out
+agents/.venv
+agents/**/__pycache__
+**/__pycache__
+.git
+.env
+.env.*
+*.log

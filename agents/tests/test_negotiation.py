@@ -92,6 +92,158 @@ class ConvergenceTest(unittest.TestCase):
             self.assertEqual(asks, sorted(asks, reverse=True), f"{category} asked for more mid-way")
 
 
+class OpeningPositionTest(unittest.TestCase):
+    """The one place model output changes an amount.
+
+    A specialist chooses which option it opens the negotiation fighting for.
+    Everything here exists to show the agency is real *and* that it cannot
+    become a way for a model to state a figure: the strategy returns an index,
+    and every price still comes from our own inventory.
+    """
+
+    @staticmethod
+    def _picking(index, reason="because I say so"):
+        """A strategy that always names the same position in each list."""
+
+        def strategy(discovered):
+            return {category: (index, reason) for category, _ in discovered}
+
+        return strategy
+
+    def _built(self, strategy, spoken=None):
+        return build_specialists(
+            CATEGORIES,
+            FixtureDiscovery(),
+            GOAL,
+            ask_strategy=strategy,
+            on_position=spoken,
+        )
+
+    def test_the_agents_choice_becomes_the_opening_ask(self):
+        for specialist in self._built(self._picking(0)):
+            self.assertEqual(
+                specialist.ask_paise,
+                specialist.options[0].price_paise,
+                f"{specialist.category} ignored its own agent's pick",
+            )
+
+    def _split_at(self, budget, strategy):
+        specialists = self._built(strategy) if strategy else build_specialists(
+            CATEGORIES, FixtureDiscovery(), GOAL
+        )
+        return NegotiationEngine(specialists, to_paise(budget), Mediator()).run()
+
+    def test_the_choice_genuinely_changes_the_split(self):
+        """Otherwise the agency is decorative, which is the thing being fixed.
+
+        Asserted at Rs 25,000, where the budget is a real constraint but not a
+        binding one — agents opening cheap end up with flights Rs 11,800 /stay
+        Rs 5,400, against Rs 8,200/Rs 8,900 from the engine's heuristic. That is
+        a different trip, chosen by the agents.
+        """
+        chose = self._split_at(25000, self._picking(0))
+        heuristic = self._split_at(25000, None)
+
+        self.assertNotEqual(
+            chose.allocations_paise,
+            heuristic.allocations_paise,
+            "the agents' opening choices made no difference to the final split",
+        )
+
+    def test_the_choice_survives_surplus_allocation_at_a_generous_budget(self):
+        """The change that turned this from decoration into agency.
+
+        Surplus allocation used to upgrade every agent toward its best-rated
+        option, so an agent that deliberately opened cheap was pushed back up
+        and its choice vanished from the receipt. Measured before the fix: the
+        opening choice changed the final split in only one narrow band
+        (Rs 18,000-19,000) and was washed out everywhere else.
+
+        The mediator now refuses to spend an agent past the option it opened
+        on. Under the engine's heuristic that is a no-op, because the opening
+        ask is the best-rated option and the rating gain check already stopped
+        there — which is why every pre-existing surplus test still passes.
+        """
+        chose = self._split_at(36000, self._picking(0))
+        heuristic = self._split_at(36000, None)
+
+        self.assertNotEqual(
+            chose.allocations_paise,
+            heuristic.allocations_paise,
+            "surplus allocation washed the agents' choices out again",
+        )
+        # Agents that opened on the cheapest option get exactly that, and the
+        # unspent remainder is simply not spent — nobody wanted it.
+        self.assertLess(chose.total_allocated_paise, heuristic.total_allocated_paise)
+
+    def test_no_agent_is_ever_funded_above_its_own_opening_ask(self):
+        """The invariant that makes the choice stick, across the whole range."""
+        for index in (0, 1):
+            for budget in range(9000, 45001, 3000):
+                specialists = self._built(self._picking(index))
+                openings = {s.category: s.opening_ask_paise for s in specialists}
+                result = NegotiationEngine(
+                    specialists, to_paise(budget), Mediator()
+                ).run()
+                for category, amount in result.allocations_paise.items():
+                    with self.subTest(index=index, budget=budget, category=category):
+                        self.assertLessEqual(amount, openings[category])
+
+    def test_an_out_of_range_pick_falls_back_instead_of_clamping(self):
+        """Clamping would invent a choice nobody made."""
+        picked = self._built(self._picking(99))
+        heuristic = build_specialists(CATEGORIES, FixtureDiscovery(), GOAL)
+
+        for chosen, default in zip(picked, heuristic):
+            self.assertEqual(chosen.ask_paise, default.ask_paise)
+
+    def test_a_strategy_that_raises_never_breaks_the_run(self):
+        def explode(discovered):
+            raise RuntimeError("model unavailable")
+
+        specialists = self._built(explode)
+        heuristic = build_specialists(CATEGORIES, FixtureDiscovery(), GOAL)
+
+        self.assertEqual(len(specialists), len(heuristic))
+        for chosen, default in zip(specialists, heuristic):
+            self.assertEqual(chosen.ask_paise, default.ask_paise)
+
+    def test_the_opening_ask_stays_inside_the_real_option_range(self):
+        for index in (0, 1, 2, 99):
+            for specialist in self._built(self._picking(index)):
+                with self.subTest(index=index, category=specialist.category):
+                    prices = [o.price_paise for o in specialist.options]
+                    self.assertGreaterEqual(specialist.ask_paise, min(prices))
+                    self.assertLessEqual(specialist.ask_paise, max(prices))
+
+    def test_budget_safety_is_unaffected_by_agent_chosen_asks(self):
+        """The invariant the product rests on, re-run with agents driving."""
+        for index in (0, 1):
+            for budget in range(5000, 60001, 2500):
+                with self.subTest(index=index, budget=budget):
+                    specialists = self._built(self._picking(index))
+                    result = NegotiationEngine(
+                        specialists, to_paise(budget), Mediator()
+                    ).run()
+                    self.assertLessEqual(
+                        result.total_allocated_paise,
+                        to_paise(budget),
+                        f"budget {budget} overspent via {result.exit_reason}",
+                    )
+
+    def test_the_agents_reason_reaches_the_transcript(self):
+        said = []
+        self._built(
+            self._picking(0, "the location is the whole point"),
+            spoken=lambda agent, text: said.append((agent, text)),
+        )
+
+        self.assertEqual(len(said), len(CATEGORIES))
+        for _, text in said:
+            self.assertIn("opening on", text)
+            self.assertIn("the location is the whole point", text)
+
+
 class GroundingTest(unittest.TestCase):
     def test_mediator_trims_an_ask_above_every_real_option(self):
         specialist = Specialist(

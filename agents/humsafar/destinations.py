@@ -171,6 +171,20 @@ def build_inventory(
 
     # Goa is the pinned demo destination — see GOA_INVENTORY above. Returned
     # verbatim so the live mandates and the tuned negotiation stay valid.
+    #
+    # **This guard is load-bearing for every live Prava run, and it is narrow.**
+    # The approved mandates are `listed` scope, locked to the exact merchant
+    # names in GOA_INVENTORY — "Air India Express", "Anjuna Beach Resort",
+    # "Gunpowder Assagao", "Dudhsagar Day Trip". Miss any condition below and
+    # discovery generates names like "Goa Grand" and "Goa Day Trip" instead, no
+    # mandate resolves, and all four mints are refused with
+    # "No approved mandate registered for merchant".
+    #
+    # That is exactly what happened once `travel_mode` and `stay_style` both
+    # gained a "compare" default: the pin stopped firing on a default CLI run
+    # and live cards broke without a single line of this file changing. A live
+    # run needs `--travel-mode flight --stay-style hotel`, and anything driving
+    # this from the browser must send the same.
     if (
         travel_mode == "flight"
         and city.lower() == "goa"

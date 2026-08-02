@@ -1,14 +1,26 @@
 """Agent narration over a deterministic negotiation.
 
-The division of labour is the single most important thing in this file:
+The division of labour is the single most important thing in this file, and it
+is worth stating precisely rather than snappily:
 
-    The model decides what an agent SAYS.
-    The engine decides what an agent GETS.
+    Model output may influence allocation only through bounded, validated
+    parameters. It is never itself an amount.
 
-Every rupee comes from integer arithmetic in `money.py`, `negotiation.py` and
-`mediator.py`. The model is handed the real figures and asked to argue for them
-in character. It cannot move money, and — because of `mentions_only` below — it
-cannot even *claim* a figure it wasn't given.
+An earlier version of this docstring said "the engine decides what an agent
+GETS", full stop. That was wrong, and `intent.py` said so two modules away: a
+parsed priority weight genuinely changes who concedes and who wins surplus. It
+is still not a contradiction of the real rule, because the weight is clamped to
+[0, 1] and scaled by `PRIORITY_INFLUENCE`, and every rupee downstream of it is
+integer arithmetic in `money.py`, `negotiation.py` and `mediator.py`.
+
+So: a model can shift the *shape* of a split within limits the code sets. It
+cannot state a figure and have that figure spent. Where a model does propose a
+number — a specialist's opening ask — it is clamped to `[floor, ceiling]` and
+grounded against real inventory before the engine will look at it.
+
+For narration specifically, the model is handed the real figures and asked to
+argue for them in character. Because of `mentions_only` below, it cannot even
+*claim* a figure it wasn't given.
 
 That last part matters more than it sounds. Instructing a model not to invent
 numbers is not a guarantee; checking its output is. If a specialist says
@@ -86,6 +98,74 @@ class Narrator:
     @property
     def available(self) -> bool:
         return bool(getattr(self.runtime, "available", False))
+
+    # -- opening positions ------------------------------------------------
+
+    def opening_positions(
+        self, categories_and_options: list[tuple[str, list]]
+    ) -> dict[str, tuple[int, str]]:
+        """Ask each specialist which option it opens the negotiation wanting.
+
+        Returns `{category: (index, reason)}` into that category's option list,
+        omitting any category whose agent was unavailable, timed out, or
+        returned a pick that does not exist. An omitted category falls back to
+        the engine's heuristic (best-rated option), so this can only ever add
+        agency — never remove the guarantee that a runnable opening ask exists.
+
+        This is the call that makes the multi-agent claim literal. Everything
+        else a model does here is narration over arithmetic it did not affect;
+        this choice sets the opening ask, which shapes every concession and the
+        final split. It stays safe because the agent returns an **index**, and
+        the price attached to that index is ours, not its.
+        """
+        if not self.available or not categories_and_options:
+            return {}
+
+        requests = [
+            (f"{category}:position", self._position_prompt(category, options))
+            for category, options in categories_and_options
+        ]
+
+        batch = getattr(self.runtime, "ask_many", None)
+        if batch is not None:
+            outputs = batch(requests)
+        else:
+            outputs = [self.runtime.ask(key, prompt) for key, prompt in requests]
+
+        picks: dict[str, tuple[int, str]] = {}
+        for (category, options), output in zip(categories_and_options, outputs):
+            index = getattr(output, "option", None)
+            if not isinstance(index, int):
+                continue
+            # The model is shown a 1-based list because that is how the prompt
+            # reads; anything outside it is discarded rather than clamped. A
+            # clamp would silently turn "option 9" into a real choice nobody
+            # made, and the fallback is already correct.
+            if not 1 <= index <= len(options):
+                self.rejected += 1
+                continue
+            reason = str(getattr(output, "reason", "") or "").strip()
+            # The reason is displayed, so it goes through the same figure check
+            # as every other line an agent says. Only the chosen option's price
+            # is quotable — an agent justifying its pick by naming a rival's
+            # price is quoting a figure this call never established.
+            if reason and not mentions_only(reason, [options[index - 1].price_paise]):
+                self.rejected += 1
+                reason = ""
+            picks[category] = (index - 1, reason)
+        return picks
+
+    def _position_prompt(self, category: str, options: list) -> str:
+        lines = "\n".join(
+            f"  {i}. {o.vendor} — {o.description} at {format_inr(o.price_paise)}"
+            + (f", rated {o.rating}/5" if o.rating and o.rating > 0 else ", unrated")
+            for i, o in enumerate(options, start=1)
+        )
+        return (
+            f"You are the {category} specialist. These are the options you found:\n"
+            f"{lines}\n\n"
+            "Which one do you open the negotiation fighting for? Reply with its number."
+        )
 
     # -- specialists ------------------------------------------------------
 

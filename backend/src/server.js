@@ -1,3 +1,7 @@
+import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { createApp } from "./app.js";
 import { EventHub } from "./events/eventHub.js";
 import { DuffelClient } from "./integrations/duffelClient.js";
@@ -23,6 +27,20 @@ const internalApiToken = process.env.INTERNAL_API_TOKEN;
 if (!isLoopback(host) && !internalApiToken) {
   throw new Error("INTERNAL_API_TOKEN is required when binding to a non-loopback host");
 }
+
+// Signs browser session cookies. Generated per boot when unset, which is fine
+// for a single-instance demo — the only cost is that a restart logs everyone
+// out, and the alternative (a checked-in default) would let anyone mint a valid
+// session against a deployed instance. Set SESSION_SECRET to survive restarts
+// or to run more than one instance behind a load balancer.
+const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex");
+
+// Where `npm --prefix frontend run build` puts the app. Serving it from this
+// process is what makes the deployed frontend same-origin with the API, which
+// is what lets a cookie authenticate it at all.
+const frontendDist =
+  process.env.FRONTEND_DIST ??
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../frontend/dist");
 
 const mandateMerchants = parseMandateMerchants(
   process.env.PRAVA_MANDATE_MERCHANTS_JSON ?? "{}",
@@ -51,9 +69,15 @@ const app = createApp({
   approvalService: new ApprovalService(),
   choiceService: new ChoiceService(),
   trustService: new TrustService(),
-  runService: new RunService(),
+  // The agent process reaches the API over loopback inside the container, so
+  // this is the bound port, never PUBLIC_BASE_URL — routing agent traffic out
+  // through the public hostname and back would be slower and would break
+  // whenever the host terminates TLS in front of us.
+  runService: new RunService({ backendUrl: `http://127.0.0.1:${port}` }),
   internalApiToken,
   publicBaseUrl: process.env.PUBLIC_BASE_URL,
+  frontendDist,
+  sessionSecret,
 });
 
 app.listen(port, host, () => {

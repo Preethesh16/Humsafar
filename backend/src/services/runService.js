@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
  * is reported over the channel the dashboard is already reading.
  */
 export class RunService {
-  constructor({ cwd = "agents", python, spawnImpl = spawn, logger = console, env = process.env } = {}) {
+  constructor({ cwd = "agents", python, spawnImpl = spawn, logger = console, env = process.env, backendUrl } = {}) {
     this.cwd = cwd;
     // A project venv is preferable on PEP 668 distributions such as Arch.
     // Keep python3 as the portable fallback so the deterministic path still
@@ -22,9 +22,20 @@ export class RunService {
     this.python = python ?? env.HUMSAFAR_PYTHON ?? "python3";
     this.spawnImpl = spawnImpl;
     this.logger = logger;
-    this.env = env;
     this.active = new Map();
     this.runs = new Map();
+
+    // The agent posts its events back over HTTP, and its own default is
+    // `http://127.0.0.1:3000`. Every managed host assigns the port instead of
+    // letting us pick it — Render and Railway both inject `PORT` — so that
+    // default silently points at nothing the moment this is deployed, and a run
+    // completes having published zero events to a dashboard waiting for them.
+    //
+    // Found by actually running the production build rather than by reading it.
+    // An explicit HUMSAFAR_BACKEND_URL still wins, for a split deployment.
+    this.env = backendUrl && !env.HUMSAFAR_BACKEND_URL
+      ? { ...env, HUMSAFAR_BACKEND_URL: backendUrl }
+      : env;
   }
 
   start({

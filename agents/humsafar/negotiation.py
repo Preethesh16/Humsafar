@@ -66,29 +66,62 @@ def build_specialists(
     categories: list[str],
     provider: DiscoveryProvider,
     goal: str,
-    ask_strategy: Optional[Callable[[str, list[Option]], int]] = None,
+    ask_strategy: Optional[
+        Callable[[list[tuple[str, list[Option]]]], dict[str, tuple[int, str]]]
+    ] = None,
+    on_position: Optional[MessageSink] = None,
 ) -> list[Specialist]:
     """Create one specialist per category, grounded in real discovered options.
 
-    A specialist's floor is the cheapest thing it found; its opening ask is the
-    best-rated thing it found. Both come from the option list rather than from
-    a model's imagination, so the mediator's grounding check has something
-    factual to check against.
+    A specialist's floor is the cheapest thing it found. Its opening ask is
+    either the best-rated thing it found (the engine's heuristic) or the option
+    its own agent chose to fight for, when `ask_strategy` is supplied.
 
-    `ask_strategy` lets the LLM state the opening ask instead (see llm.py).
-    A model-stated ask is exactly the case the grounding check exists for.
+    **`ask_strategy` is where a model genuinely moves money**, and the contract
+    is shaped so that it can do so safely. It receives every category's options
+    at once — one batched call rather than four serial ones — and returns
+    `{category: (index, reason)}`. It returns an *index*, never an amount: the
+    price attached to that index comes from our inventory, so a model cannot
+    invent, inflate or round a figure. A category it omits, or an index outside
+    the list, falls back to the heuristic. The strategy can therefore only
+    change *which real option* an agent opens on.
+
+    The result is still clamped to `[minimum, most expensive found]`, which is a
+    no-op for any honest index and a backstop for a strategy that is not
+    `Narrator.opening_positions`.
     """
-    specialists: list[Specialist] = []
+    discovered: list[tuple[str, list[Option]]] = []
     for category in categories:
         options = provider.discover(category, goal)
-        if not options:
-            continue
+        if options:
+            discovered.append((category, options))
 
+    picks: dict[str, tuple[int, str]] = {}
+    if ask_strategy is not None and discovered:
+        try:
+            picks = ask_strategy(discovered) or {}
+        except Exception:  # noqa: BLE001 - agency is an enhancement, never a dependency
+            picks = {}
+
+    specialists: list[Specialist] = []
+    for category, options in discovered:
         minimum = min(o.price_paise for o in options)
+        ceiling = max(o.price_paise for o in options)
         preferred = max(options, key=lambda o: (o.rating, -o.price_paise))
+
         opening = preferred.price_paise
-        if ask_strategy is not None:
-            opening = max(minimum, ask_strategy(category, options))
+        chosen = picks.get(category)
+        if chosen is not None:
+            index, reason = chosen
+            if 0 <= index < len(options):
+                target = options[index]
+                opening = min(ceiling, max(minimum, target.price_paise))
+                if on_position is not None:
+                    on_position(
+                        category,
+                        f"I'm opening on {target.vendor} at {format_inr(target.price_paise)}."
+                        + (f" {reason}" if reason else ""),
+                    )
 
         specialists.append(
             Specialist(
@@ -332,13 +365,6 @@ class NegotiationEngine:
             s.category: self.narrator.argue(s, record, self.budget_paise)
             for s in self.specialists
         }
-
-    def _argue(self, specialist: Specialist, record: RoundRecord) -> str:
-        if self.narrator is not None:
-            text = self.narrator.argue(specialist, record, self.budget_paise)
-            if text:
-                return text
-        return self._default_argument(specialist, record)
 
     def _default_argument(self, specialist: Specialist, record: RoundRecord) -> str:
         """Deterministic fallback dialogue.

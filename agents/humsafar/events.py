@@ -259,15 +259,30 @@ class EventEmitter:
             }
         )
 
-    def card_issued(self, agent: str, card_id: str, amount_cap_paise: int) -> None:
-        self.emit(
-            {
-                "type": "card_issued",
-                "agent": agent,
-                "cardId": card_id,
-                "amountCap": to_rupees(amount_cap_paise),
-            }
-        )
+    def card_issued(
+        self,
+        agent: str,
+        card_id: str,
+        amount_cap_paise: int,
+        mandate_cap_paise: Optional[int] = None,
+    ) -> None:
+        """`amountCap` is the credential's ceiling, `mandateCap` the slice.
+
+        `mandateCap` is additive and optional — the backend validator checks
+        required fields per type and ignores extras, so older callers that pass
+        one cap still validate. It is omitted rather than duplicated when the
+        caller does not know the slice, since a mandate ceiling copied from the
+        credential would assert a limit nobody set.
+        """
+        event = {
+            "type": "card_issued",
+            "agent": agent,
+            "cardId": card_id,
+            "amountCap": to_rupees(amount_cap_paise),
+        }
+        if mandate_cap_paise is not None:
+            event["mandateCap"] = to_rupees(mandate_cap_paise)
+        self.emit(event)
 
     def purchase_result(
         self,

@@ -68,6 +68,32 @@ reported `DECLINED` after the mints had already succeeded — mislabelling the
 result and consuming the mandates. Fixed in `9cc1bc2`. **The dashboard is
 authoritative; that run worked.**
 
+> **⚠️ This artefact no longer matches what the product does. Read before
+> demoing.**
+>
+> Since 2026-08-02 ~20:10 IST the `food` and `guide` categories are **advisory**
+> (`--advisory-categories`, `orchestrator._record_advisory`). They still take
+> part in the negotiation and still hold a share of the budget, but they mint no
+> card, reach no checkout and land on the receipt at ₹0. A current run produces
+> **two** credentials — flights and stay — not four.
+>
+> The reasoning is sound: no transactional provider exists for restaurants or
+> activities, so calling them booked would be a fabricated result, which the
+> handbook treats as a disqualifier. It is the same standard applied everywhere
+> else in this file.
+>
+> But the two artefacts now tell different stories, and a judge comparing this
+> table against a live run will see four credentials here and two on screen.
+> **Do not present §1.2 as "what the product does today."** It is an accurate
+> record of a run on 2 Aug at 15:30, when all four categories were
+> transactional, and should be described that way — as evidence that the
+> four-agent credential model works end to end, alongside a plain statement that
+> two categories were subsequently made advisory pending a real provider.
+>
+> The four mandates behind it are still live and still hold ₹28,800, so the
+> four-credential run is reproducible the moment the Visa cryptogram fault
+> clears — see §3.
+
 ### 1.3 A real merchant-scoped credential was issued
 
 `POST /v1/mandates/{id}/charge` for ₹100 returned:
@@ -155,6 +181,57 @@ authorization at 15:45 succeeded — so this is not a quota and not the mandates
 Two other teams reported the identical error on 30 Jul in Prava's Discord
 (toby, and Suman001 with a written bug report). Treating it as a known
 intermittent sandbox fault; raised in the support channel.
+
+**Confirmed on both flows (2026-08-02, ~20:30 IST).** The fault is not specific
+to mandates. A *standard checkout* session — `POST /v1/sessions` with no
+`mandate_setup`, the path Prava's own guidance points at — fails identically:
+
+```
+session ses_01KZ1FKQS40K5M3FT4MCZ84HE0   status: failed
+line_items[0]: token=null dynamic_cvv=null expiry_month=null expiry_year=null
+error: { code: "FETCH_AGENTIC_CREDS_ERROR",
+         message: "Visa 400 — Fetching cryptogram failed" }
+```
+
+The hosted page reported *"Your identity was verified, but we couldn't complete
+the payment."* So the passkey ceremony succeeds and Visa threshold checks
+succeed — an over-cap charge still declines correctly with a
+`visaCorrelationId` — while **only agentic-credential issuance fails**. Both
+`/v1/mandates/{id}/charge` and the session checkout path hit it. No client-side
+change can route around this.
+
+**Every other variable ruled out (2026-08-02, ~20:40 IST).** A screenshot of
+another team's successful payment (VISA ••••2275, merchant "Libas", **$5.23
+USD**) raised currency and merchant country as the difference. Both are
+disproven — a USD session against a US merchant fails with byte-identical
+output:
+
+```
+session ses_01KZ1FYXPHVFBAS94M403N083N   status: failed
+txn_01KZ1G6YZZ58PRDZYQ9DYBXV32 -> failed
+creds: token=NULL | cvv=NULL | expiry=NULL
+error: FETCH_AGENTIC_CREDS_ERROR — Visa 400 —  Fetching cryptogram failed
+```
+
+The full matrix now tested and failing: **mandate charge and standard checkout ×
+INR and USD × merchant country IN and GB and US × ₹50 through ₹28,800.** Not
+amount, not currency, not country, not flow, not quota — the sandbox transaction
+limit surfaces as a separate `429 TRIES_EXHAUSTED`, which we have never seen.
+
+**Root cause: the card.** In Prava's support channel, `_Devastation__` reported
+the identical error string on Prava's **own Playground** — so it reproduces with
+zero third-party code involved. Prava staff advised retrying; 4–5 retries did
+not clear it. It was fixed by Yash issuing a **replacement test card**, after
+which that team confirmed *"it's working now"*. A replacement for `CARD-17`
+(`...2341`) is the outstanding ask.
+
+**Prava staff have validated `Creds_Generated` as the intended milestone.** On
+seeing that exact status, Birdie: *"this is working exactly as intended for this
+stage of the flow… Prava has successfully created the single-use,
+merchant-scoped payment credential for this session"*; Yash: *"that was the
+expected scenario. Congrats 🔥"*. §1.2 claims precisely this and nothing beyond
+it, which is now corroborated by the vendor rather than only by our reading of
+the docs.
 
 **Consequence:** no *further* live runs are possible until this clears. It does
 not affect the evidence above — the complete four-agent run at 15:30 and the cap

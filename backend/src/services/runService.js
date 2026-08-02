@@ -14,9 +14,12 @@ import { randomUUID } from "node:crypto";
  * is reported over the channel the dashboard is already reading.
  */
 export class RunService {
-  constructor({ cwd = "agents", python = "python3", spawnImpl = spawn, logger = console, env = process.env } = {}) {
+  constructor({ cwd = "agents", python, spawnImpl = spawn, logger = console, env = process.env } = {}) {
     this.cwd = cwd;
-    this.python = python;
+    // A project venv is preferable on PEP 668 distributions such as Arch.
+    // Keep python3 as the portable fallback so the deterministic path still
+    // runs in a fresh clone with no optional SDK dependencies installed.
+    this.python = python ?? env.HUMSAFAR_PYTHON ?? "python3";
     this.spawnImpl = spawnImpl;
     this.logger = logger;
     this.env = env;

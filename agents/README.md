@@ -11,6 +11,15 @@ cd agents
 python3 -m humsafar --demo --no-stream        # nothing else required
 ```
 
+For real OpenAI Agents SDK turns, install the pinned optional dependencies in
+the ignored project environment (required on PEP 668 systems such as Arch):
+
+```bash
+python3 -m venv agents/.venv
+agents/.venv/bin/python -m pip install -r agents/requirements.txt
+# Root .env: HUMSAFAR_PYTHON=.venv/bin/python
+```
+
 With the backend up (`npm start` from the repo root), drop `--no-stream` and the
 run streams live to `GET /api/events` for the dashboard:
 

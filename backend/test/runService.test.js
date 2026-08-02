@@ -60,6 +60,12 @@ test("RunService never enables Prava or live checkout implicitly", () => {
   assert.equal(calls[0].args.includes("--llm"), false);
 });
 
+test("RunService uses the configured project Python without exposing it to the browser", () => {
+  const { service, calls } = harness({ HUMSAFAR_PYTHON: ".venv/bin/python" });
+  service.start(trip);
+  assert.equal(calls[0].command, ".venv/bin/python");
+});
+
 test("RunService rejects a second run while the shared event stream is busy", () => {
   const { service } = harness();
   service.start(trip);

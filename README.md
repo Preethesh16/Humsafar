@@ -57,14 +57,48 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Live dashboard over SSE | **Working**, including reconnect replay. |
 | Run-scoped approval protocol | **Working** and verified end to end. |
 | Prava sandbox authentication | **Verified.** `npm run prava:verify` returns authentication OK. |
-| Prava customer, mandates, credentials | **Not yet created.** Zero mandates. No session, credential or transaction has been created. |
+| Prava mandates | **Created.** Five approved through the hosted passkey ceremony, `active`/`available`. |
+| Scoped credential issuance | **Verified on real rails.** Four credentials issued in a single run, one per agent, each capped at its own slice. |
+| Network cap enforcement | **Verified.** Visa declined ₹160 against a ₹100 mandate — *"Total amount 160.00 exceeds …"*. |
+| Merchant order | **Not performed.** No goods were bought; the charge is deliberately left unreconciled. |
 | Duffel flights/stays | **Not configured.** No `DUFFEL_ACCESS_TOKEN`, so discovery falls back to disclosed fixtures. |
 | Guide / Food inventory | **Fixtures by design**, shaped like Viator/OpenTable responses. Partner API access does not clear in a hackathon window. |
 
-**So: no real payment has been made yet.** Every purchase in a current demo run is a
-fixture, and the dashboard labels it as one — a run is reported as
-*"Fixture-only run — no payment was attempted"*, with **0 of 4** purchases having
-exercised a payment path.
+### What actually happened on Prava
+
+On **2 Aug 2026, 15:30 IST**, one run produced four `Creds_Generated` records in Prava's
+dashboard, seconds apart:
+
+| Amount | Agent | Merchant |
+|---|---|---|
+| ₹9,800 | flights | Air India Express |
+| ₹11,200 | stay | Anjuna Beach Resort |
+| ₹4,200 | food | Gunpowder Assagao |
+| ₹3,600 | guide | Dudhsagar Day Trip |
+
+**₹28,800 — exactly the split the agents negotiated on screen.** Each credential is
+merchant-locked and amount-capped to that agent's slice. Separately, a ₹160 charge
+against a ₹100 mandate was **refused by Visa**, and the refusal left the mandate intact.
+
+So the claim this project makes is demonstrated, not asserted:
+
+> Four agents negotiated one budget, each was issued a real merchant-scoped,
+> amount-capped Prava credential, and the card network physically refused an overspend.
+
+**What was NOT done, stated plainly:** no merchant order was placed. Credentials were
+issued and locked; nothing was bought, and no `APPROVED` was ever reported to Prava,
+because reporting an outcome that never happened would fabricate a completed record.
+Prava staff confirmed (Discord, 29 Jul) that reaching this point with a sandbox card is
+a valid sandbox flow.
+
+Full transaction ids, the exact decline text, and an explicit list of claims we refuse to
+make are in **[`agents/PRAVA-EVIDENCE.md`](agents/PRAVA-EVIDENCE.md)**.
+
+> **Reproducing this right now:** Prava's sandbox has been returning
+> `FETCH_AGENTIC_CREDS_ERROR` ("Visa 400 — Fetching cryptogram failed") on every charge
+> since 15:49 IST on 2 Aug. Two other teams reported the same fault on 30 Jul. It is
+> upstream of this repository and does not affect the evidence above, which landed
+> beforehand. A default `--demo` run uses stub credentials and is unaffected.
 
 ---
 
@@ -158,7 +192,7 @@ cd frontend && npm run test:render # server-rendered UI smoke test
 cd agents && python3 -m unittest discover -s tests -t .
 ```
 
-Currently **75 JavaScript** and **80 Python** tests.
+Currently **79 JavaScript** and **156 Python** tests.
 
 ### Environment
 
@@ -172,10 +206,18 @@ anything payment-related.
 
 Both are visible on screen in a `--demo` run:
 
-1. **Overspend is refused.** An agent attempts a charge above its own cap and is
-   rejected. This is deliberately *not* implemented as a software `if` presented as card
-   enforcement — a guardian check dressed up as network enforcement would be exactly the
-   kind of misleading claim the rules prohibit.
+1. **Overspend is refused — by Visa, not by us.** An agent attempts a charge above its
+   own cap and is rejected. This is deliberately *not* a software `if` presented as card
+   enforcement; a guardian check dressed up as network enforcement would be exactly the
+   misleading claim the rules prohibit. Against live Prava this produced a real decline:
+   *"Total amount 160.00 exceeds …"* on a ₹160 charge against a ₹100 mandate. The
+   classifier only calls a refusal cap enforcement when the network says the amount was
+   exceeded — `MANDATE_NOT_ACTIVE`, an exhausted use limit, or a bare decline are each
+   reported as what they are, precisely so this proof cannot be faked by accident.
+
+   The attempt runs **before** that agent's own purchase. Afterwards a one-time mandate
+   is already consumed, and the refusal would prove an exhausted use limit while claiming
+   cap enforcement — the right answer for the wrong reason.
 2. **Failure is contained.** One booking is failed on purpose. The orchestrator
    re-negotiates **only that agent's slice** and recovers; the other purchases stand.
 
@@ -194,9 +236,15 @@ Required by the hackathon rules, and stated precisely:
   Viator/OpenTable responses, because partner API approval does not clear in a weekend.
   Flights and stays fall back to the same fixture mechanism whenever Duffel is
   unconfigured, and the run prints which source each category actually resolved to.
-- **Payment status:** Prava sandbox authentication is verified. No customer, mandate,
-  session, credential or transaction has been created. No payment — sandbox or
-  production — has occurred. Nothing in the UI claims otherwise.
+- **Payment status:** Prava **sandbox** only — no production access was requested or used,
+  and no real money moved at any point. Five mandates were approved by a human through
+  Prava's hosted passkey ceremony. Four merchant-scoped, amount-capped credentials were
+  issued in a single run (₹9,800 / ₹11,200 / ₹4,200 / ₹3,600), and Visa refused a ₹160
+  charge against a ₹100 mandate. **No merchant order was placed** — nothing was bought,
+  and no `APPROVED` outcome was ever reported to Prava, because reporting a result that
+  never happened would fabricate a completed record. The UI labels every line accordingly
+  and never promotes a run to the strongest source seen on one line. Evidence and the
+  explicit list of claims we refuse to make: [`agents/PRAVA-EVIDENCE.md`](agents/PRAVA-EVIDENCE.md).
 - **Third-party inspiration:** the buyer/mediator negotiation structure was adapted from
   a teammate's earlier, separate project ("Accord"); the seller side was not used. Some
   resilience patterns — fixture fallback, partial-failure recovery — were adopted from a
@@ -213,9 +261,9 @@ runnable to point at.
 
 | Track | What we would claim | Evidence today | Status |
 |---|---|---|---|
-| **Prava Overall** | Prava is the core mechanic: one merchant-scoped, capped credential per agent, minted only after an explicit approval | Scoped-card service, mandate resolver, cap enforcement and the approval gate are implemented and tested. Sandbox authentication verified via `npm run prava:verify`. | ⏳ **Pending the transaction.** No customer, mandate, session, credential or charge exists yet. |
-| **Visa Intelligent Commerce** | Permissions and controls, not just a payment | Per-agent amount caps, merchant-scoped mandates, and an expiring one-shot run-scoped approval that fails closed on a changed plan — all verified end to end | ◑ **Controls demonstrated, completion pending.** The permissions half is real; the transaction half is not. |
-| **OpenAI** | Models materially used for agent reasoning, never for money | The agent core runs deterministically today and degrades to templated dialogue without a key. No `OPENAI_API_KEY` is configured. | ⏳ **Not yet demonstrated.** Deliberate design: no model output may move money, so the money path stays deterministic. |
+| **Prava Overall** | Prava is the core mechanic: one merchant-scoped, capped credential per agent, minted only after an explicit approval | Four credentials issued in one run (₹9,800 / ₹11,200 / ₹4,200 / ₹3,600) matching the negotiated split, five passkey-approved mandates, and a real Visa cap decline. All visible in the Prava dashboard. | ✓ **Demonstrated.** Credentials issued and an overspend refused. No merchant order placed. |
+| **Visa Intelligent Commerce** | Permissions and controls, not just a payment | Per-agent amount caps, merchant-scoped mandates, an expiring one-shot approval that fails closed on a changed plan — and **Visa itself declining an over-cap charge**: *"Total amount 160.00 exceeds …"* | ✓ **Demonstrated.** Controls, authentication and a network-enforced refusal, all on Visa rails through Prava. |
+| **OpenAI** | Models materially used for agent reasoning, never for money | Agents SDK with five agent identities: an Intent Agent parsing arbitrary goals into categories and priorities that measurably change the split, four specialist negotiators, and a mediator explainer. No model-facing schema contains a money field, and any figure an agent states that it was not given is rejected. | ✓ **Demonstrated.** Reasoning is material; the money path stays deterministic by construction. |
 | **Localhost Startup-Ready** | A real product direction, not a demo toy | The negotiation mechanic, the containment argument, and the honesty layer are the product thesis | ◑ **Narrative, not code evidence.** |
 | **Project NANDA** | A reusable Prava adapter, discoverable | `GET /.well-known/agentfacts.json` → `200`, `POST /a2a/ping` → `200`, both verified | ◑ **Endpoints demonstrated**, full adapter submission pending. |
 | **Senso** | Trust materially influences a merchant decision | The trust route exists and materially changes purchases, but it is a **local fixture heuristic** and labels itself as such: *"replace with a verified Senso response before claiming track evidence"* | ✗ **Not claimed.** A local heuristic is not Senso. |

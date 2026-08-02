@@ -336,12 +336,17 @@ function ReceiptPage({ state, source, navigate }) {
   const summary = useMemo(() => summarize(state), [state]);
   if (!state.receipt) return <div className="page-empty"><h2>Waiting for the agents to settle…</h2></div>;
 
-  // The largest line the agents actually settled. Checkout is offered against
-  // a real purchase from this run rather than a figure chosen here — the
-  // amount and the merchant both come from what the agents agreed.
-  const payable = (state.receipt.purchases ?? [])
-    .filter((p) => p.status === "success" && Number(p.amount) > 0)
-    .sort((a, b) => Number(b.amount) - Number(a.amount))[0];
+  // What the user chose and the agents priced — not what a mint happened to
+  // return. Keying this off a *successful purchase* was backwards: with live
+  // cards on, a Visa outage fails every mint and reports amount 0, and the
+  // advisory categories report 0 by design. So the one moment a person would
+  // most want to pay by hand was the exact moment the button disappeared.
+  //
+  // `choice.made` carries the vendor and price from the choice step, which are
+  // real regardless of whether any credential was ever issued.
+  const payable = Object.values(state.choice?.made ?? {})
+    .filter((pick) => Number(pick.price) > 0)
+    .sort((a, b) => Number(b.price) - Number(a.price))[0];
 
   return (
     <>
@@ -356,15 +361,15 @@ function ReceiptPage({ state, source, navigate }) {
       {payable && source !== SOURCE.MOCK && (
         <PravaCheckout
           merchant={{
-            name: payable.merchant,
+            name: payable.vendor,
             // Sandbox merchant details may be arbitrary; Prava states this,
             // because no real storefront is contacted. Derived from the
             // merchant the agent chose rather than invented per vendor.
-            url: `https://example.com/${encodeURIComponent(String(payable.merchant).toLowerCase().replace(/\s+/g, "-"))}`,
+            url: `https://example.com/${encodeURIComponent(String(payable.vendor).toLowerCase().replace(/\s+/g, "-"))}`,
             countryCode: "IN",
           }}
-          amount={Number(payable.amount)}
-          description={payable.description ?? payable.agent}
+          amount={Number(payable.price)}
+          description={`${payable.agent} — ${payable.vendor}`}
         />
       )}
     </>

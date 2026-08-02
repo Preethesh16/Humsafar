@@ -171,6 +171,11 @@ remaining booking boundaries are in [`PRODUCTION-INTEGRATIONS.md`](PRODUCTION-IN
 Requires Node 20.19+ and Python 3.10+. No credentials are needed for the fixture demo.
 
 ```bash
+# 0. Optional OpenAI Agents SDK environment (required for model-backed agents)
+python3 -m venv agents/.venv
+agents/.venv/bin/python -m pip install -r agents/requirements.txt
+# Set HUMSAFAR_PYTHON=.venv/bin/python in the root .env
+
 # 1. backend  (http://127.0.0.1:3000)
 npm install
 npm start

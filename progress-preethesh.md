@@ -520,3 +520,41 @@
 - Fixed: the receipt now creates an authorize-only, one-time, listed Humsafar mandate capped to the server-verified `final_receipt.totalSpent`. The button and all status text say **Authorize**, not Pay. Status sync checks Prava's standing mandates and marks the ceremony authorized only for an exact merchant/cap match in `active`/`available` state. It never exposes a mandate/session id and always returns `paid: false`.
 - Safety: made no live session, passkey, credential, charge, report or retry while implementing the correction. The browser rehearsal remains prohibited from clicking the Prava control. A completed hosted ceremony may prove budget authorization only; actual payment still requires working credentials, a real merchant/test processor result and truthful Prava reconciliation.
 - Validation: 196/196 JavaScript tests, 218/218 Python tests, frontend SSR and the production build pass. The running backend was restarted on the corrected code. Live desktop DOM inspection and a 390px capture confirmed the receipt says “Authorize,” displays the authoritative planned total, fits without horizontal overflow on mobile and does not create a Prava session until clicked.
+
+### [2026-08-03] — Reframed the Devfolio problem statement for evaluators
+- Prompt: requested high-impact submission copy for Devfolio's “The problem it solves” field.
+- Changed: replaced the generic travel-planner framing with the product's defensible wedge: travellers remain the manual coordinator across recommendations, a finite budget, preferences, maps, weather and payment risk. The paste-ready copy now connects that pain directly to visible Humsafar mechanics—specialist contention, deterministic mediation, affordable human choice, proximity-aware itinerary generation, one-shot approval and per-agent Prava blast-radius limits.
+- Claim discipline: the copy says recommendations are not silently presented as bookings and limits the payment proof to the observed Visa sandbox over-cap refusal. It does not claim production access, a merchant order or a completed booking.
+- Commit: n/a; submission-copy-only update is intentionally not pushed as an engineering milestone.
+
+### [2026-08-03] — Added evaluator-ready engineering challenges
+- Prompt: requested paste-ready copy for Devfolio's “Challenges we ran into” field.
+- Changed: distilled the build history into four concrete engineering narratives with resolutions: decorative negotiation became option-backed deterministic contention; inconsistent providers became normalized provenance-aware data; Linux passkeys and Node NAT64/Happy-Eyeballs failures became a phone handoff plus stable network configuration; and overlapping multi-day map geometry became day-scoped quest levels with deterministic marker separation.
+- Evidence discipline: included the assigned-card credential-minting outage as an isolated vendor-layer failure and described the team's fail-closed response without claiming a completed payment. Every quantitative claim—integer paise, exact remainder allocation, 12/12 network verification and the reproduced provider matrix—comes from the repository evidence record.
+- Commit: n/a; submission-copy-only update is intentionally not pushed as an engineering milestone.
+
+### [2026-08-03] — Added the Visa Intelligent Commerce track pitch
+- Prompt: requested evaluator-ready copy explaining how Humsafar fits the Best Visa Intelligent Commerce Implementation track.
+- Changed: framed Visa as Humsafar's network-enforced permission plane rather than a checkout badge. The copy connects negotiated integer-paise allocations to run-scoped approval, one merchant/cap per specialist, single-use credentials, compartmentalized failure and the absence of card material from model/browser/event boundaries.
+- Evidence used: five passkey-approved sandbox mandates; four dashboard credential rows matching ₹9,800/₹11,200/₹4,200/₹3,600 and totalling ₹28,800; and Visa's real ₹160-versus-₹100 over-cap refusal. The disclosure explicitly limits the claim to sandbox authorization, credential issuance and network enforcement—no production charge or merchant booking.
+- Commit: n/a; submission-copy-only update is intentionally not pushed as an engineering milestone.
+
+### [2026-08-03] — Added the OpenAI partner-track pitch
+- Prompt: requested evaluator-ready copy explaining how Humsafar fits the OpenAI partner track.
+- Changed: positioned OpenAI as the material reasoning layer of Humsafar's multi-agent market—not a narration add-on. The copy follows the implemented flow from Budget Strategy Agent to four independently instructed specialists and the Mediator, and names the actual Agents SDK primitives used: distinct `Agent` definitions, `Runner`, typed Pydantic outputs, concurrent specialist turns and one grouped trace per trip.
+- Safety boundary: made the strongest defensible architecture claim explicit: no model-facing schema contains money; agents choose grounded option identities while deterministic integer-paise code owns prices, allocations and caps. Invented figures are rejected, payment tools are unavailable to the agents, sensitive trace payloads are disabled and per-agent deterministic fallback preserves the financial invariants when model calls fail.
+- Commit: n/a; submission-copy-only update is intentionally not pushed as an engineering milestone.
+
+### [2026-08-03] — Added the OpenAI participation-credits explanation
+- Prompt: requested copy for Devfolio's separate “Participation Credits (Already Claimed)” entry.
+- Changed: added a concise usage-focused explanation distinguishing this disclosure from the competitive OpenAI track pitch. It records that the credits powered the implemented Budget Strategy Agent, concurrent specialists, Mediator and failure-path testing rather than decorative generation.
+- Claim discipline: ties credit usage to verified repository behavior—Agents SDK structured outputs, material option/priority decisions, deterministic integer-paise ownership and payment isolation—without claiming an award, production payment or capability the models do not have.
+- Commit: n/a; submission-copy-only update is intentionally not pushed as an engineering milestone.
+
+### [2026-08-03] — Re-enabled the local Prava sandbox phone handoff
+- Prompt: the receipt displayed “Phone approval is disabled on this server” and requested an urgent sandbox reconnection.
+- Root cause: the running `.env` predated the phone-authorization feature and did not contain `HUMSAFAR_ENABLE_PRAVA_PHONE_APPROVAL`; the backend therefore failed closed exactly as designed. The Prava keys were present and the sandbox base URL was correct.
+- Changed: added the ignored local-only phone approval opt-in and Humsafar merchant metadata to `.env`, then restarted the sandbox backend. No tracked application file or secret was changed.
+- Validation: `npm run prava:verify` returned sandbox authentication OK, customer found and two existing mandates. Backend health and the Vite frontend both respond. A deliberately nonexistent run sent through the browser proxy now returns `PRAVA_PLAN_NOT_FOUND` instead of `PRAVA_PHONE_APPROVAL_DISABLED`, proving the feature is enabled without creating a Prava session. No transaction, mandate, credential or scarce sandbox attempt was consumed.
+- Runtime: frontend remains at `http://127.0.0.1:5173/`; backend is restarted at `http://127.0.0.1:3000/`. Because final receipts are currently held in the backend's bounded in-memory event history, the receipt visible before this required restart cannot be authorized against the new process. Start one fresh plan, reach its receipt, then click **Authorize … on phone** once with the phone ready; that click is the point at which a short-lived sandbox session is created.
+- Commit: n/a; `.env` is gitignored and this was a local runtime configuration repair, not a source milestone.

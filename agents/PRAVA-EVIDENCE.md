@@ -42,7 +42,33 @@ The passkey ceremony **failed on Linux desktop** ("Verification Unavailable")
 and succeeded on a phone. Linux browsers generally expose no platform
 authenticator. This matches the reports from other teams in Prava's Discord.
 
-### 1.2 A real merchant-scoped credential was issued
+### 1.2 A complete four-agent run issued four real credentials ← strongest artefact
+
+Prava dashboard, **2 Aug 15:30 IST**, four rows seconds apart, each
+`Creds_Generated`:
+
+| Order ID | Amount | Agent |
+|---|---|---|
+| `ord_01KZ0YNW1FCJNS4E…` | ₹9,800 | flights |
+| `ord_01KZ0YNXA9R8D9A4…` | ₹11,200 | stay |
+| `ord_01KZ0YNY1HEJ0BVF…` | ₹4,200 | food |
+| `ord_01KZ0YNYQY8ACJYF…` | ₹3,600 | guide |
+
+Total **₹28,800** — exactly the split the agents negotiated on screen, each
+credential merchant-locked to that agent's chosen vendor and capped at its own
+slice. This is the whole product claim, in Prava's own records, from a single
+run.
+
+**Screenshot this block for the submission.** A judge can line these four
+amounts up against the deliberation feed and the receipt.
+
+Note for anyone reading the terminal output of that run: it printed
+`FAIL Rs 0.00` for all four. That was a defect in our own `LiveCheckout`, which
+reported `DECLINED` after the mints had already succeeded — mislabelling the
+result and consuming the mandates. Fixed in `9cc1bc2`. **The dashboard is
+authoritative; that run worked.**
+
+### 1.3 A real merchant-scoped credential was issued
 
 `POST /v1/mandates/{id}/charge` for ₹100 returned:
 
@@ -57,7 +83,7 @@ Repeated through the **full product path** — agent → backend resolver → Pr
 returning `transactionId: txn_01KZ0Z3FYYS1C0ZES9HEHSB6RR`, `status: issued`,
 `source: sandbox`.
 
-### 1.3 The card network refused an overspend ← the central claim
+### 1.4 The card network refused an overspend ← the safety claim
 
 Charging **₹160 against a ₹100 mandate**:
 
@@ -101,9 +127,11 @@ proof: an agent physically cannot spend past its slice.
 
 The defensible headline is therefore:
 
-> Four specialist agents negotiated one budget, and each was issued a real
-> merchant-scoped, amount-capped Prava sandbox credential. The card network
-> refused a charge that exceeded an agent's slice. No merchant order was placed.
+> Four specialist agents negotiated one ₹30,000 budget into a ₹28,800 split, and
+> each was issued a real merchant-scoped, amount-capped Prava sandbox credential
+> for its own slice — all four visible in the Prava dashboard at 15:30 on 2 Aug.
+> The card network refused a charge that exceeded an agent's slice. No merchant
+> order was placed.
 
 Prava staff (Sushant, Discord, 29 Jul) confirmed this class of flow is valid:
 *"if a card is able to go as far in the flow and get an error due to test card,
@@ -128,8 +156,9 @@ Two other teams reported the identical error on 30 Jul in Prava's Discord
 (toby, and Suman001 with a written bug report). Treating it as a known
 intermittent sandbox fault; raised in the support channel.
 
-**Consequence:** a single clean four-agent live run has not yet been recorded.
-The proofs above were captured individually before the fault began.
+**Consequence:** no *further* live runs are possible until this clears. It does
+not affect the evidence above — the complete four-agent run at 15:30 and the cap
+decline both landed before the fault began, and are visible in the dashboard.
 
 ---
 

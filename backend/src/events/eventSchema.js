@@ -17,6 +17,9 @@ const EVENT_TYPES = new Set([
   "blocked_attempt",
   "renegotiation_triggered",
   "final_receipt",
+  // INTERFACES.md §6. Without these the allow-list rejects them with a 400 and
+  // the choice step never reaches the dashboard — "additive" holds for fields,
+  // not for event types.
   "choice_requested",
   "choice_made",
 ]);

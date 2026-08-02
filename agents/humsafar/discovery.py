@@ -115,13 +115,19 @@ class BackendDiscovery:
             return self.fallback.discover(category, goal)
 
         source = str(body.get("source", "fixture"))
-        self.sources[category] = source
 
-        # The backend's shared fixtures are the pinned Goa demo ladder. For a
-        # different goal, use the destination-aware local fallback instead of
-        # silently showing Goa inventory. Both paths remain labelled fixture.
+        # `source: "fixture"` means the backend had no real inventory — its
+        # Duffel token is absent, or the category has no live provider at all.
+        # Its fallback set is Goa-only, so accepting it would answer a Udaipur
+        # request with Zostel Goa and GoGoa Bikes. Both sets are fixtures; the
+        # local one at least matches the destination that was asked for.
+        #
+        # A `live` response is always preferred, whatever it contains.
         if source != "live":
+            self.sources[category] = "fixture"
             return self.fallback.discover(category, goal)
+
+        self.sources[category] = source
 
         options = []
         for row in body.get("data", []) or []:

@@ -40,7 +40,7 @@ test("RunService launches provider-backed agents with structured trip context", 
   const { args, options } = calls[0];
 
   assert.equal(started.status, "running");
-  assert.ok(args.includes("--live-discovery"));
+  assert.equal(args.includes("--local-discovery"), false);
   assert.ok(args.includes("--trust"));
   assert.ok(args.includes("--llm"));
   assert.equal(args[args.indexOf("--destination-code") + 1], "GOI");

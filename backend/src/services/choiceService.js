@@ -1,5 +1,12 @@
 const VALID_AGENTS = new Set(["flights", "stay", "food", "guide"]);
 
+/**
+ * The §6 human choice step — run-scoped, one decision per category.
+ *
+ * The event that opens a choice carries the complete affordable shortlist.
+ * The browser may select exactly one offered option, once. Correlation by
+ * runId prevents a stale tab from settling a category in another run.
+ */
 export class ChoiceError extends Error {
   constructor(message, { code = "INVALID_CHOICE", status = 400 } = {}) {
     super(message);
@@ -9,14 +16,6 @@ export class ChoiceError extends Error {
   }
 }
 
-/**
- * Server-owned rendezvous between the Python agent process and the browser.
- *
- * The event that opens a choice carries the complete affordable shortlist.
- * The browser may select exactly one of those option IDs, once.  The agent's
- * later choice_made event settles the row (including timeout auto-picks), so a
- * stale tab cannot rewrite a plan that has already moved to approval.
- */
 export class ChoiceService {
   constructor({ clock = () => Date.now() } = {}) {
     this.clock = clock;

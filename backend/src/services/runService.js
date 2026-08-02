@@ -64,9 +64,11 @@ export class RunService {
       "--goal", goal.trim(),
       "--budget", String(amount),
       "--run-id", runId,
-      "--live-discovery",
       "--trust",
     ];
+    // Backend discovery is the CLI default, so configured Duffel/Google
+    // credentials are used without an opt-in flag. Structured trip context is
+    // still passed explicitly so no provider has to re-parse the goal.
     pushArg(args, "--days", trip.days);
     pushArg(args, "--origin", trip.origin);
     pushArg(args, "--destination", trip.destination);

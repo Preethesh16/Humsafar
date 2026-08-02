@@ -186,9 +186,9 @@ cd agents && python3 -m humsafar --goal "Plan my Goa trip" --budget 30000 --demo
 The dashboard opens on a clearly-labelled **simulated stream** so it demos with nothing
 else running. Toggle **live backend** (or open `?source=live`) to consume real events.
 
-Useful agent flags: `--demo` runs both proof shots, `--live-discovery` uses the backend's
-discovery routes, `--no-stream` skips the backend entirely, `--llm` uses OpenAI for
-dialogue when `OPENAI_API_KEY` is set.
+Useful agent flags: `--demo` runs both proof shots, backend provider discovery is
+the default, `--local-discovery` forces offline fixtures, `--no-stream` skips the
+event backend, and `--llm` uses OpenAI dialogue when `OPENAI_API_KEY` is set.
 
 ### Tests
 

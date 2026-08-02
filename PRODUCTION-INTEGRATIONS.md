@@ -17,7 +17,8 @@ experience, the only additional key required is the existing server-side
 | `PRAVA_SECRET_KEY` | Only for the existing sandbox payment proof | Server-to-server Prava sandbox access, mandate lookup and capped credentials. It does not supply travel inventory. |
 | `PRAVA_PUBLISHABLE_KEY` | No, not in the current REST flow | Reserved for a future Prava browser SDK integration. Never substitute it for the secret key. |
 | `INTERNAL_API_TOKEN` | Only when deployed off localhost | Protects state-changing backend routes. Generate this ourselves; it is not a third-party API key. |
-| `DUFFEL_ACCESS_TOKEN` | **Optional** | Live/test flight and stay search. Current code does not place Duffel orders. Free/no-key mode uses disclosed estimates and checkout handoffs. |
+| `DUFFEL_ACCESS_TOKEN` | **Optional** | Live/test flight search. Duffel Stays also requires that product to be enabled on the account. Current code does not place orders. Free/no-key mode uses disclosed estimates and checkout handoffs. |
+| `FX_BASE_URL` | No key required | Frankfurter daily reference rates convert non-INR provider search totals into INR for planning. The original amount/currency and conversion basis stay attached; this is not a settlement quote. |
 | `GEOAPIFY_API_KEY` | **Yes for the mapped local planner** | Server-side place discovery, nearby food possibilities and route distance/duration. It never proves opening hours, a ticket, a table or a booking. |
 | `GOOGLE_MAPS_API_KEY` | **Optional** | Paid geocoder override. The default is now keyless OpenStreetMap Nominatim. |
 
@@ -33,6 +34,7 @@ These services improve planning without pretending to be booking APIs:
 |---|---|---|
 | Destination coordinates | OpenStreetMap Nominatim | **Implemented.** User-triggered only, server-cached, identified with a custom User-Agent, serialised and limited to one request/second. Public Nominatim is suitable for this hackathon/low-volume use, not an SLA-backed commercial launch. Set `HUMSAFAR_NOMINATIM_URL` to a self-hosted instance when scaling. |
 | Weather | Open-Meteo | **Implemented, keyless.** Exact-date forecasts are shown only inside the provider's 16-day window; distant dates are labelled unavailable. |
+| Search-price currency conversion | Frankfurter | **Implemented, keyless.** Daily reference rates only. Converted rows retain the provider amount/currency and are labelled as planning conversions; they are not card-network or settlement rates. |
 | Restaurants, sights and essentials | Geoapify Places | **Implemented.** Real mapped POIs and nearby meal possibilities; public place data is not availability, popularity, opening-hours or booking proof. |
 | Road distance and duration | Geoapify Routing | **Implemented.** Multi-stop drive/walk/bicycle/scooter/transit routing; an outage degrades to a labelled straight-line estimate. |
 | Rail/bus planning | Operator-published GTFS/static schedules where available, otherwise an honest search handoff | No single complete, reliable, free India-wide transactional feed exists. Never scrape IRCTC. Exact availability and ticketing remain on the official/authorized checkout surface. |
@@ -108,9 +110,18 @@ and the route is rebuilt around it.
 Only place coordinates, routes and in-window weather are provider facts. Visit
 duration, entry and meal ranges are planning estimates. Food and activities are
 passed to the agent layer as `advisory` categories: they may reserve budget but
-cannot mint a card or claim a checkout. Duffel results are accepted into the INR
-budget only when Duffel returns `INR`; another billing currency fails closed
-rather than being silently treated as rupees.
+cannot mint a card or claim a checkout. Duffel prices already denominated in INR
+enter unchanged. Other currencies are converted with a daily Frankfurter
+reference rate, rounded upward to paise, and retain the original provider amount,
+currency, rate date and a `reference-rate-conversion` label. If that rate is
+unavailable, discovery fails closed to the disclosed fallback rather than treating
+foreign currency as rupees.
+
+Live sandbox verification on 2026-08-02 returned a Duffel flight offer for
+Bengaluru–Goa and a labelled USD-to-INR planning conversion. The same account
+returned `DUFFEL_ACCESS_REQUIRED` for Stays. Enabling live hotel search therefore
+requires Duffel to grant Stays access; changing code or inventing hotel prices
+cannot remove that provider-side boundary.
 
 REST Countries is not used for domestic Goa planning. Adding an unrelated key
 would increase secret and failure surface without improving places, routing,

@@ -3,9 +3,10 @@ import { withFixtureFallback } from "../integrations/withFixtureFallback.js";
 import { scaleFixtures } from "./tripScope.js";
 
 export class DiscoveryService {
-  constructor({ duffelClient, googleMapsClient, logger = console }) {
+  constructor({ duffelClient, googleMapsClient, fxRateClient, logger = console }) {
     this.duffelClient = duffelClient;
     this.googleMapsClient = googleMapsClient;
+    this.fxRateClient = fxRateClient;
     this.logger = logger;
   }
 
@@ -48,7 +49,7 @@ export class DiscoveryService {
         logger: this.logger,
         live: async () => {
           const resolved = await this.#flightCodes(input);
-          return normalizeFlights(await this.duffelClient.searchFlights({ ...input, ...resolved }));
+          return normalizeFlights(await this.duffelClient.searchFlights({ ...input, ...resolved }), this.fxRateClient);
         },
         fixture: async () => scaleFixtures(flightFixtures, "flights", input),
       });
@@ -62,10 +63,10 @@ export class DiscoveryService {
           // Duffel itself is not configured. DuffelClient owns `token`; test
           // doubles without that property are treated as configured.
           if (Object.hasOwn(this.duffelClient, "token") && !this.duffelClient.token) {
-            return normalizeStays(await this.duffelClient.searchStays(input));
+            return normalizeStays(await this.duffelClient.searchStays(input), this.fxRateClient);
           }
           const coordinates = await this.#stayCoordinates(input);
-          return normalizeStays(await this.duffelClient.searchStays({ ...input, ...coordinates }));
+          return normalizeStays(await this.duffelClient.searchStays({ ...input, ...coordinates }), this.fxRateClient);
         },
         fixture: async () => this.#withPlaceIds(scaleFixtures(stayFixtures, "stay", input), input),
       });
@@ -88,40 +89,74 @@ export class DiscoveryService {
   async #flightCodes(input) {
     const origin = /^[A-Z]{3}$/i.test(input.origin ?? "")
       ? input.origin.toUpperCase()
-      : (await this.duffelClient.suggestPlace(input.originName)).code;
+      : await this.#flightCode(input.originName);
     const destination = /^[A-Z]{3}$/i.test(input.destination ?? "")
       ? input.destination.toUpperCase()
-      : (await this.duffelClient.suggestPlace(input.destinationName)).code;
+      : await this.#flightCode(input.destinationName);
     return { origin, destination };
+  }
+
+  async #flightCode(placeName) {
+    try {
+      return (await this.duffelClient.suggestPlace(placeName)).code;
+    } catch (error) {
+      if (error.code !== "DUFFEL_PLACE_NOT_FOUND" || !this.googleMapsClient?.geocode || !this.duffelClient.suggestNearby) throw error;
+      const coordinates = await this.googleMapsClient.geocode(placeName);
+      return (await this.duffelClient.suggestNearby(coordinates)).code;
+    }
   }
 }
 
-function normalizeFlights(data) {
+async function normalizeFlights(data, fxRateClient) {
   const offers = data?.offers ?? [];
-  assertInr(offers.map((offer) => offer.total_currency), "flight");
-  return offers.map((offer) => ({
-    id: offer.id,
-    category: "flights",
-    vendor: offer.owner?.name ?? "Airline",
-    description: offer.slices?.map((slice) => `${slice.origin?.iata_code}-${slice.destination?.iata_code}`).join(", ") ?? "Flight",
-    price: Number(offer.total_amount),
-    currency: offer.total_currency,
-    source: "live",
+  return Promise.all(offers.map(async (offer) => {
+    const price = await inrPrice(offer.total_amount, offer.total_currency, "flight", fxRateClient);
+    const journey = offer.slices?.map((slice) => `${slice.origin?.iata_code}-${slice.destination?.iata_code}`).join(", ") ?? "Flight";
+    return {
+      id: offer.id,
+      category: "flights",
+      vendor: offer.owner?.name ?? "Airline",
+      description: price.converted
+        ? `${journey}; provider total ${price.providerCurrency} ${price.providerAmount}, converted to INR using a daily reference rate`
+        : journey,
+      price: price.amount,
+      currency: "INR",
+      providerAmount: price.providerAmount,
+      providerCurrency: price.providerCurrency,
+      priceBasis: price.converted ? "reference-rate-conversion" : "provider-inr",
+      fxDate: price.fxDate,
+      source: "live",
+    };
   }));
 }
 
-function normalizeStays(data) {
+async function normalizeStays(data, fxRateClient) {
   const results = data?.results ?? data ?? [];
-  assertInr(results.map((result) => result.cheapest_rate_currency ?? result.cheapest_rate?.total_currency), "stay");
-  return results.map((result) => ({
-    id: result.id,
-    category: "stay",
-    vendor: result.accommodation?.name ?? "Accommodation",
-    description: result.accommodation?.description ?? "Stay",
-    price: Number(result.cheapest_rate_total_amount ?? result.cheapest_rate?.total_amount),
-    currency: result.cheapest_rate_currency ?? result.cheapest_rate?.total_currency,
-    rating: result.accommodation?.rating,
-    source: "live",
+  if (!Array.isArray(results)) {
+    const error = new Error("Duffel stay search returned an invalid result list");
+    error.code = "DUFFEL_INVALID_RESPONSE";
+    throw error;
+  }
+  return Promise.all(results.map(async (result) => {
+    const providerAmount = result.cheapest_rate_total_amount ?? result.cheapest_rate?.total_amount;
+    const providerCurrency = result.cheapest_rate_currency ?? result.cheapest_rate?.total_currency;
+    const price = await inrPrice(providerAmount, providerCurrency, "stay", fxRateClient);
+    return {
+      id: result.id,
+      category: "stay",
+      vendor: result.accommodation?.name ?? "Accommodation",
+      description: price.converted
+        ? `${result.accommodation?.description ?? "Stay"}; provider total ${price.providerCurrency} ${price.providerAmount}, converted to INR using a daily reference rate`
+        : result.accommodation?.description ?? "Stay",
+      price: price.amount,
+      currency: "INR",
+      providerAmount: price.providerAmount,
+      providerCurrency: price.providerCurrency,
+      priceBasis: price.converted ? "reference-rate-conversion" : "provider-inr",
+      fxDate: price.fxDate,
+      rating: result.accommodation?.rating,
+      source: "live",
+    };
   }));
 }
 
@@ -137,4 +172,25 @@ function assertInr(currencies, inventory) {
   const error = new Error(`Duffel ${inventory} inventory returned ${unsupported}; Humsafar requires INR billing`);
   error.code = "DUFFEL_CURRENCY_UNSUPPORTED";
   throw error;
+}
+
+async function inrPrice(amount, currency, inventory, fxRateClient) {
+  const numeric = Number(amount);
+  const providerCurrency = String(currency ?? "").toUpperCase();
+  if (!Number.isFinite(numeric) || numeric <= 0 || !providerCurrency) {
+    const error = new Error(`Duffel ${inventory} inventory returned an invalid price`);
+    error.code = "DUFFEL_PRICE_INVALID";
+    throw error;
+  }
+  if (providerCurrency === "INR") {
+    return { amount: numeric, providerAmount: numeric, providerCurrency, converted: false, fxDate: null };
+  }
+  if (!fxRateClient?.convert) {
+    assertInr([providerCurrency], inventory);
+  }
+  const converted = await fxRateClient.convert(numeric, providerCurrency, "INR");
+  return {
+    amount: converted.amount, providerAmount: numeric, providerCurrency,
+    converted: true, fxDate: converted.date,
+  };
 }

@@ -69,7 +69,7 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Scoped credential issuance | **Verified on real rails.** Four credentials issued in a single run, one per agent, each capped at its own slice. |
 | Network cap enforcement | **Verified.** Visa declined ₹160 against a ₹100 mandate — *"Total amount 160.00 exceeds …"*. |
 | Merchant order | **Not performed.** No goods were bought; the charge is deliberately left unreconciled. |
-| Duffel flights/stays | **Optional provider test search, not order creation.** Ordinary city names are resolved through Duffel Places. Non-INR inventory fails closed; missing/unsupported provider access falls back to disclosed estimates. |
+| Duffel flights/stays | **Flights verified against provider test search; no order creation.** Ordinary city names resolve through Duffel Places, with coordinate-based airport fallback. Foreign-currency totals are converted into labelled INR planning estimates while preserving the provider amount. This account still needs Duffel Stays access, so hotels currently fall back to disclosed estimates. |
 | Activities / Food | **Advisory only.** Geoapify supplies real mapped possibilities and the planner supplies labelled cost bands. No activity ticket, guide, restaurant reservation, card or payment is claimed. |
 
 ### What actually happened on Prava
@@ -250,9 +250,11 @@ Required by the hackathon rules, and stated precisely:
 - **Not bookings, and labelled as such:** the day planner uses real Geoapify map/place
   results for food and activities, but its cost bands are estimates and those categories
   are advisory—no card, reservation or order is created. The agent negotiation still
-  uses disclosed Guide/Food estimate rows until a transactional partner exists. Flights
-  and stays fall back to disclosed fixtures whenever Duffel is unconfigured or unusable,
-  and the run prints which source each category actually resolved to.
+  uses disclosed Guide/Food estimate rows until a transactional partner exists. Duffel
+  flight search is live against test inventory; foreign-currency offers retain their
+  provider total and receive a clearly labelled reference-rate INR planning conversion.
+  Stays and any unavailable flight search fall back to disclosed fixtures, and the run
+  prints which source each category actually resolved to.
 - **Payment status:** Prava **sandbox** only — no production access was requested or used,
   and no real money moved at any point. Five mandates were approved by a human through
   Prava's hosted passkey ceremony. Four merchant-scoped, amount-capped credentials were

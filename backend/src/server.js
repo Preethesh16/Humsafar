@@ -1,6 +1,7 @@
 import { createApp } from "./app.js";
 import { EventHub } from "./events/eventHub.js";
 import { DuffelClient } from "./integrations/duffelClient.js";
+import { FxRateClient } from "./integrations/fxRateClient.js";
 import { GoogleMapsClient } from "./integrations/googleMapsClient.js";
 import { GeoapifyClient } from "./integrations/geoapifyClient.js";
 import { NominatimClient } from "./integrations/nominatimClient.js";
@@ -40,6 +41,7 @@ const app = createApp({
   discoveryService: new DiscoveryService({
     duffelClient: new DuffelClient(),
     googleMapsClient: geocoder,
+    fxRateClient: new FxRateClient(),
   }),
   itineraryService: new ItineraryService({
     geoapifyClient: new GeoapifyClient(),

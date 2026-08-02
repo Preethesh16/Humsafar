@@ -1,6 +1,7 @@
 # Humsafar agent core — Python dependencies
 #
-# Install:  python3 -m pip install --user -r agents/requirements.txt
+# Install:  python3 -m venv agents/.venv
+#           agents/.venv/bin/python -m pip install -r agents/requirements.txt
 #
 # Pinned, not floated. A hackathon demo that breaks because a transitive
 # release landed mid-weekend is a self-inflicted failure, and the Agents SDK

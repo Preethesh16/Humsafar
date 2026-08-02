@@ -3,7 +3,7 @@ import express from "express";
 import { validateEvent } from "./events/eventSchema.js";
 import { ApprovalError } from "./services/approvalService.js";
 
-export function createApp({ eventHub, scopedCardService, runService, discoveryService, mandateService, approvalService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, choiceService, discoveryService, mandateService, approvalService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -81,6 +81,30 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
       ...request.body,
       approvalRequestId: request.params.approvalRequestId,
     }));
+  });
+
+  app.post("/api/choices", authorize(internalApiToken), (request, response) => {
+    if (!choiceService) return response.status(503).json({ error: { code: "CHOICE_UNAVAILABLE" } });
+    try {
+      return response.status(202).json({ data: choiceService.record(request.body ?? {}) });
+    } catch (error) {
+      return response.status(error.status ?? 400).json({
+        error: { code: error.code ?? "INVALID_CHOICE", message: error.message },
+      });
+    }
+  });
+
+  app.get("/api/choices", authorize(internalApiToken), (request, response) => {
+    if (!choiceService) return response.status(503).json({ error: { code: "CHOICE_UNAVAILABLE" } });
+    try {
+      const found = choiceService.get({ runId: request.query.runId, agent: request.query.agent });
+      if (!found) return response.status(204).end();
+      return response.json({ data: found });
+    } catch (error) {
+      return response.status(error.status ?? 400).json({
+        error: { code: error.code ?? "INVALID_CHOICE", message: error.message },
+      });
+    }
   });
 
   app.post("/api/runs", authorize(internalApiToken), (request, response) => {

@@ -9,13 +9,33 @@ export class DiscoveryService {
     this.logger = logger;
   }
 
+  /**
+   * Attaches a Google place id to each row so the UI can link to one location
+   * instead of a search that returns a list.
+   *
+   * Best-effort by construction: without a key, or for an invented fixture
+   * venue, `findPlaceId` returns null and the link degrades to a search that
+   * the UI then labels honestly. Lookups run in parallel and never reject, so
+   * discovery cannot be slowed or broken by a maps failure.
+   */
+  async #withPlaceIds(rows, input) {
+    if (!this.googleMapsClient?.findPlaceId) return rows;
+    const near = String(input.destination ?? "").trim();
+    return Promise.all(
+      rows.map(async (row) => {
+        const placeId = await this.googleMapsClient.findPlaceId(row.vendor, near);
+        return placeId ? { ...row, placeId } : row;
+      }),
+    );
+  }
+
   async search(category, input = {}) {
     // Offline rows are written for a baseline 3-day, one-traveller, one-room
     // trip. Scale them to what was actually asked, or an 8-day trip for four is
     // quoted the price of a 3-day trip for one. Live provider responses are
     // already priced for the real request and must never be scaled again.
-    if (category === "food") return { data: scaleFixtures(foodFixtures, "food", input), source: "fixture" };
-    if (category === "guide") return { data: scaleFixtures(guideFixtures, "guide", input), source: "fixture" };
+    if (category === "food") return { data: await this.#withPlaceIds(scaleFixtures(foodFixtures, "food", input), input), source: "fixture" };
+    if (category === "guide") return { data: await this.#withPlaceIds(scaleFixtures(guideFixtures, "guide", input), input), source: "fixture" };
     if (category === "flights") {
       // Duffel only searches air inventory. A train/bus/road/compare request
       // must fall through to the mode-aware local provider rather than quietly
@@ -44,7 +64,7 @@ export class DiscoveryService {
           const coordinates = await this.#stayCoordinates(input);
           return normalizeStays(await this.duffelClient.searchStays({ ...input, ...coordinates }));
         },
-        fixture: async () => scaleFixtures(stayFixtures, "stay", input),
+        fixture: async () => this.#withPlaceIds(scaleFixtures(stayFixtures, "stay", input), input),
       });
     }
     throw new TypeError("category must be flights, stay, food, or guide");

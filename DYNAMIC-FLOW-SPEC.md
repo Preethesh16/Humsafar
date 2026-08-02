@@ -26,7 +26,7 @@ external APIs; it is no longer a handoff checklist.
 | Goal/budget already drive a run | Jeswin | **Done** — `run_goal(goal, budget, …)` |
 | **`POST /api/runs`** — start a run from the browser | **Preethesh** | **Done** — structured trip context, provider discovery, status endpoint, one active run |
 | **`POST` / `GET /api/choices`** | **Preethesh** | **Done** — offered-option validation, one-shot settlement, timeout conflicts |
-| Duffel real inventory | Preethesh | Needs `DUFFEL_ACCESS_TOKEN` |
+| Duffel real inventory | Preethesh | **Done for test search** — server-side token, conversational/coordinate place resolution and labelled reference FX conversion; order creation remains outside the available account scope |
 | Five-page journey | Deepthi + Preethesh | **Done** — native History API, no router dependency |
 | Conversational destination, origin, transport, flexible/exact dates, party, trip scope, budget and vibe | Preethesh | **Done** — nine prompts, no IATA/coordinate knowledge required |
 | User-controlled specialist roster | Preethesh + Jeswin | **Done** — Journey/Stay/Food/Things-to-do can be disabled; omitted agents receive no allocation, choice or checkout |

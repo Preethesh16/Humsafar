@@ -595,8 +595,10 @@ def run_goal(
         overspend_agent=kwargs.pop("overspend_agent", None),
         fail_agent=kwargs.pop("fail_agent", None),
         auto_approve=kwargs.pop("auto_approve", True),
+        run_id=kwargs.pop("run_id", None) or f"run-{uuid4().hex[:12]}",
     )
     kwargs.setdefault("trust", None)
+    kwargs.setdefault("choice", None)
     # The failure beat is a property of checkout, but it is configured on the
     # run — wire it here so callers only have to name the agent.
     if config.fail_agent and "checkout" not in kwargs:

@@ -280,3 +280,18 @@
 - Blocked on: item 1 needs the run-creation endpoint; item 4 needs Jeswin's identity fields on `main`; items 7, 9 and 10 (deploy, video, Devfolio) need external platform access and a real transaction to record.
 - Needs from Jeswin/Preethesh: unchanged. The track table will need updating the moment the first genuine sandbox charge lands — that single event moves Prava from pending to demonstrated and completes the Visa claim.
 - Commit: `961c8c3` (pushed to `deepthi/frontend-demo`)
+
+### [2026-08-02 02:30 IST] — Drafted the submission pack while blocked on everything else
+- Prompt: pull `main`, merge my work in, then continue any pending work.
+- Files changed: `submission.md` (new), `progress-deepthi.md`.
+- Pull/merge: nothing new on `main`, and my branch was already level at `dd72333` — nothing to pull and nothing to merge this round.
+- Re-checked all three blockers rather than assuming: still no `POST /api/runs` in `INTERFACES.md` (item 1), still no agent identity fields (item 4), and still no completed Prava charge anywhere in Preethesh's log. **The deadline is today** — the earlier published time is Aug 2, 3 PM PT / Aug 3, 3:30 AM IST.
+- Decision — **drafted the submission content now, even though the agreed order puts it last.** The sequencing exists so optional work does not crowd out the sandbox transaction, and drafting text does not compete with that: it uses time that is otherwise idle while I am blocked on two teammates and one credential. Writing it after the charge lands would put the slowest task on the critical path at the worst moment. Nothing is published — that decision stays with the team.
+- Changed: added `submission.md` with the Devfolio field copy, a shot-by-shot demo runbook, and a pre-submission checklist.
+- Decision — **every charge-dependent claim is written twice, [A] charge landed and [B] no charge.** This is the part that actually de-risks the deadline. Under time pressure the failure mode is not forgetting to write copy, it is pasting an optimistic claim that the demo cannot support. Pre-writing the honest [B] variant means the safe option costs zero minutes at 3am, and the pack says explicitly: never mix variants, and if in doubt use [B].
+- Decision — **the runbook names the exact phrases that must not be said** ("order placed", "booking confirmed", "real money", "production", "we analysed reviews") and flags beat 8 as where an overclaim is both most tempting and most damaging. A narration slip is not caught by any test, so it needed to be written down.
+- Also recorded in the checklist: publish rather than leave a draft, verify the status reads *Submitted*, choose one variant consistently across README/video/Devfolio, and restart long-running processes after the final pull.
+- Validation: 75/75 tests still pass; scanned the new file for key/card patterns before committing — clean.
+- Blocked on: unchanged — items 1 and 4 on teammates, items 7/9/10 on platform access and a real transaction to record.
+- Needs from Jeswin/Preethesh: someone must check the **live Devfolio countdown** and confirm which deadline is real. `brainstorming.md` flags the handbook contradicting itself by four hours, and that is the single assumption that could cost us the submission outright.
+- Commit: `cc20d6e` (pushed to `deepthi/frontend-demo`)

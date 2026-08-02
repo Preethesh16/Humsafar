@@ -10,7 +10,7 @@ import { IconCheck } from "../lib/icons.jsx";
  * external channel. The fan-out button is deliberately inert until a channel is
  * wired — it copies the summary rather than pretending a message was sent.
  */
-export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations, isMock, onDismiss }) {
+export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations, isMock, onDismiss, checkout }) {
   const closeRef = useRef(null);
 
   // A modal that can only be dismissed with the mouse is a keyboard trap. Escape
@@ -141,6 +141,11 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
             <b>{summary.failedPurchases}</b>
           </div>
         </div>
+
+        {/* Inside the panel, not after it. This is a modal overlay, so a
+            sibling rendered afterwards sits behind it and is invisible — which
+            is exactly how the pay button went missing. */}
+        {checkout}
 
         <button type="button" className="run-btn" onClick={copySummary}>
           Copy confirmation summary

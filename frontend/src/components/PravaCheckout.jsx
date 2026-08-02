@@ -1,68 +1,77 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Redirect-to-Prava checkout, from inside the app.
+ * Paying for the plan through Prava, one merchant at a time.
  *
- * The agents settle the budget and reserve each slice. This is the human
- * paying: leave for Prava's hosted page, authenticate with a passkey, come
- * back. It is Prava's documented `full_checkout` flow with no `mandate_setup`,
- * so it authorises nothing for later — one payment, made by the cardholder.
+ * **One session per merchant, because Prava cannot batch them.** Sending four
+ * merchants in `purchase_context` is rejected outright:
  *
- * Coming back is handled two ways, because neither alone is reliable:
+ *     VAL_2001 — purchase_context: "Multi-merchant checkout is not yet supported"
  *
- * - `callback_url` returns the browser here once Prava is done. Prava requires
- *   **https**, so it does nothing on a local dev server and only takes effect
- *   once deployed.
- * - The session id is parked in `sessionStorage` and the result is polled on
- *   return. That covers http origins, a passkey finished on a phone, and a
- *   closed tab — any of which would strand a redirect-only flow.
+ * That is the same constraint as the mandate model, where `listed` scope locks
+ * a mandate to a single merchant. So a four-agent plan is genuinely four
+ * payments, and pretending otherwise would mean showing one button that
+ * silently paid for a quarter of the trip.
  *
- * No credential ever reaches this component. The status route reports whether
- * one was issued and, when it was not, why. Tokens, CVVs and expiries stay
- * server-side.
+ * Each row therefore redirects to its own hosted page, and the component
+ * tracks which merchants are settled so a plan can be paid across several
+ * trips to Prava without losing its place.
+ *
+ * Returning is handled twice over, because neither way is reliable alone:
+ * `callback_url` brings the browser back but Prava requires https, so it is
+ * inert on a local dev server; the session id is also parked in
+ * `sessionStorage` and polled on return, which covers http origins, a passkey
+ * finished on a phone, and a closed tab.
+ *
+ * No credential reaches this component — the status route reports whether one
+ * was issued and, if not, why. Tokens, CVVs and expiries stay server-side.
  */
 
 const STORAGE_KEY = "humsafar.pravaCheckout";
 const POLL_MS = 3000;
 
-export default function PravaCheckout({ merchant, amount, description }) {
-  const [session, setSession] = useState(null);
-  const [result, setResult] = useState(null);
+function readParked() {
+  try {
+    return JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? "{}") ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export default function PravaCheckout({ items }) {
+  const [pending, setPending] = useState(() => readParked().pending ?? null);
+  const [settled, setSettled] = useState(() => readParked().settled ?? {});
+  const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
   const timer = useRef(null);
 
-  // Resume after the redirect. Without this, returning from Prava shows a
-  // fresh "Pay" button as though the trip to the hosted page never happened.
-  useEffect(() => {
-    let parked;
-    try {
-      parked = JSON.parse(sessionStorage.getItem(STORAGE_KEY) ?? "null");
-    } catch {
-      parked = null;
-    }
-    if (parked?.sessionId) setSession(parked);
+  const persist = useCallback((next) => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   }, []);
 
+  // Resume after the redirect. Without this, coming back from Prava shows a
+  // fresh Pay button as though the trip never happened.
   useEffect(() => {
-    if (!session?.sessionId || result) return undefined;
+    if (!pending?.sessionId) return undefined;
 
     let cancelled = false;
     const tick = async () => {
       try {
         const response = await fetch(
-          `/api/prava/checkout-sessions/${encodeURIComponent(session.sessionId)}`,
+          `/api/prava/checkout-sessions/${encodeURIComponent(pending.sessionId)}`,
         );
         if (response.ok) {
           const data = (await response.json())?.data ?? {};
           if (!cancelled && data.status && data.status !== "pending") {
-            sessionStorage.removeItem(STORAGE_KEY);
-            setResult(data);
+            const next = { pending: null, settled: { ...settled, [pending.agent]: data } };
+            setSettled(next.settled);
+            setPending(null);
+            persist(next);
             return;
           }
         }
       } catch {
-        // Transient. Keep polling rather than declaring an outcome.
+        // Transient — keep waiting rather than declaring an outcome.
       }
       if (!cancelled) timer.current = window.setTimeout(tick, POLL_MS);
     };
@@ -72,88 +81,120 @@ export default function PravaCheckout({ merchant, amount, description }) {
       cancelled = true;
       window.clearTimeout(timer.current);
     };
-  }, [session, result]);
+  }, [pending, settled, persist]);
 
-  const pay = useCallback(async () => {
-    setBusy(true);
-    setError("");
-    try {
-      const response = await fetch("/api/prava/checkout-sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount,
-          currency: "INR",
-          merchant,
-          product: { description, unitPrice: amount, quantity: 1 },
-        }),
-      });
+  const pay = useCallback(
+    async (item) => {
+      setBusy(item.agent);
+      setError("");
+      try {
+        const response = await fetch("/api/prava/checkout-sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: item.price,
+            currency: "INR",
+            merchant: {
+              name: item.vendor,
+              // Sandbox merchant details may be arbitrary — Prava says so,
+              // because no real storefront is contacted.
+              url: `https://example.com/${encodeURIComponent(
+                String(item.vendor).toLowerCase().replace(/\s+/g, "-"),
+              )}`,
+              countryCode: "IN",
+            },
+            product: { description: `${item.agent} — ${item.vendor}`, unitPrice: item.price, quantity: 1 },
+          }),
+        });
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        throw new Error(body?.error?.message ?? `Prava returned ${response.status}`);
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body?.error?.message ?? `Prava returned ${response.status}`);
+        }
+
+        const data = (await response.json())?.data ?? {};
+        if (!data.iframe_url) throw new Error("Prava did not return a checkout page");
+
+        persist({
+          pending: { sessionId: data.session_id, agent: item.agent, vendor: item.vendor },
+          settled,
+        });
+        // Full-page redirect: the passkey ceremony is more reliable as a
+        // top-level navigation than inside a frame, and it is what Prava's own
+        // walkthrough describes.
+        window.location.href = data.iframe_url;
+      } catch (caught) {
+        setError(caught.message || "Could not start the payment");
+        setBusy(null);
       }
+    },
+    [settled, persist],
+  );
 
-      const data = (await response.json())?.data ?? {};
-      if (!data.iframe_url) throw new Error("Prava did not return a checkout page");
+  if (!items.length) return null;
 
-      sessionStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ sessionId: data.session_id, merchant: merchant.name }),
-      );
-      // Full-page redirect, deliberately: the passkey ceremony is more reliable
-      // as a top-level navigation than inside a frame, and it is what Prava's
-      // own walkthrough describes.
-      window.location.href = data.iframe_url;
-    } catch (caught) {
-      setError(caught.message || "Could not start the payment");
-      setBusy(false);
-    }
-  }, [merchant, amount, description]);
-
-  if (result) {
-    const paid = result.credentialIssued;
-    return (
-      <div className={`prava-checkout ${paid ? "is-paid" : "is-failed"}`}>
-        <h4>{paid ? "✓ Payment credential issued" : "Payment did not complete"}</h4>
-        <p>
-          {paid ? (
-            <>
-              Prava issued a single-use, merchant-locked credential for{" "}
-              <strong>{merchant.name}</strong>. Session <code>{result.sessionId}</code>.
-            </>
-          ) : (
-            <>
-              Prava reported <code>{result.errorCode ?? result.status}</code>
-              {result.errorMessage ? `: ${result.errorMessage}` : ""}. Nothing was charged.
-            </>
-          )}
-        </p>
-      </div>
-    );
-  }
-
-  if (session) {
-    return (
-      <div className="prava-checkout is-waiting">
-        <h4>Waiting for Prava…</h4>
-        <p>
-          Finish on Prava&apos;s page and this updates by itself — including if you complete it
-          on your phone.
-        </p>
-      </div>
-    );
-  }
+  const outstanding = items.filter((item) => !settled[item.agent]);
+  const total = outstanding.reduce((sum, item) => sum + Number(item.price), 0);
 
   return (
     <div className="prava-checkout">
-      <button type="button" className="prava-checkout__pay" onClick={pay} disabled={busy}>
-        {busy ? "Opening Prava…" : `Pay ₹${Number(amount).toLocaleString("en-IN")} with Prava`}
-      </button>
+      <h4>Pay with Prava</h4>
       <p className="prava-checkout__note">
-        You will be taken to Prava to authenticate with your passkey. Card details are entered
-        on Prava&apos;s page — this application never sees a card number.
+        Prava does not support multi-merchant checkout, so each agent&apos;s merchant is paid
+        separately — {items.length} payments for this plan. Card details are entered on
+        Prava&apos;s page; this application never sees a card number.
       </p>
+
+      {pending && (
+        <p className="prava-checkout__waiting">
+          Waiting for Prava to settle <strong>{pending.vendor}</strong> — this updates by
+          itself, including if you finish on your phone.
+        </p>
+      )}
+
+      <ul className="prava-checkout__list">
+        {items.map((item) => {
+          const done = settled[item.agent];
+          const paid = done?.credentialIssued;
+          return (
+            <li key={item.agent} className={done ? (paid ? "is-paid" : "is-failed") : ""}>
+              <div className="prava-checkout__row">
+                <span className="prava-checkout__who">
+                  <strong>{item.vendor}</strong>
+                  <em>{item.agent}</em>
+                </span>
+                <span className="prava-checkout__amt">
+                  ₹{Number(item.price).toLocaleString("en-IN")}
+                </span>
+                {done ? (
+                  <span className="prava-checkout__state">
+                    {paid ? "✓ credential issued" : done.errorCode || done.status}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="prava-checkout__pay"
+                    onClick={() => pay(item)}
+                    disabled={Boolean(busy) || Boolean(pending)}
+                  >
+                    {busy === item.agent ? "Opening…" : "Pay"}
+                  </button>
+                )}
+              </div>
+              {done && !paid && done.errorMessage && (
+                <p className="prava-checkout__why">{done.errorMessage}</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {outstanding.length > 0 && (
+        <p className="prava-checkout__total">
+          {outstanding.length} of {items.length} outstanding · ₹{total.toLocaleString("en-IN")}
+        </p>
+      )}
+
       {error && (
         <p className="prava-checkout__error" role="alert">
           {error}

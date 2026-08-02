@@ -1147,3 +1147,15 @@ footer p { max-width: 760px; margin: 0; }
 .prava-checkout.is-failed { border-color: #e6afa3; background: #fff6f2; }
 .prava-checkout.is-waiting { border-color: #c9bdae; }
 .prava-checkout code { font-size: 0.82em; background: rgba(0,0,0,0.05); padding: 0.1em 0.35em; border-radius: 4px; }
+.prava-checkout__list { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
+.prava-checkout__list li { border: 1px solid #e2d8cc; border-radius: 10px; padding: 0.6rem 0.75rem; background: #fff; }
+.prava-checkout__list li.is-paid { border-color: #9ec9ae; background: #eef8f1; }
+.prava-checkout__list li.is-failed { border-color: #e6afa3; background: #fff6f2; }
+.prava-checkout__row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.prava-checkout__who { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 8rem; }
+.prava-checkout__who em { font-style: normal; opacity: 0.65; font-size: 0.78rem; }
+.prava-checkout__amt { font-variant-numeric: tabular-nums; font-weight: 600; }
+.prava-checkout__state { font-size: 0.8rem; font-weight: 600; opacity: 0.85; }
+.prava-checkout__why { margin: 0.4rem 0 0; font-size: 0.78rem; opacity: 0.8; }
+.prava-checkout__waiting { margin: 0.6rem 0 0 !important; font-weight: 600; }
+.prava-checkout__total { margin: 0.7rem 0 0 !important; font-size: 0.82rem; opacity: 0.8; }

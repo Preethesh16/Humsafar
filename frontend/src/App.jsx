@@ -336,43 +336,32 @@ function ReceiptPage({ state, source, navigate }) {
   const summary = useMemo(() => summarize(state), [state]);
   if (!state.receipt) return <div className="page-empty"><h2>Waiting for the agents to settle…</h2></div>;
 
-  // What the user chose and the agents priced — not what a mint happened to
-  // return. Keying this off a *successful purchase* was backwards: with live
-  // cards on, a Visa outage fails every mint and reports amount 0, and the
-  // advisory categories report 0 by design. So the one moment a person would
-  // most want to pay by hand was the exact moment the button disappeared.
+  // Every merchant the user chose, each payable on its own. Prava rejects a
+  // multi-merchant session outright ("Multi-merchant checkout is not yet
+  // supported"), so a four-agent plan really is four payments.
   //
-  // `choice.made` carries the vendor and price from the choice step, which are
-  // real regardless of whether any credential was ever issued.
-  const payable = Object.values(state.choice?.made ?? {})
+  // Derived from `choice.made` rather than from a successful purchase: with
+  // live agent cards on, a Visa outage fails every mint and reports amount 0,
+  // and the advisory categories report 0 by design — so keying off purchases
+  // hid the button at exactly the moment a person would want to pay by hand.
+  const payables = Object.values(state.choice?.made ?? {})
     .filter((pick) => Number(pick.price) > 0)
-    .sort((a, b) => Number(b.price) - Number(a.price))[0];
+    .sort((a, b) => Number(b.price) - Number(a.price));
 
   return (
-    <>
-      <FinalReceipt
-        receipt={state.receipt}
-        summary={summary}
-        blockedAttempts={state.blockedAttempts}
-        renegotiations={state.renegotiations}
-        isMock={source === SOURCE.MOCK}
-        onDismiss={() => navigate("/deliberate")}
-      />
-      {payable && source !== SOURCE.MOCK && (
-        <PravaCheckout
-          merchant={{
-            name: payable.vendor,
-            // Sandbox merchant details may be arbitrary; Prava states this,
-            // because no real storefront is contacted. Derived from the
-            // merchant the agent chose rather than invented per vendor.
-            url: `https://example.com/${encodeURIComponent(String(payable.vendor).toLowerCase().replace(/\s+/g, "-"))}`,
-            countryCode: "IN",
-          }}
-          amount={Number(payable.price)}
-          description={`${payable.agent} — ${payable.vendor}`}
-        />
-      )}
-    </>
+    <FinalReceipt
+      receipt={state.receipt}
+      summary={summary}
+      blockedAttempts={state.blockedAttempts}
+      renegotiations={state.renegotiations}
+      isMock={source === SOURCE.MOCK}
+      onDismiss={() => navigate("/deliberate")}
+      checkout={
+        source !== SOURCE.MOCK && payables.length > 0 ? (
+          <PravaCheckout items={payables} />
+        ) : null
+      }
+    />
   );
 }
 

@@ -195,13 +195,13 @@ class _StubTrust:
 class TrustInfluencesThePurchaseTest(unittest.TestCase):
     def test_a_flagged_merchant_loses_the_sale(self):
         emitter = EventEmitter(enabled=False)
-        trust = _StubTrust("opentable-gunpowder")
+        trust = _StubTrust("Gunpowder Assagao")
         orchestrator = Orchestrator(emitter, trust=trust)
 
         report = orchestrator.run(RunConfig(goal="Plan my Goa trip", budget_paise=to_paise(30000)))
 
         food = next(p for p in report.purchases if p.agent == "food")
-        self.assertNotEqual(food.merchant, "opentable-gunpowder")
+        self.assertNotEqual(food.merchant, "Gunpowder Assagao")
         self.assertIn("trust", food.detail)
 
     def test_an_allowed_merchant_is_left_alone(self):
@@ -215,7 +215,7 @@ class TrustInfluencesThePurchaseTest(unittest.TestCase):
 
     def test_the_switch_still_respects_the_slice(self):
         emitter = EventEmitter(enabled=False)
-        orchestrator = Orchestrator(emitter, trust=_StubTrust("duffel-anjuna-beach"))
+        orchestrator = Orchestrator(emitter, trust=_StubTrust("Anjuna Beach Resort"))
 
         report = orchestrator.run(RunConfig(goal="Plan my Goa trip", budget_paise=to_paise(30000)))
 

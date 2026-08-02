@@ -148,7 +148,11 @@ class ScopedCardClient:
         )
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                return ScopedCard(json.loads(response.read().decode("utf-8")))
+                card = ScopedCard(json.loads(response.read().decode("utf-8")))
+            # The reconciliation step needs to know which mandate was charged,
+            # and only this client knows which one it resolved.
+            card.setdefault("mandateId", mandate_id)
+            return card
         except urllib.error.HTTPError as exc:
             # 422 is the documented "failed" path and already carries the
             # locked shape, including the reason the mint was refused.
@@ -258,6 +262,7 @@ class StubScopedCardClient:
             cardId=f"stub-instruction-{index:03d}",
             cardToken=f"stub-token-{index:03d}",
             transactionId=f"stub-txn-{index:03d}",
+            mandateId=f"stub-mandate-{key[:12]}",
             dynamicCvv="000",
             expiryMonth="12",
             expiryYear="30",

@@ -214,7 +214,7 @@ class MandateResolverTest(ServerCase):
     table = {
         "/api/prava/mandates/resolve": (
             200,
-            {"data": {"mandateId": "mandate_live_1", "merchant": "duffel-taj"}, "source": "sandbox"},
+            {"data": {"mandateId": "mandate_live_1", "merchant": "Taj Holiday Village"}, "source": "sandbox"},
         ),
         "/api/scoped-cards": (
             201,
@@ -225,7 +225,7 @@ class MandateResolverTest(ServerCase):
                 "dynamicCvv": "123",
                 "expiryMonth": "12",
                 "expiryYear": "30",
-                "merchant": "duffel-taj",
+                "merchant": "Taj Holiday Village",
                 "amountCap": 100.0,
                 "status": "issued",
                 "source": "sandbox",
@@ -236,7 +236,7 @@ class MandateResolverTest(ServerCase):
     def test_the_backend_resolver_is_used_before_the_local_registry(self):
         client = ScopedCardClient(base_url=self.url, registry={})
 
-        card = client.mint("duffel-taj", to_paise(100))
+        card = client.mint("Taj Holiday Village", to_paise(100))
 
         self.assertTrue(card.issued)
         self.assertTrue(any("resolve" in path for _, path in self.handler.seen))
@@ -245,9 +245,9 @@ class MandateResolverTest(ServerCase):
 class MandateResolverFallbackTest(unittest.TestCase):
     def test_an_unreachable_backend_falls_back_to_the_local_registry(self):
         client = ScopedCardClient(
-            base_url=DEAD_URL, registry={"duffel-taj": "mandate_local"}, timeout=0.5
+            base_url=DEAD_URL, registry={"taj holiday village": "mandate_local"}, timeout=0.5
         )
-        self.assertEqual(client._resolve_mandate("duffel-taj"), "mandate_local")
+        self.assertEqual(client._resolve_mandate("Taj Holiday Village"), "mandate_local")
 
     def test_an_unknown_merchant_refuses_to_mint(self):
         client = ScopedCardClient(base_url=DEAD_URL, registry={}, timeout=0.5)

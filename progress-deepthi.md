@@ -311,3 +311,19 @@
 - Blocked on: the human completing the hosted approval. `mandateCount` is still 0, so no mandate is active and no charge is possible yet.
 - Needs from Jeswin/Preethesh: **pull this before your next Prava attempt.** If either of you has been hitting random `fetch failed` errors, this is why — it is environmental, it looks exactly like a bad key, and `curl` will not reproduce it.
 - Commit: `df0922c` (pushed to `deepthi/frontend-demo`, merged to `main`)
+
+### [2026-08-02 IST] — Audited the intake and choice pages that landed in my area
+- Prompt: pull `main`, then continue my part of the work.
+- Files changed: `frontend/src/pages/Intake.jsx`, `frontend/src/pages/Choose.jsx`, `frontend/test/render.ssr.jsx`, `progress-deepthi.md`.
+- Merged `origin/main` `f17b1e6` — the dynamic browser-to-agent trip flow, `runService`, `choiceService`, Google Maps geocoding, and `PRODUCTION-INTEGRATIONS.md`. Clean merge, working tree clean.
+- **My two remaining Priority 0 items were built by teammates while I was blocked on them.** Item 1 (goal/budget submission) is now `pages/Intake.jsx` against a real run endpoint, and the taste step I proposed in `INTERFACES.md` §6 is now `pages/Choose.jsx`. `submission.md` had also already been updated to the single post-evidence position, so the A/B variants I wrote are gone — correctly, since the evidence resolved which one applies.
+- **The gap that was left:** both new pages live in my area of ownership and neither had any render coverage, while my own acceptance criteria require render, accessibility and mobile checks to pass. New UI arrived without the checks that apply to it.
+- Found and fixed two real accessibility defects:
+  - `Intake.jsx` had 13 controls but only 10 labels. The two coordinate-override inputs carried a `placeholder` and nothing else. A placeholder is not an accessible name — it is not reliably announced and it disappears the moment you type — so both now carry an explicit `aria-label`.
+  - `Choose.jsx` conveyed which option was selected **only through a CSS class**, so a screen-reader user could not tell what they had picked. Added `aria-pressed`, which makes the toggle state programmatic rather than purely visual.
+- Decision — **I did not add `aria-live` to the choice countdown**, even though I used it on the approval panel. A per-second live region spams assistive tech, which makes the page worse rather than better; the approval countdown announces a single state, the choice timer ticks continuously. Different control, different correct answer.
+- Added render coverage for both pages, including assertions that an unrated option says "no rating available" rather than showing an invented score, and that a fixture option can never render as a live order.
+- Validation: 90/90 JS, Python OK, render assertions up from 24 to 32, clean production build.
+- Blocked on: nothing of mine. Remaining items are 7 (deploy — needs an HTTPS backend), 9 (video — needs recording) and 10 (Devfolio — needs the platform); all three need a human or external access, not code.
+- Needs from Jeswin/Preethesh: nothing.
+- Commit: `f2cfd54` (pushed to `deepthi/frontend-demo`)

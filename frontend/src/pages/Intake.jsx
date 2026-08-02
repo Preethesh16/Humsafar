@@ -173,8 +173,12 @@ export default function Intake({ onStarted, navigate }) {
           <summary className="field-label">Override hotel search coordinates (optional)</summary>
           <p className="field-hint">When Google Maps and Duffel are configured, Humsafar resolves your destination automatically. Only enter coordinates to override that location.</p>
           <div className="intake-grid">
-            <input className="field-input" type="number" step="any" min="-90" max="90" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="Latitude" />
-            <input className="field-input" type="number" step="any" min="-180" max="180" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="Longitude" />
+            {/* These two are the only controls on the form not wrapped in a
+                <label>. A placeholder is not an accessible name — it is never
+                guaranteed to be announced and it disappears the moment you
+                type — so the name is carried explicitly. */}
+            <input className="field-input" type="number" step="any" min="-90" max="90" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="Latitude" aria-label="Latitude override" />
+            <input className="field-input" type="number" step="any" min="-180" max="180" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="Longitude" aria-label="Longitude override" />
           </div>
         </details>
       </div>

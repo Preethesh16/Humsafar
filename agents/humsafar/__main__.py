@@ -22,6 +22,7 @@ from .events import EventEmitter
 from .llm import Narrator
 from .money import format_inr
 from .orchestrator import run_goal
+from .processor import DeclinedByTestCard
 from .reporting import ChargeReporter
 from .trust import TrustClient
 
@@ -107,6 +108,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--choice-timeout", type=int, default=45, help="Seconds before the agent picks"
     )
+    # Prava's step 4: present the card at a real merchant. Step 5 says the
+    # decline IS the expected sandbox result, so this records a checkout a
+    # human actually performed rather than assuming one.
+    parser.add_argument(
+        "--merchant", metavar="NAME", help="Merchant where the card was presented by hand"
+    )
+    parser.add_argument(
+        "--merchant-declined",
+        metavar="MESSAGE",
+        help="Verbatim decline message the merchant's checkout showed",
+    )
     parser.add_argument("--llm", action="store_true", help="Use OpenAI for agent dialogue")
     parser.add_argument("--overspend", metavar="AGENT", help="Have this agent attempt an over-slice charge")
     parser.add_argument("--fail", metavar="AGENT", help="Fail this agent's booking once, then recover")
@@ -189,8 +201,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.await_approval
         else AutoApproval()
     )
+    processor = (
+        DeclinedByTestCard(args.merchant, args.merchant_declined)
+        if args.merchant and args.merchant_declined
+        else None
+    )
     checkout = (
-        LiveCheckout(reporter=ChargeReporter(base_url=args.backend, token=token))
+        LiveCheckout(reporter=ChargeReporter(base_url=args.backend, token=token), processor=processor)
         if args.live_checkout
         else None
     )
@@ -209,7 +226,7 @@ def main(argv: list[str] | None = None) -> int:
         f"  discovery   : {'local FIXTURE data' if args.local_discovery else 'backend route (Duffel when configured)'}\n"
         f"  trust check : {'on' if args.trust else 'off'}\n"
         f"  approval    : {'HUMAN via approval API' if args.await_approval else 'auto (no human decision)'}\n"
-        f"  checkout    : {'LIVE Prava credential + reconciliation' if args.live_checkout else 'SIMULATED (fixture)'}\n"
+        f"  checkout    : {('LIVE + merchant attempt at ' + args.merchant) if (args.live_checkout and args.merchant) else ('LIVE Prava credential, no merchant attempt' if args.live_checkout else 'SIMULATED (fixture)')}\n"
         f"  reasoning   : {'OpenAI Agents SDK' if narrator.available else 'deterministic templates'}\n"
         f"  specialists : {', '.join(categories)}\n"
         f"  streaming   : {'off' if args.no_stream else args.backend}\n",

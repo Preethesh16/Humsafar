@@ -157,6 +157,17 @@ class DestinationAwarenessTest(unittest.TestCase):
             options = FixtureDiscovery().discover(category, "trip to Ziro")
             self.assertTrue(options, f"{category} produced nothing")
 
+    def test_the_journey_shortlist_matches_the_users_transport_choice(self):
+        from humsafar.discovery import FixtureDiscovery
+
+        train = FixtureDiscovery(travel_mode="train").discover("flights", "trip to Goa")
+        compare = FixtureDiscovery(travel_mode="compare").discover("flights", "trip to Goa")
+
+        self.assertTrue(all("Rail" in option.vendor for option in train))
+        self.assertTrue(any("Rail" in option.vendor for option in compare))
+        self.assertTrue(any("Air" in option.vendor or option.vendor == "IndiGo" for option in compare))
+        self.assertTrue(all(option.source == "fixture" for option in compare))
+
 
 class ChoiceDrivesThePurchaseTest(unittest.TestCase):
     def _run(self, choice):

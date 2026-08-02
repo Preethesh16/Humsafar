@@ -14,6 +14,10 @@ export const IconPlane = (p) => (
   <svg {...base} {...p}><path d="M10.2 9 3.5 6.6l1.6-1.6 8 1.9 3.6-3.6a2 2 0 1 1 2.8 2.8l-3.6 3.6 1.9 8-1.6 1.6L14.8 12l-3 3 .3 3.2-1.3 1.3-1.7-3.6-3.6-1.7 1.3-1.3 3.2.3 3-3Z" /></svg>
 );
 
+export const IconRoute = (p) => (
+  <svg {...base} {...p}><circle cx="6" cy="18" r="2.5" /><circle cx="18" cy="6" r="2.5" /><path d="M8.5 18h2.2a3 3 0 0 0 3-3v-6a3 3 0 0 1 3-3h-1.2" /></svg>
+);
+
 export const IconHome = (p) => (
   <svg {...base} {...p}><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V20h14V9.5" /><path d="M9.5 20v-5.5h5V20" /></svg>
 );
@@ -64,7 +68,7 @@ export const IconRefresh = (p) => (
 
 /** Maps an agent id from the locked contract to its glyph. */
 export const AGENT_ICON = {
-  flights: IconPlane,
+  flights: IconRoute,
   stay: IconHome,
   food: IconFood,
   guide: IconCompass,

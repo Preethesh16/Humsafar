@@ -306,7 +306,7 @@ Landed locally on Preethesh's branch and awaiting the one-shot merge:
 - Validated one-shot choice API; every selected option is affordable and bound into the approval digest.
 - Choice now occurs before approval, and execution uses the approved option rather than selecting afterward.
 - Run status, concurrency protection, child-process backpressure protection, and same-origin token proxy.
-- Destination-aware fallback for arbitrary origin/destination/duration; Duffel flights use entered IATA/date context, and Duffel Stays uses a server-side Google geocode or an explicit coordinate override.
+- Destination-aware fallback for arbitrary origin/destination/duration and requested journey mode; Duffel uses optional provider context, while a cached/keyless Nominatim client geocodes stays and Google remains an override.
 - No router advisory chain: the five linear screens use the native History API; production audit is clean.
 
 Still external/release work, not silently treated as complete: configure OpenAI,

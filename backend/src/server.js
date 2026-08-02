@@ -2,6 +2,7 @@ import { createApp } from "./app.js";
 import { EventHub } from "./events/eventHub.js";
 import { DuffelClient } from "./integrations/duffelClient.js";
 import { GoogleMapsClient } from "./integrations/googleMapsClient.js";
+import { NominatimClient } from "./integrations/nominatimClient.js";
 import { PravaClient } from "./integrations/pravaClient.js";
 import { DiscoveryService } from "./services/discoveryService.js";
 import { ApprovalService } from "./services/approvalService.js";
@@ -27,12 +28,15 @@ const scopedCardService = new ScopedCardService({
   mandateMerchants,
 });
 const pravaClient = scopedCardService.pravaClient;
+const geocoder = process.env.GOOGLE_MAPS_API_KEY
+  ? new GoogleMapsClient()
+  : new NominatimClient();
 const app = createApp({
   eventHub: new EventHub(),
   scopedCardService,
   discoveryService: new DiscoveryService({
     duffelClient: new DuffelClient(),
-    googleMapsClient: new GoogleMapsClient(),
+    googleMapsClient: geocoder,
   }),
   mandateService: new MandateService({ pravaClient, mandateMerchants }),
   approvalService: new ApprovalService(),

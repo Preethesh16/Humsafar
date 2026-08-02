@@ -13,7 +13,7 @@ npm install && npm start          # http://127.0.0.1:3000
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-The root page is a dynamic trip intake. Starting a run switches to the live
+The root page is an eight-question conversational trip concierge. Starting a run switches to the live
 stream automatically and persists the run correlation for refreshes. With no
 run, the dashboard can still boot on the clearly labelled mocked stream; use
 `?source=live` or `?source=mock` to select explicitly.
@@ -48,7 +48,7 @@ npm run build     # production bundle
 | `src/state/sessionReducer.js` | Pure fold of the locked event contract into UI state. No React — unit-tested directly. |
 | `src/lib/mockStream.js` | **MOCKED** scripted replay of the `brainstorming.md` Section 7 demo beats. |
 | `src/lib/useEventStream.js` | Switches between the mock replay and `EventSource("/api/events")`. |
-| `src/pages/Intake.jsx` | Structured origin/destination, IATA, dates, travellers, rooms, budget and preference input; coordinates are only an advanced override because the backend can geocode automatically. |
+| `src/pages/Intake.jsx` | One-question-at-a-time destination, origin, journey mode, dates/flexibility, party, budget and vibe intake. Provider codes and coordinates are deliberately absent from the user flow. |
 | `src/pages/Choose.jsx` | Affordable option selection with honest ranking and timeout labels. |
 | `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, final receipt. |
 | `src/lib/icons.jsx` | Inline SVG glyphs. Presentation only. |

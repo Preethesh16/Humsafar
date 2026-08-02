@@ -32,6 +32,8 @@ const trip = {
   returnDate: "2026-08-13",
   travelers: 2,
   rooms: 1,
+  travelMode: "train",
+  dateFlexibility: "exact",
 };
 
 test("RunService launches provider-backed agents with structured trip context", () => {
@@ -45,11 +47,21 @@ test("RunService launches provider-backed agents with structured trip context", 
   assert.ok(args.includes("--llm"));
   assert.equal(args[args.indexOf("--destination-code") + 1], "GOI");
   assert.equal(args[args.indexOf("--travelers") + 1], "2");
+  assert.equal(args[args.indexOf("--travel-mode") + 1], "train");
+  assert.equal(started.trip.dateFlexibility, "exact");
   assert.deepEqual(options.stdio, ["ignore", "ignore", "ignore"]);
   assert.equal(service.get(started.runId).status, "running");
 
   children[0].emit("exit", 0);
   assert.equal(service.get(started.runId).status, "complete");
+});
+
+test("RunService rejects unknown travel modes", () => {
+  const { service } = harness();
+  assert.throws(
+    () => service.start({ ...trip, travelMode: "teleport" }),
+    (error) => error.code === "INVALID_TRAVELMODE",
+  );
 });
 
 test("RunService never enables Prava or live checkout implicitly", () => {

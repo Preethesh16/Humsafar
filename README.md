@@ -57,7 +57,7 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Negotiation, mediation, convergence | **Working.** Deterministic, tested, terminates by construction. |
 | Scoped-card abstraction and cap enforcement | **Working**, against a stub credential issuer by default. |
 | Live dashboard over SSE | **Working**, including reconnect replay. |
-| Dynamic browser intake | **Working.** Free-form cities plus IATA codes, dates, travellers, rooms, budget and preferences start a real agent subprocess. |
+| Conversational trip concierge | **Working.** Eight one-question prompts collect ordinary city names, journey mode, flexible/exact dates, party, budget and vibe—no IATA codes or coordinates. |
 | Human option choice | **Working.** Only offered affordable options are accepted, once; selections are bound into approval. |
 | Run-scoped approval protocol | **Working** and verified end to end. |
 | Prava sandbox authentication | **Verified.** `npm run prava:verify` returns authentication OK. |
@@ -65,7 +65,7 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Scoped credential issuance | **Verified on real rails.** Four credentials issued in a single run, one per agent, each capped at its own slice. |
 | Network cap enforcement | **Verified.** Visa declined ₹160 against a ₹100 mandate — *"Total amount 160.00 exceeds …"*. |
 | Merchant order | **Not performed.** No goods were bought; the charge is deliberately left unreconciled. |
-| Duffel flights/stays | **Wired for live test search.** With `GOOGLE_MAPS_API_KEY`, destinations are geocoded automatically for stays. Missing provider access falls back to disclosed destination-aware fixtures. |
+| Duffel flights/stays | **Optional live test search.** Keyless cached OpenStreetMap geocoding is the default; Google is an optional override. Missing provider access falls back to disclosed destination- and journey-aware estimates. |
 | Guide / Food inventory | **Fixtures by design**, shaped like Viator/OpenTable responses. Partner API access does not clear in a hackathon window. |
 
 ### What actually happened on Prava

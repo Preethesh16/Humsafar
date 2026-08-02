@@ -41,6 +41,8 @@ export class RunService {
     longitude,
     travelers = 1,
     rooms = 1,
+    travelMode = "compare",
+    dateFlexibility = "flexible",
     awaitApproval = true,
     awaitChoice = true,
   } = {}) {
@@ -58,7 +60,7 @@ export class RunService {
     const trip = validateTrip({
       days, origin, destination, originCode, destinationCode,
       departureDate, returnDate, travelers, rooms,
-      latitude, longitude,
+      latitude, longitude, travelMode, dateFlexibility,
     });
 
     const runId = `run-${randomUUID().slice(0, 12)}`;
@@ -83,6 +85,7 @@ export class RunService {
     pushArg(args, "--longitude", trip.longitude);
     pushArg(args, "--travelers", trip.travelers);
     pushArg(args, "--rooms", trip.rooms);
+    pushArg(args, "--travel-mode", trip.travelMode);
     if (awaitApproval) args.push("--await-approval");
     if (awaitChoice) args.push("--await-choice");
     if (this.env.OPENAI_API_KEY) args.push("--llm");
@@ -155,6 +158,8 @@ function validateTrip(input) {
   const returnDate = isoDate(input.returnDate, "returnDate");
   const latitude = coordinate(input.latitude, "latitude", -90, 90);
   const longitude = coordinate(input.longitude, "longitude", -180, 180);
+  const travelMode = oneOf(input.travelMode, "travelMode", ["compare", "flight", "train", "bus", "drive"], "compare");
+  const dateFlexibility = oneOf(input.dateFlexibility, "dateFlexibility", ["exact", "flexible"], "flexible");
   if ((latitude === null) !== (longitude === null)) {
     throw new RunError("latitude and longitude must be supplied together", "INCOMPLETE_COORDINATES");
   }
@@ -173,6 +178,8 @@ function validateTrip(input) {
     returnDate,
     latitude,
     longitude,
+    travelMode,
+    dateFlexibility,
   };
 }
 
@@ -206,6 +213,15 @@ function isoDate(value, field) {
 function optionalText(value) {
   if (value === undefined || value === null || value === "") return null;
   return String(value).trim().slice(0, 120) || null;
+}
+
+function oneOf(value, field, allowed, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const normalized = String(value).trim().toLowerCase();
+  if (!allowed.includes(normalized)) {
+    throw new RunError(`${field} must be one of: ${allowed.join(", ")}`, `INVALID_${field.toUpperCase()}`);
+  }
+  return normalized;
 }
 
 function coordinate(value, field, min, max) {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { destinationFromGoal, mapsUrl } from "../src/lib/maps.js";
+import { destinationFromGoal, isExactPlace, mapsUrl } from "../src/lib/maps.js";
 
 test("builds a keyless Google Maps search for the vendor and place", () => {
   const url = mapsUrl("Anjuna Beach Resort", "Goa");
@@ -51,4 +51,24 @@ test("an unparseable goal returns empty rather than nonsense", () => {
   assert.equal(destinationFromGoal(""), "");
   assert.equal(destinationFromGoal(undefined), "");
   assert.equal(destinationFromGoal("something entirely different"), "");
+});
+
+test("a place id pins the link to one location instead of a search", () => {
+  const url = mapsUrl("The Hosteller", "Goa", "ChIJabc123");
+  assert.ok(url.startsWith("https://www.google.com/maps/place/?api=1&query="));
+  assert.ok(url.includes("query_place_id=ChIJabc123"));
+});
+
+test("without a place id it falls back to search, and says so", () => {
+  assert.equal(isExactPlace(undefined), false);
+  assert.equal(isExactPlace(""), false);
+  assert.equal(isExactPlace("   "), false);
+  assert.equal(isExactPlace("ChIJabc123"), true);
+  assert.ok(mapsUrl("The Hosteller", "Goa").includes("/maps/search/"));
+});
+
+test("the place id is encoded, so it cannot inject extra parameters", () => {
+  const url = mapsUrl("X", "Goa", "abc&zoom=2");
+  assert.ok(!url.includes("&zoom=2"), "injected parameters must be encoded away");
+  assert.ok(url.includes(encodeURIComponent("abc&zoom=2")));
 });

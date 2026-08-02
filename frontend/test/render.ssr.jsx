@@ -244,7 +244,10 @@ assert.ok(chooseHtml.includes('aria-pressed'), "option selection state is progra
 // choose button — nesting an <a> in a <button> is invalid HTML, traps the
 // keyboard, and would make "look this place up" select it.
 assert.ok(chooseHtml.includes("google.com/maps/search/"), "options link out to Google Maps");
-assert.ok(chooseHtml.includes("View on map"), "the map link is visible");
+// These fixture options carry no place id, so the link can only search. The
+// label must say so rather than promising one location it cannot deliver.
+assert.ok(chooseHtml.includes("Search on map"), "an unpinned option offers a search");
+assert.ok(!chooseHtml.includes("View on map"), "without a place id it must not claim to show one place");
 assert.ok(
   chooseHtml.includes('rel="noopener noreferrer"'),
   "external links must not hand the opener to another origin",
@@ -254,6 +257,28 @@ assert.ok(
   "no anchor may be nested inside a button",
 );
 assert.ok(!/[?&]key=/.test(chooseHtml), "no Maps API key may reach client markup");
+
+// With a place id the same card pins to exactly one location.
+const pinnedState = {
+  choice: {
+    requested: {
+      stay: {
+        agent: "stay",
+        slice: 11200,
+        ranking: "rating",
+        timeoutSeconds: 45,
+        options: [
+          { optionId: "p1", vendor: "Taj Holiday Village", description: "Garden villa", price: 11200, rating: 4.8, source: "fixture", placeId: "ChIJpinned" },
+        ],
+      },
+    },
+    made: {},
+  },
+};
+const pinnedHtml = renderToStaticMarkup(<Choose state={pinnedState} runId="run_1" goal="trip to Goa" />);
+assert.ok(pinnedHtml.includes("google.com/maps/place/"), "a place id uses the exact-place endpoint");
+assert.ok(pinnedHtml.includes("query_place_id=ChIJpinned"), "the place id is carried into the link");
+assert.ok(pinnedHtml.includes("View on map"), "a pinned option may claim to show the place");
 assert.ok(!chooseHtml.includes("live order"), "a fixture option must never read as a live order");
 
 // The app shell itself must render — it carries the hero, the journey stepper
@@ -285,7 +310,7 @@ for (const [needle, description] of [
 for (const [needle, description] of [
   ["Where do you want to disappear to?", "first conversational question"],
   ["A city, state, beach, mountains", "plain-language destination prompt"],
-  ["Question 1 of 9", "question progress"],
+  ["Question 1 of 10", "question progress"],
   ["trip concierge", "concierge mode label"],
   ["Planning and negotiation are live", "honest capability boundary"],
 ]) {

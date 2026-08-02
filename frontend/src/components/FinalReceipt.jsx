@@ -110,7 +110,13 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
                   )}
                 </span>
                 <span className="outcome-amount">
-                  {failed ? "not charged" : line.outcome === "credential_issued" ? "authorised only" : money(line.amount)}
+                  {failed
+                    ? "not charged"
+                    : line.outcome === "credential_issued"
+                      ? "authorised only"
+                      : line.outcome === "advisory"
+                        ? "reserved · unspent"
+                        : money(line.amount)}
                 </span>
               </li>
             );

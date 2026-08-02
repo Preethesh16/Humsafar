@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import Choose from "./pages/Choose.jsx";
 import Intake from "./pages/Intake.jsx";
@@ -8,12 +8,14 @@ import { AuditLog } from "./components/AuditLog.jsx";
 import { BudgetSplit } from "./components/BudgetSplit.jsx";
 import { DeliberationFeed } from "./components/DeliberationFeed.jsx";
 import { FinalReceipt } from "./components/FinalReceipt.jsx";
+import { ItineraryPlan } from "./components/ItineraryPlan.jsx";
 import { ProofPanel } from "./components/ProofPanel.jsx";
 import { PurchaseCards } from "./components/PurchaseCards.jsx";
 import { PHASES, summarize } from "./state/sessionReducer.js";
 import { SOURCE, initialSource, useEventStream } from "./lib/useEventStream.js";
 import { money } from "./lib/agents.js";
 import { IconArrow, IconCheck, IconSearch, IconSpark } from "./lib/icons.jsx";
+import { previewItinerary, stayReplanRequest } from "./lib/itinerary.js";
 
 /**
  * The four journey steps, and which phases mark each one reached. Derived
@@ -43,7 +45,7 @@ const PHASE_LABEL = {
   [PHASES.COMPLETE]: "settled",
 };
 
-export function Dashboard({ state, connection, source, setSource, goal }) {
+export function Dashboard({ state, connection, source, setSource, goal, itinerary }) {
   const [receiptDismissed, setReceiptDismissed] = useState(false);
 
   const summary = useMemo(() => summarize(state), [state]);
@@ -167,6 +169,8 @@ export function Dashboard({ state, connection, source, setSource, goal }) {
         })}
       </div>
 
+      <ItineraryPlan plan={itinerary} compact />
+
       <main className="workspace">
         <DeliberationFeed messages={state.messages} round={state.round} />
 
@@ -191,8 +195,8 @@ export function Dashboard({ state, connection, source, setSource, goal }) {
         <p>
           <strong>Truth layer.</strong> Every purchase carries the source it came from —{" "}
           <strong>live</strong> or <strong>fixture</strong> — and an untagged result is
-          shown as unverified, never as a completed payment. Guide and Food responses are
-          fixtures shaped like Viator and OpenTable, disclosed as an MVP cut.
+          shown as unverified, never as a completed payment. Food and activity ideas are
+          advisory: mapped possibilities and estimates, with no card or booking claim.
         </p>
         <span className="footer-mark">Humsafar · dashboard 0.2</span>
       </footer>
@@ -223,21 +227,54 @@ export function Dashboard({ state, connection, source, setSource, goal }) {
 export default function App() {
   const [runId, setRunId] = useState(() => readSession("humsafar.runId"));
   const [goal, setGoal] = useState(() => readSession("humsafar.goal"));
+  const [itinerary, setItinerary] = useState(() => readJsonSession("humsafar.itinerary"));
   const [source, setSource] = useState(initialSource);
+  const rebasingStay = useRef(null);
   const { state, connection } = useEventStream(source, runId);
   const { pathname, navigate } = useHistoryRoute();
 
-  const started = ({ runId: nextRunId, goal: nextGoal }) => {
+  // The first preview uses the destination centre because no room exists yet.
+  // As soon as the stay agent/user chooses one, geocode that exact stay and
+  // rebuild every day's first/last leg around it. This is a planning refresh,
+  // not a reservation or payment call.
+  useEffect(() => {
+    const stayName = state.choice?.made?.stay?.vendor;
+    if (!stayName || !itinerary || itinerary.base?.name === stayName) return;
+    const requestKey = `${runId ?? "pending"}:${stayName}`;
+    if (rebasingStay.current === requestKey) return;
+    rebasingStay.current = requestKey;
+    let cancelled = false;
+    previewItinerary(stayReplanRequest(itinerary, stayName))
+      .then((next) => {
+        if (cancelled) return;
+        setItinerary(next);
+        writeSession("humsafar.itinerary", JSON.stringify(next));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const next = {
+          ...itinerary,
+          baseAssumption: `Stay selected (${stayName}), but its map pin could not be confirmed; routes still use the destination centre.`,
+        };
+        setItinerary(next);
+        writeSession("humsafar.itinerary", JSON.stringify(next));
+      });
+    return () => { cancelled = true; };
+  }, [state.choice?.made?.stay?.vendor, itinerary, runId]);
+
+  const started = ({ runId: nextRunId, goal: nextGoal, itinerary: nextItinerary }) => {
     setRunId(nextRunId);
     setGoal(nextGoal);
     setSource(SOURCE.LIVE);
+    setItinerary(nextItinerary ?? null);
     writeSession("humsafar.runId", nextRunId);
     writeSession("humsafar.goal", nextGoal);
+    writeSession("humsafar.itinerary", JSON.stringify(nextItinerary ?? null));
   };
 
   let page;
   if (pathname === "/deliberate") {
-    page = <Dashboard state={state} connection={connection} source={source} setSource={setSource} goal={goal} />;
+    page = <Dashboard state={state} connection={connection} source={source} setSource={setSource} goal={goal} itinerary={itinerary} />;
   } else if (pathname === "/choose") {
     page = <Choose state={state} runId={runId ?? state.runId} goal={goal} />;
   } else if (pathname === "/approve") {
@@ -329,6 +366,16 @@ function useHistoryRoute() {
 function readSession(key) {
   if (typeof sessionStorage === "undefined") return null;
   return sessionStorage.getItem(key);
+}
+
+function readJsonSession(key) {
+  const value = readSession(key);
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 function writeSession(key, value) {

@@ -18,6 +18,7 @@ experience, the only additional key required is the existing server-side
 | `PRAVA_PUBLISHABLE_KEY` | No, not in the current REST flow | Reserved for a future Prava browser SDK integration. Never substitute it for the secret key. |
 | `INTERNAL_API_TOKEN` | Only when deployed off localhost | Protects state-changing backend routes. Generate this ourselves; it is not a third-party API key. |
 | `DUFFEL_ACCESS_TOKEN` | **Optional** | Live/test flight and stay search. Current code does not place Duffel orders. Free/no-key mode uses disclosed estimates and checkout handoffs. |
+| `GEOAPIFY_API_KEY` | **Yes for the mapped local planner** | Server-side place discovery, nearby food possibilities and route distance/duration. It never proves opening hours, a ticket, a table or a booking. |
 | `GOOGLE_MAPS_API_KEY` | **Optional** | Paid geocoder override. The default is now keyless OpenStreetMap Nominatim. |
 
 Do **not** create a separate OpenAI key per agent. Agent isolation comes from
@@ -31,9 +32,9 @@ These services improve planning without pretending to be booking APIs:
 | Need | Free path | Current state and constraint |
 |---|---|---|
 | Destination coordinates | OpenStreetMap Nominatim | **Implemented.** User-triggered only, server-cached, identified with a custom User-Agent, serialised and limited to one request/second. Public Nominatim is suitable for this hackathon/low-volume use, not an SLA-backed commercial launch. Set `HUMSAFAR_NOMINATIM_URL` to a self-hosted instance when scaling. |
-| Weather | Open-Meteo | Recommended next adapter. No key for non-commercial use; attribution, usage limits and no uptime guarantee apply. Self-hosting is available. |
-| Restaurants, sights and essentials | OpenStreetMap/Overpass | Recommended discovery source. Public instances are best-effort and rate-limited; cache or self-host. Results prove a place exists, not that a table/ticket is available. |
-| Road distance and duration | Self-hosted OSRM or public demo for development | Open source and no proprietary key when self-hosted. The public demo is not a production SLA. |
+| Weather | Open-Meteo | **Implemented, keyless.** Exact-date forecasts are shown only inside the provider's 16-day window; distant dates are labelled unavailable. |
+| Restaurants, sights and essentials | Geoapify Places | **Implemented.** Real mapped POIs and nearby meal possibilities; public place data is not availability, popularity, opening-hours or booking proof. |
+| Road distance and duration | Geoapify Routing | **Implemented.** Multi-stop drive/walk/bicycle/scooter/transit routing; an outage degrades to a labelled straight-line estimate. |
 | Rail/bus planning | Operator-published GTFS/static schedules where available, otherwise an honest search handoff | No single complete, reliable, free India-wide transactional feed exists. Never scrape IRCTC. Exact availability and ticketing remain on the official/authorized checkout surface. |
 | Destination knowledge | Wikivoyage/Wikimedia APIs | Useful for itinerary context with attribution; not pricing or availability. |
 
@@ -93,3 +94,25 @@ option.
 Until those boundaries are granted, adapters return a clearly labelled
 estimate, public-data result or checkout handoff. They must not emit a completed
 merchant checkout.
+
+## Local planner contract now implemented
+
+The concierge asks whether the traveller wants to choose from mapped suggestions
+or let Humsafar decide, then collects interests, pace and local transport. The
+backend groups geographically close places, orders each group by nearest next
+stop, inserts nearby lunch/dinner possibilities, adds travel time and returns to
+the route base each night. Before accommodation is chosen the base is explicitly
+the destination centre; after the Stay choice, the selected property is geocoded
+and the route is rebuilt around it.
+
+Only place coordinates, routes and in-window weather are provider facts. Visit
+duration, entry and meal ranges are planning estimates. Food and activities are
+passed to the agent layer as `advisory` categories: they may reserve budget but
+cannot mint a card or claim a checkout. Duffel results are accepted into the INR
+budget only when Duffel returns `INR`; another billing currency fails closed
+rather than being silently treated as rupees.
+
+REST Countries is not used for domestic Goa planning. Adding an unrelated key
+would increase secret and failure surface without improving places, routing,
+weather or inventory; it belongs in a future international-entry-requirements
+adapter if that feature is built.

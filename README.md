@@ -59,6 +59,7 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Scoped-card abstraction and cap enforcement | **Working**, against a stub credential issuer by default. |
 | Live dashboard over SSE | **Working**, including reconnect replay. |
 | Conversational trip concierge | **Working.** Nine one-question prompts collect ordinary city names, journey mode, flexible/exact dates, party, optional trip parts, accommodation style, budget and vibe—no IATA codes or coordinates. |
+| Local day planner | **Working with Geoapify.** Travellers choose mapped suggestions or “decide for me”; Humsafar clusters nearby stops, routes them with timings, suggests nearby food/cost ranges without booking it, and returns to the selected stay each night. Open-Meteo supplies in-window weather. |
 | Flexible specialist scope | **Working.** Travellers can disable Journey, Stay, Food or Things to do; disabled agents do not negotiate, receive a slice, offer choices or execute. |
 | Group accommodation | **Working in concierge mode.** Party/room-aware comparisons include hotel rooms, hostels, homestays and entire-home/villa estimates. Whole-home rows are labelled search handoffs/fixtures, not live Airbnb inventory. |
 | Human option choice | **Working.** Only offered affordable options are accepted, once; selections are bound into approval. |
@@ -68,8 +69,8 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Scoped credential issuance | **Verified on real rails.** Four credentials issued in a single run, one per agent, each capped at its own slice. |
 | Network cap enforcement | **Verified.** Visa declined ₹160 against a ₹100 mandate — *"Total amount 160.00 exceeds …"*. |
 | Merchant order | **Not performed.** No goods were bought; the charge is deliberately left unreconciled. |
-| Duffel flights/stays | **Optional live test search.** Keyless cached OpenStreetMap geocoding is the default; Google is an optional override. Missing provider access falls back to disclosed destination- and journey-aware estimates. |
-| Guide / Food inventory | **Fixtures by design**, shaped like Viator/OpenTable responses. Partner API access does not clear in a hackathon window. |
+| Duffel flights/stays | **Optional provider test search, not order creation.** Ordinary city names are resolved through Duffel Places. Non-INR inventory fails closed; missing/unsupported provider access falls back to disclosed estimates. |
+| Activities / Food | **Advisory only.** Geoapify supplies real mapped possibilities and the planner supplies labelled cost bands. No activity ticket, guide, restaurant reservation, card or payment is claimed. |
 
 ### What actually happened on Prava
 
@@ -155,7 +156,7 @@ observed on a single line.
         ┌────────────────────────────────┐    ┌──────────┐
         │  Dashboard (React + Vite)      │    │  Prava   │
         │  deliberation · split · cards  │    │  sandbox │
-        │  approval · proof · audit      │    └──────────┘
+        │  itinerary · approval · audit │    └──────────┘
         └────────────────────────────────┘   Deepthi
 ```
 
@@ -246,10 +247,12 @@ Required by the hackathon rules, and stated precisely:
   conversations. That is ideation and planning — no product code.
 - **Inside the official build window:** all source code, all tests, every commit in this
   repository, and all working integrations.
-- **Not real, and labelled as such:** Guide and Food inventory are fixtures shaped like
-  Viator/OpenTable responses, because partner API approval does not clear in a weekend.
-  Flights and stays fall back to the same fixture mechanism whenever Duffel is
-  unconfigured, and the run prints which source each category actually resolved to.
+- **Not bookings, and labelled as such:** the day planner uses real Geoapify map/place
+  results for food and activities, but its cost bands are estimates and those categories
+  are advisory—no card, reservation or order is created. The agent negotiation still
+  uses disclosed Guide/Food estimate rows until a transactional partner exists. Flights
+  and stays fall back to disclosed fixtures whenever Duffel is unconfigured or unusable,
+  and the run prints which source each category actually resolved to.
 - **Payment status:** Prava **sandbox** only — no production access was requested or used,
   and no real money moved at any point. Five mandates were approved by a human through
   Prava's hosted passkey ceremony. Four merchant-scoped, amount-capped credentials were

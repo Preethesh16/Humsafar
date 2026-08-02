@@ -514,6 +514,122 @@ footer p { max-width: 760px; margin: 0; }
   * { animation: none !important; transition: none !important; }
 }
 
+/* ---------------------- real local itinerary planner ---------------------- */
+.planner-mode-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.planner-subquestion { margin-top: 24px; }
+.planner-subquestion > strong { display: block; margin-bottom: 10px; color: var(--forest); }
+
+.planner-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.planner-controls label { display: grid; gap: 7px; color: var(--muted); font-size: 13px; }
+.planner-controls select {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.mapped-place-picker { margin-top: 22px; }
+.secondary-action {
+  border: 1px solid var(--forest-2);
+  border-radius: 999px;
+  padding: 10px 18px;
+  color: var(--forest);
+  background: var(--paper);
+  cursor: pointer;
+  font-weight: 650;
+}
+.secondary-action:disabled { opacity: .6; cursor: wait; }
+
+.mapped-place-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.mapped-place {
+  display: grid;
+  gap: 6px;
+  min-height: 132px;
+  padding: 14px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  color: var(--ink);
+  background: var(--paper);
+  cursor: pointer;
+}
+.mapped-place.selected { border-color: var(--forest-2); background: var(--mint); }
+.mapped-place > span { color: var(--forest-2); font: 600 11px var(--mono); text-transform: uppercase; }
+.mapped-place > small, .mapped-place > em { color: var(--muted); font-size: 12px; font-style: normal; }
+
+.planner-loading {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--forest);
+  background: var(--mint);
+}
+
+.itinerary-plan {
+  margin: 28px 0;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 253, 248, .85);
+  box-shadow: var(--shadow-small);
+}
+.app > .itinerary-plan { margin: 28px 0; }
+.itinerary-plan__head { display: flex; justify-content: space-between; gap: 24px; align-items: start; }
+.itinerary-plan__head h2 { margin: 4px 0; color: var(--forest); }
+.itinerary-plan__head p { margin: 0; color: var(--muted); }
+.itinerary-cost { display: grid; min-width: 220px; padding: 14px; border-radius: 14px; background: var(--mint); }
+.itinerary-cost span, .itinerary-cost em { color: var(--muted); font-size: 11px; font-style: normal; }
+.itinerary-cost strong { font-size: 20px; color: var(--forest); }
+
+.itinerary-days { display: grid; gap: 16px; margin-top: 22px; }
+.itinerary-day { padding: 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); }
+.itinerary-day > header { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
+.itinerary-day > header span { color: var(--muted); font: 600 11px var(--mono); text-transform: uppercase; }
+.itinerary-day h3 { margin: 2px 0 0; color: var(--forest); }
+.route-total { text-align: right; color: var(--muted); font-size: 12px; }
+.route-total small { display: block; }
+.itinerary-weather, .itinerary-advice { margin: 12px 0 0; padding: 8px 11px; border-radius: 10px; background: var(--blue-soft); color: var(--ink); font-size: 12px; }
+.itinerary-weather.unavailable { background: var(--amber-soft); }
+.itinerary-advice { background: var(--paper-2); }
+
+.timeline { list-style: none; margin: 18px 0 0; padding: 0; }
+.timeline-stop { display: grid; grid-template-columns: 64px 1fr; gap: 14px; padding: 13px 0; border-top: 1px solid var(--line); }
+.timeline-stop time { color: var(--coral-ink); font: 700 13px var(--mono); }
+.timeline-stop strong { color: var(--forest); }
+.timeline-stop p { margin: 3px 0; color: var(--muted); font-size: 13px; }
+.timeline-stop a { display: inline-block; margin-top: 5px; color: var(--forest-2); font-size: 12px; }
+.timeline-stop.food > div { padding: 10px; border-radius: 12px; background: var(--amber-soft); }
+.stop-meta, .stop-route { display: block; color: var(--muted-2); font-size: 11px; }
+.food-options { display: grid; gap: 4px; margin-top: 7px; color: var(--muted); font-size: 12px; }
+.day-estimate { margin: 8px 0 0; color: var(--muted); font-size: 12px; text-align: right; }
+.itinerary-truth { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; color: var(--muted); font-size: 11px; }
+
+.itinerary-plan.compact .itinerary-days { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.itinerary-plan.compact .itinerary-day { min-width: 0; }
+
+@media (max-width: 800px) {
+  .planner-mode-options, .planner-controls, .mapped-place-grid, .itinerary-plan.compact .itinerary-days { grid-template-columns: 1fr; }
+  .itinerary-plan__head, .itinerary-day > header { flex-direction: column; }
+  .itinerary-cost { min-width: 0; width: 100%; }
+  .route-total { text-align: left; }
+  .itinerary-plan { padding: 16px; }
+}
+
 /* ── Intake and Choose pages ──────────────────────────────────────────────
    Reuses the existing tokens only. Deepthi's contrast pass fixed --muted and
    --muted-2 to clear WCAG AA on every surface; nothing here introduces a new

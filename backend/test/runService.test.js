@@ -51,6 +51,7 @@ test("RunService launches provider-backed agents with structured trip context", 
   assert.equal(args[args.indexOf("--travelers") + 1], "2");
   assert.equal(args[args.indexOf("--travel-mode") + 1], "train");
   assert.equal(args[args.indexOf("--categories") + 1], "flights,stay,food");
+  assert.equal(args[args.indexOf("--advisory-categories") + 1], "food");
   assert.equal(args[args.indexOf("--stay-style") + 1], "home");
   assert.deepEqual(started.trip.includedCategories, ["flights", "stay", "food"]);
   assert.equal(started.trip.dateFlexibility, "exact");
@@ -87,6 +88,13 @@ test("RunService never enables Prava or live checkout implicitly", () => {
   assert.equal(calls[0].args.includes("--live-cards"), false);
   assert.equal(calls[0].args.includes("--live-checkout"), false);
   assert.equal(calls[0].args.includes("--llm"), false);
+});
+
+test("RunService keeps food and guide advisory until transactional providers exist", () => {
+  const { service, calls } = harness();
+  service.start({ ...trip, includedCategories: ["stay", "food", "guide"] });
+  const { args } = calls[0];
+  assert.equal(args[args.indexOf("--advisory-categories") + 1], "food,guide");
 });
 
 test("RunService uses the configured project Python without exposing it to the browser", () => {

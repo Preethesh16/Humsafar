@@ -82,7 +82,7 @@ export function validateEvent(event) {
       }
       if (!nonNegativeNumber(event.amount)) return "purchase_result.amount is invalid";
       if (!nonEmptyString(event.merchant)) return "purchase_result.merchant is required";
-      if (event.outcome !== undefined && !new Set(["simulated", "credential_issued", "checkout_completed", "checkout_failed"]).has(event.outcome)) {
+      if (event.outcome !== undefined && !new Set(["simulated", "credential_issued", "checkout_completed", "checkout_failed", "advisory"]).has(event.outcome)) {
         return "purchase_result.outcome is invalid";
       }
       return nonEmptyString(event.details) ? undefined : "purchase_result.details is required";

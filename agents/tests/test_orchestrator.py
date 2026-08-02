@@ -82,6 +82,37 @@ class EndToEndTest(unittest.TestCase):
         messages = [event for event in emitter.sent if event["type"] == "agent_message"]
         self.assertFalse(any(event["agent"] == "guide" for event in messages))
 
+    def test_advisory_food_reserves_budget_without_minting_or_booking(self):
+        cards = StubScopedCardClient()
+        report, emitter = run(
+            categories=("flights", "stay", "food"),
+            advisory_categories=("food",),
+            card_client=cards,
+        )
+
+        food = next(purchase for purchase in report.purchases if purchase.agent == "food")
+        self.assertEqual(food.amount_paise, 0)
+        self.assertEqual(food.outcome, "advisory")
+        self.assertIn("No card was minted", food.detail)
+        self.assertEqual(len(cards.minted), 2)
+        self.assertFalse(any(
+            event["type"] == "card_issued" and event["agent"] == "food"
+            for event in emitter.sent
+        ))
+        approval = next(event for event in emitter.sent if event["type"] == "approval_requested")
+        self.assertGreater(approval["allocations"]["food"], 0)
+
+    def test_advisory_guide_is_not_described_as_a_food_reservation(self):
+        report, _ = run(
+            categories=("stay", "guide"),
+            advisory_categories=("guide",),
+        )
+
+        guide = next(purchase for purchase in report.purchases if purchase.agent == "guide")
+        self.assertEqual(guide.outcome, "advisory")
+        self.assertIn("activity suggestions", guide.detail)
+        self.assertNotIn("restaurant", guide.detail)
+
 
 class OverspendTest(unittest.TestCase):
     def test_an_over_slice_charge_is_refused(self):

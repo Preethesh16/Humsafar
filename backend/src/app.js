@@ -14,7 +14,7 @@ import {
   verifySessionToken,
 } from "./session.js";
 
-export function createApp({ eventHub, scopedCardService, runService, discoveryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -148,6 +148,21 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
     }
   });
 
+  // Browser-reachable: `frontend/src/lib/itinerary.js` calls both of these
+  // directly from the intake page. Left on the agent-only token they would 401
+  // for every real visitor once deployed, which is the same failure the session
+  // layer exists to prevent — it just would not show up in development, where
+  // the Vite proxy supplies the token.
+  app.post("/api/itineraries/suggestions", browserOrAgent, async (request, response) => {
+    if (!itineraryService) return response.status(503).json({ error: { code: "ITINERARY_UNAVAILABLE" } });
+    return itineraryResponse(response, () => itineraryService.suggestions(request.body ?? {}));
+  });
+
+  app.post("/api/itineraries/preview", browserOrAgent, async (request, response) => {
+    if (!itineraryService) return response.status(503).json({ error: { code: "ITINERARY_UNAVAILABLE" } });
+    return itineraryResponse(response, () => itineraryService.plan(request.body ?? {}));
+  });
+
   app.post("/api/trust/check", agentOnly, async (request, response) => {
     if (!trustService) return response.status(503).json({ error: { code: "TRUST_UNAVAILABLE" } });
     try {
@@ -240,6 +255,20 @@ export function createApp({ eventHub, scopedCardService, runService, discoverySe
   });
 
   return app;
+}
+
+async function itineraryResponse(response, operation) {
+  try {
+    return response.json(await operation());
+  } catch (error) {
+    const providerUnavailable = [
+      "GEOAPIFY_NOT_CONFIGURED", "GEOAPIFY_NETWORK_ERROR", "GEOAPIFY_REQUEST_FAILED",
+      "OPEN_METEO_NETWORK_ERROR", "OPEN_METEO_REQUEST_FAILED",
+    ].includes(error.code);
+    return response.status(providerUnavailable ? 503 : 400).json({
+      error: { code: error.code ?? "INVALID_ITINERARY", message: error.message },
+    });
+  }
 }
 
 function choiceResponse(response, operation, successStatus = 200) {

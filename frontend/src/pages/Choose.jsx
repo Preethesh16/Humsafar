@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { metaFor } from "../lib/agents.js";
-import { destinationFromGoal, mapsUrl } from "../lib/maps.js";
+import { destinationFromGoal, isExactPlace, mapsUrl } from "../lib/maps.js";
 
 /**
  * Step 3 — the user picks the taste.
@@ -58,7 +58,14 @@ function Countdown({ seconds, onExpire }) {
 
 function OptionCard({ option, chosen, disabled, onPick, place }) {
   const rated = option.rating !== null && option.rating !== undefined;
-  const map = mapsUrl(option.vendor, place);
+  // `area` is the locality the row itself states ("Anjuna", "Vagator"). It
+  // narrows the fallback search when there is no place id — "The Hosteller
+  // Vagator Goa" finds one hostel where "The Hosteller" finds a chain.
+  const map = mapsUrl(option.vendor, [option.area, place].filter(Boolean).join(" "), option.placeId);
+  // Only a place id pins the link to one location. Without one Google can only
+  // search, and a generic venue name returns a list — so the label says
+  // "Search on map" rather than promising a single result it cannot deliver.
+  const exact = isExactPlace(option.placeId);
 
   // The map link sits OUTSIDE the button, not inside it. An <a> nested in a
   // <button> is invalid HTML and gives assistive tech two conflicting controls
@@ -106,9 +113,13 @@ function OptionCard({ option, chosen, disabled, onPick, place }) {
           rel="noopener noreferrer"
           // The vendor is named so a screen reader hears which place this
           // opens, rather than a page full of identical "View on map" links.
-          aria-label={`View ${option.vendor} on Google Maps (opens in a new tab)`}
+          aria-label={
+            exact
+              ? `View ${option.vendor} on Google Maps (opens in a new tab)`
+              : `Search Google Maps for ${option.vendor} (opens in a new tab)`
+          }
         >
-          View on map ↗
+          {exact ? "View on map ↗" : "Search on map ↗"}
         </a>
       )}
     </div>

@@ -9,13 +9,33 @@ export class DiscoveryService {
     this.logger = logger;
   }
 
+  /**
+   * Attaches a Google place id to each row so the UI can link to one location
+   * instead of a search that returns a list.
+   *
+   * Best-effort by construction: without a key, or for an invented fixture
+   * venue, `findPlaceId` returns null and the link degrades to a search that
+   * the UI then labels honestly. Lookups run in parallel and never reject, so
+   * discovery cannot be slowed or broken by a maps failure.
+   */
+  async #withPlaceIds(rows, input) {
+    if (!this.googleMapsClient?.findPlaceId) return rows;
+    const near = String(input.destination ?? "").trim();
+    return Promise.all(
+      rows.map(async (row) => {
+        const placeId = await this.googleMapsClient.findPlaceId(row.vendor, near);
+        return placeId ? { ...row, placeId } : row;
+      }),
+    );
+  }
+
   async search(category, input = {}) {
     // Offline rows are written for a baseline 3-day, one-traveller, one-room
     // trip. Scale them to what was actually asked, or an 8-day trip for four is
     // quoted the price of a 3-day trip for one. Live provider responses are
     // already priced for the real request and must never be scaled again.
-    if (category === "food") return { data: scaleFixtures(foodFixtures, "food", input), source: "fixture" };
-    if (category === "guide") return { data: scaleFixtures(guideFixtures, "guide", input), source: "fixture" };
+    if (category === "food") return { data: await this.#withPlaceIds(scaleFixtures(foodFixtures, "food", input), input), source: "fixture" };
+    if (category === "guide") return { data: await this.#withPlaceIds(scaleFixtures(guideFixtures, "guide", input), input), source: "fixture" };
     if (category === "flights") {
       // Duffel only searches air inventory. A train/bus/road/compare request
       // must fall through to the mode-aware local provider rather than quietly
@@ -26,7 +46,10 @@ export class DiscoveryService {
       return withFixtureFallback({
         integration: "duffel-flights",
         logger: this.logger,
-        live: async () => normalizeFlights(await this.duffelClient.searchFlights(input)),
+        live: async () => {
+          const resolved = await this.#flightCodes(input);
+          return normalizeFlights(await this.duffelClient.searchFlights({ ...input, ...resolved }));
+        },
         fixture: async () => scaleFixtures(flightFixtures, "flights", input),
       });
     }
@@ -44,7 +67,7 @@ export class DiscoveryService {
           const coordinates = await this.#stayCoordinates(input);
           return normalizeStays(await this.duffelClient.searchStays({ ...input, ...coordinates }));
         },
-        fixture: async () => scaleFixtures(stayFixtures, "stay", input),
+        fixture: async () => this.#withPlaceIds(scaleFixtures(stayFixtures, "stay", input), input),
       });
     }
     throw new TypeError("category must be flights, stay, food, or guide");
@@ -59,12 +82,23 @@ export class DiscoveryService {
       error.code = "STAY_COORDINATES_UNAVAILABLE";
       throw error;
     }
-    return this.googleMapsClient.geocode(input.destination);
+    return this.googleMapsClient.geocode(input.destinationName ?? input.destination);
+  }
+
+  async #flightCodes(input) {
+    const origin = /^[A-Z]{3}$/i.test(input.origin ?? "")
+      ? input.origin.toUpperCase()
+      : (await this.duffelClient.suggestPlace(input.originName)).code;
+    const destination = /^[A-Z]{3}$/i.test(input.destination ?? "")
+      ? input.destination.toUpperCase()
+      : (await this.duffelClient.suggestPlace(input.destinationName)).code;
+    return { origin, destination };
   }
 }
 
 function normalizeFlights(data) {
   const offers = data?.offers ?? [];
+  assertInr(offers.map((offer) => offer.total_currency), "flight");
   return offers.map((offer) => ({
     id: offer.id,
     category: "flights",
@@ -77,7 +111,9 @@ function normalizeFlights(data) {
 }
 
 function normalizeStays(data) {
-  return (data?.results ?? data ?? []).map((result) => ({
+  const results = data?.results ?? data ?? [];
+  assertInr(results.map((result) => result.cheapest_rate_currency ?? result.cheapest_rate?.total_currency), "stay");
+  return results.map((result) => ({
     id: result.id,
     category: "stay",
     vendor: result.accommodation?.name ?? "Accommodation",
@@ -87,4 +123,18 @@ function normalizeStays(data) {
     rating: result.accommodation?.rating,
     source: "live",
   }));
+}
+
+/**
+ * Agent allocations and Prava caps are denominated in INR. Treating a GBP or
+ * USD provider amount as rupees would make the budget proof meaningless, so a
+ * differently configured Duffel organisation must fail closed. The fallback
+ * layer will then disclose fixture data instead of relabelling the currency.
+ */
+function assertInr(currencies, inventory) {
+  const unsupported = currencies.find((currency) => currency && currency !== "INR");
+  if (!unsupported) return;
+  const error = new Error(`Duffel ${inventory} inventory returned ${unsupported}; Humsafar requires INR billing`);
+  error.code = "DUFFEL_CURRENCY_UNSUPPORTED";
+  throw error;
 }

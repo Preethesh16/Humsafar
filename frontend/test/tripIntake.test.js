@@ -15,6 +15,11 @@ const answers = {
   budget: 30000,
   vibes: ["food", "chill"],
   note: "Avoid red-eye travel",
+  placePlanningMode: "decide",
+  placeInterests: ["beaches", "heritage"],
+  selectedPlaceIds: [],
+  pace: "relaxed",
+  localTransportMode: "scooter",
 };
 
 test("a conversational intake becomes one explicit agent goal", () => {
@@ -27,6 +32,9 @@ test("a conversational intake becomes one explicit agent goal", () => {
   assert.match(goal, /explicitly skip: things to do/);
   assert.match(goal, /stay preference: entire home \/ villa/);
   assert.match(goal, /Avoid red-eye travel/);
+  assert.match(goal, /choose and route places for me/);
+  assert.match(goal, /food is suggestion-only/);
+  assert.match(goal, /local transport: scooter/);
 });
 
 test("exact and flexible trip lengths are deterministic", () => {
@@ -40,6 +48,8 @@ test("the wizard validates only the answer currently being requested", () => {
   assert.match(validateStep(5, { ...answers, categories: [] }), /at least one/);
   assert.equal(validateStep(5, answers), "");
   assert.equal(validateStep(6, answers), "");
+  assert.match(validateStep(8, { ...answers, placePlanningMode: "choose", selectedPlaceIds: [] }), /at least one mapped place/);
+  assert.equal(validateStep(8, answers), "");
 });
 
 test("room suggestions stay conservative", () => {

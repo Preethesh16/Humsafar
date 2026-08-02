@@ -33,13 +33,21 @@ external APIs; it is no longer a handoff checklist.
 | Group-aware accommodation | Preethesh | **Done** — compare hotel rooms, hostels, homestays and whole-home/villa estimates using travellers and rooms |
 | Cross-mode journey preference | Preethesh + Jeswin | **Done** — flight/train/bus/road/compare reaches the Journey Agent and mode-aware fallback |
 | Keyless destination geocoding | Preethesh | **Done** — policy-compliant cached Nominatim fallback; Google is optional |
+| Preference-driven local itinerary | Preethesh | **Done** — choose mapped places or “decide for me”; Geoapify clusters nearby stops, routes each day and finds meal possibilities; Open-Meteo adds exact-date weather |
+| Hotel-based daily routing | Preethesh | **Done** — preview starts from the destination centre, then every day is recalculated to start/end at the selected stay |
 | Real merchant order creation | External/provider boundary | **Not done** — needs Duffel booking credentials, traveller details and processor integration |
-| Food and guide providers | External/provider boundary | **Fixtures, explicitly labelled** |
+| Food and activity booking providers | External/provider boundary | **Not connected** — mapped suggestions and cost bands are advisory; no card, reservation or payment is created |
 
 Browser runs use backend discovery and trust checks by default. OpenAI narration
 turns on when `OPENAI_API_KEY` exists. Prava card minting and live checkout stay
 explicit environment opt-ins so merely opening the UI cannot consume a sandbox
 mandate.
+
+The local planner is exposed through `POST /api/itineraries/suggestions` and
+`POST /api/itineraries/preview`. Provider keys remain on the backend. Place,
+route and weather facts preserve their provider source; visit durations, entry
+fees and meal costs are separately labelled planning estimates. A venue on a
+map is not proof of availability or bookability.
 
 ---
 

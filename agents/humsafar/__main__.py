@@ -58,6 +58,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated specialists to include: flights, stay, food, guide",
     )
     parser.add_argument(
+        "--advisory-categories",
+        default="",
+        help="Comma-separated included specialists that reserve budget but never mint or checkout",
+    )
+    parser.add_argument(
         "--stay-style",
         choices=("compare", "hotel", "hostel", "home", "homestay"),
         default="compare",
@@ -147,6 +152,15 @@ def main(argv: list[str] | None = None) -> int:
     if unknown_categories:
         raise SystemExit(f"unknown --categories value: {', '.join(sorted(unknown_categories))}")
     categories = tuple(category for category in allowed_categories if category in requested_categories)
+    advisory_categories = tuple(
+        category.strip().lower()
+        for category in args.advisory_categories.split(",")
+        if category.strip()
+    )
+    if len(set(advisory_categories)) != len(advisory_categories) or any(
+        category not in categories for category in advisory_categories
+    ):
+        raise SystemExit("--advisory-categories must be unique and included in --categories")
 
     overspend = args.overspend or ("stay" if args.demo else None)
     fail = args.fail or ("guide" if args.demo else None)
@@ -238,6 +252,7 @@ def main(argv: list[str] | None = None) -> int:
         f"  checkout    : {('LIVE + merchant attempt at ' + args.merchant) if (args.live_checkout and args.merchant) else ('LIVE Prava credential, no merchant attempt' if args.live_checkout else 'SIMULATED (fixture)')}\n"
         f"  reasoning   : {'OpenAI Agents SDK' if narrator.available else 'deterministic templates'}\n"
         f"  specialists : {', '.join(categories)}\n"
+        f"  advisory    : {', '.join(advisory_categories) if advisory_categories else 'none'}\n"
         f"  streaming   : {'off' if args.no_stream else args.backend}\n",
         file=sys.stderr,
     )
@@ -257,6 +272,7 @@ def main(argv: list[str] | None = None) -> int:
         overspend_agent=overspend,
         fail_agent=fail,
         categories=categories,
+        advisory_categories=advisory_categories,
     )
 
     print("\n  ── RECEIPT ─────────────────────────────────────────────")

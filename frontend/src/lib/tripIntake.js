@@ -20,6 +20,35 @@ export const TRIP_VIBES = [
   { id: "workation", label: "Workation" },
 ];
 
+export const PLACE_INTERESTS = [
+  { id: "beaches", label: "Beaches" },
+  { id: "heritage", label: "Heritage & worship" },
+  { id: "nature", label: "Nature & parks" },
+  { id: "culture", label: "Museums & culture" },
+  { id: "adventure", label: "Adventure" },
+  { id: "nightlife", label: "Nightlife" },
+  { id: "shopping", label: "Markets & shopping" },
+];
+
+export const PLANNING_MODES = [
+  { id: "decide", label: "I have no plan — decide for me", note: "The Local Planner chooses a balanced set of real mapped places and keeps each day geographically tight." },
+  { id: "choose", label: "Show me places to pick", note: "See mapped suggestions for your interests, then choose what must be included." },
+];
+
+export const TRIP_PACES = [
+  { id: "relaxed", label: "Relaxed", note: "About 2 main places per day" },
+  { id: "balanced", label: "Balanced", note: "About 3 main places per day" },
+  { id: "packed", label: "Packed", note: "About 4 main places per day" },
+];
+
+export const LOCAL_TRANSPORT_MODES = [
+  { id: "drive", label: "Taxi / car" },
+  { id: "scooter", label: "Scooter" },
+  { id: "transit", label: "Public transport" },
+  { id: "walk", label: "Mostly walking" },
+  { id: "bicycle", label: "Bicycle" },
+];
+
 export const TRIP_PARTS = [
   { id: "flights", label: "Journey", note: "Compare flight, train, bus and road options." },
   { id: "stay", label: "Stay", note: "Hotels, hostels, homestays and entire homes." },
@@ -49,7 +78,7 @@ export function buildTripGoal(answers) {
     ?? "compare everything";
   const timing = answers.dateMode === "exact"
     ? `from ${friendlyDate(answers.departureDate)} to ${friendlyDate(answers.returnDate)}`
-    : `for about ${days} days with flexible dates`;
+    : `for about ${days} days with flexible dates, starting around ${friendlyDate(answers.departureDate)}`;
   const vibes = answers.vibes?.length
     ? answers.vibes.map((id) => TRIP_VIBES.find((item) => item.id === id)?.label.toLowerCase()).filter(Boolean)
     : [];
@@ -67,6 +96,13 @@ export function buildTripGoal(answers) {
     skippedParts.length ? `explicitly skip: ${skippedParts.map((part) => part.label.toLowerCase()).join(", ")}` : null,
     selectedParts.includes("stay") ? `stay preference: ${stayStyle}` : null,
     vibes.length ? `priorities: ${vibes.join(", ")}` : "keep the plan balanced",
+    answers.placePlanningMode === "choose"
+      ? `local itinerary: include my ${answers.selectedPlaceIds?.length ?? 0} selected mapped places`
+      : "local itinerary: choose and route places for me",
+    answers.placeInterests?.length ? `place interests: ${answers.placeInterests.join(", ")}` : null,
+    answers.pace ? `daily pace: ${answers.pace}` : null,
+    answers.localTransportMode ? `local transport: ${answers.localTransportMode}` : null,
+    "food is suggestion-only; do not reserve or purchase meals",
     answers.note?.trim() || null,
   ].filter(Boolean).join("; ");
 }
@@ -91,6 +127,9 @@ export function validateStep(step, answers) {
   }
   if (step === 6 && (!Number.isFinite(Number(answers.budget)) || Number(answers.budget) < 5000)) {
     return "Use a trip budget of at least ₹5,000.";
+  }
+  if (step === 8 && answers.placePlanningMode === "choose" && !answers.selectedPlaceIds?.length) {
+    return "Choose at least one mapped place, or select ‘decide for me’.";
   }
   return "";
 }

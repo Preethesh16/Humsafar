@@ -6,7 +6,9 @@ import { createApp } from "./app.js";
 import { EventHub } from "./events/eventHub.js";
 import { DuffelClient } from "./integrations/duffelClient.js";
 import { GoogleMapsClient } from "./integrations/googleMapsClient.js";
+import { GeoapifyClient } from "./integrations/geoapifyClient.js";
 import { NominatimClient } from "./integrations/nominatimClient.js";
+import { OpenMeteoClient } from "./integrations/openMeteoClient.js";
 import { PravaClient } from "./integrations/pravaClient.js";
 import { DiscoveryService } from "./services/discoveryService.js";
 import { ApprovalService } from "./services/approvalService.js";
@@ -15,6 +17,7 @@ import { MandateService } from "./services/mandateService.js";
 import { RunService } from "./services/runService.js";
 import { ScopedCardService } from "./services/scopedCardService.js";
 import { TrustService } from "./services/trustService.js";
+import { ItineraryService } from "./services/itineraryService.js";
 
 const host = process.env.HOST ?? "127.0.0.1";
 const port = parsePort(process.env.PORT ?? "3000");
@@ -55,6 +58,10 @@ const app = createApp({
   discoveryService: new DiscoveryService({
     duffelClient: new DuffelClient(),
     googleMapsClient: geocoder,
+  }),
+  itineraryService: new ItineraryService({
+    geoapifyClient: new GeoapifyClient(),
+    weatherClient: new OpenMeteoClient(),
   }),
   mandateService: new MandateService({ pravaClient, mandateMerchants }),
   approvalService: new ApprovalService(),

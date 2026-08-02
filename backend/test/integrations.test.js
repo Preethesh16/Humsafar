@@ -224,6 +224,7 @@ test("non-INR Duffel flights use a reference conversion while preserving the pro
   assert.equal(result.data[0].currency, "INR");
   assert.equal(result.data[0].providerAmount, 100);
   assert.equal(result.data[0].providerCurrency, "GBP");
+  assert.equal(result.data[0].merchant, "Duffel");
   assert.equal(result.data[0].priceBasis, "reference-rate-conversion");
   assert.match(result.data[0].description, /provider total GBP 100/);
 });

@@ -46,3 +46,16 @@ test("validateEvent accepts a complete choice request and rejects invented shape
   assert.match(validateEvent({ ...event, options: [] }), /non-empty array/);
   assert.match(validateEvent({ ...event, agent: "attacker" }), /agent/);
 });
+
+test("validateEvent distinguishes a refused credential from a checkout failure", () => {
+  assert.equal(validateEvent({
+    type: "purchase_result",
+    agent: "flights",
+    status: "failed",
+    amount: 0,
+    merchant: "Duffel",
+    source: "sandbox",
+    outcome: "credential_failed",
+    details: "Prava refused the scoped credential request",
+  }), undefined);
+});

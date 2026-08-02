@@ -116,6 +116,9 @@ async function normalizeFlights(data, fxRateClient) {
       id: offer.id,
       category: "flights",
       vendor: offer.owner?.name ?? "Airline",
+      // The airline is the inventory owner shown to the traveller; Duffel is
+      // the checkout merchant whose Prava mandate is approved.
+      merchant: "Duffel",
       description: price.converted
         ? `${journey}; provider total ${price.providerCurrency} ${price.providerAmount}, converted to INR using a daily reference rate`
         : journey,

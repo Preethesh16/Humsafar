@@ -167,6 +167,7 @@ Use these exact distinctions:
 | Local fixture checkout | `fixture / simulated; no payment attempted` | live, sandbox transaction, order placed |
 | Prava session or mandate approved | `Prava sandbox authorization` | purchase complete |
 | Prava credential issued | `Prava sandbox credential issued` | merchant charged, booking complete |
+| Prava refuses credential issuance before checkout | `Prava sandbox credential request refused — no checkout` | merchant decline, checkout attempted, money moved |
 | Real merchant rejects sandbox credential | `Prava sandbox checkout attempt — declined as expected` | successful order, money moved |
 | Merchant/test processor actually approves and Prava is truthfully reconciled | `completed sandbox checkout` plus the exact merchant/test qualification | production, real-money order |
 

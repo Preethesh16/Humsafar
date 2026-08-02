@@ -1,6 +1,6 @@
 import unittest
 
-from humsafar.cards import StubScopedCardClient, load_mandate_registry
+from humsafar.cards import ScopedCard, StubScopedCardClient, load_mandate_registry
 from humsafar.checkout import SimulatedCheckout
 from humsafar.events import EventEmitter, validate_event
 from humsafar.guardian import Guardian
@@ -113,6 +113,23 @@ class EndToEndTest(unittest.TestCase):
         self.assertIn("activity suggestions", guide.detail)
         self.assertNotIn("restaurant", guide.detail)
 
+    def test_a_real_credential_refusal_keeps_sandbox_provenance(self):
+        class RefusedSandboxCard:
+            def mint(self, merchant, amount_cap_paise):
+                return ScopedCard(
+                    status="failed", source="sandbox", merchant=merchant,
+                    amountCap=amount_cap_paise / 100, error="cap refused",
+                    errorCode="DECLINED",
+                )
+
+        report, emitter = run(categories=("flights",), card_client=RefusedSandboxCard())
+        purchase = report.purchases[0]
+        self.assertEqual(purchase.source, "sandbox")
+        self.assertEqual(purchase.outcome, "credential_failed")
+        event = next(item for item in emitter.sent if item["type"] == "purchase_result")
+        self.assertEqual(event["source"], "sandbox")
+        self.assertEqual(event["outcome"], "credential_failed")
+
 
 class OverspendTest(unittest.TestCase):
     def test_an_over_slice_charge_is_refused(self):
@@ -207,6 +224,7 @@ class StubCardTest(unittest.TestCase):
 
         self.assertTrue(first.issued)
         self.assertFalse(over.issued)
+        self.assertEqual(over["source"], "fixture")
         self.assertTrue(under.issued)
 
     def test_the_token_is_redacted_when_printed(self):
@@ -216,7 +234,9 @@ class StubCardTest(unittest.TestCase):
         self.assertNotIn(card["cardToken"], str(card.safe()))
 
     def test_a_non_positive_cap_is_refused(self):
-        self.assertFalse(StubScopedCardClient().mint("m", 0).issued)
+        card = StubScopedCardClient().mint("m", 0)
+        self.assertFalse(card.issued)
+        self.assertEqual(card["source"], "fixture")
 
 
 class MandateRegistryTest(unittest.TestCase):

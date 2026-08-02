@@ -60,6 +60,7 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Live dashboard over SSE | **Working**, including reconnect replay. |
 | Conversational trip concierge | **Working.** Nine one-question prompts collect ordinary city names, journey mode, flexible/exact dates, party, optional trip parts, accommodation style, budget and vibe—no IATA codes or coordinates. |
 | Local day planner | **Working with Geoapify.** Travellers choose mapped suggestions or “decide for me”; Humsafar clusters nearby stops, routes them with timings, suggests nearby food/cost ranges without booking it, and returns to the selected stay each night. Open-Meteo supplies in-window weather. |
+| Guided completion experience | **Working.** Milo, the generated route-cat concierge, accompanies intake and decisions. The receipt opens beside a persistent trip quest with mapped stations, browser-only geolocation, distance to the next stop, a transport-aware animated vehicle and XP progress. The map is schematic; directions open in Google Maps. |
 | Flexible specialist scope | **Working.** Travellers can disable Journey, Stay, Food or Things to do; disabled agents do not negotiate, receive a slice, offer choices or execute. |
 | Group accommodation | **Working in concierge mode.** Party/room-aware comparisons include hotel rooms, hostels, homestays and entire-home/villa estimates. Whole-home rows are labelled search handoffs/fixtures, not live Airbnb inventory. |
 | Human option choice | **Working.** Only offered affordable options are accepted, once; selections are bound into approval. |
@@ -67,6 +68,7 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Prava sandbox authentication | **Verified.** `npm run prava:verify` returns authentication OK. |
 | Prava mandates | **Created.** Five approved through the hosted passkey ceremony, `active`/`available`. |
 | Scoped credential issuance | **Verified on real rails.** Four credentials issued in a single run, one per agent, each capped at its own slice. |
+| Browser-to-Prava refusal path | **Verified.** A full Journey-only browser run reused the phone-approved Duffel mandate and asked Prava for a ₹10,300 credential against its ₹100 cap. Prava refused credential issuance, no merchant checkout ran, and the receipt reported ₹0 charged. |
 | Network cap enforcement | **Verified.** Visa declined ₹160 against a ₹100 mandate — *"Total amount 160.00 exceeds …"*. |
 | Merchant order | **Not performed.** No goods were bought; the charge is deliberately left unreconciled. |
 | Duffel flights/stays | **Flights verified against provider test search; no order creation.** Ordinary city names resolve through Duffel Places, with coordinate-based airport fallback. Foreign-currency totals are converted into labelled INR planning estimates while preserving the provider amount. This account still needs Duffel Stays access, so hotels currently fall back to disclosed estimates. |
@@ -120,6 +122,7 @@ unit tests assert the forbidden phrasings can never appear.
 |---|---|
 | `fixture / simulated; no payment attempted` | Local fixture data. No payment path touched. |
 | `Prava sandbox credential issued` | A sandbox credential exists. Nothing has been charged. |
+| `Prava sandbox credential request refused — no checkout` | Prava refused before issuing a credential, so no merchant checkout could run. |
 | `Prava sandbox checkout attempt — not completed` | A sandbox checkout was attempted and did not complete. |
 | `completed sandbox checkout` | A sandbox checkout genuinely completed. Sandbox, not real money. |
 | `source unverified; not evidence of a payment` | Provenance was missing or unrecognised. Assume nothing. |

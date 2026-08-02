@@ -13,7 +13,7 @@ npm install && npm start          # http://127.0.0.1:3000
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-The root page is an eight-question conversational trip concierge. Starting a run switches to the live
+The root page is a one-question-at-a-time conversational trip concierge. Starting a run switches to the live
 stream automatically and persists the run correlation for refreshes. With no
 run, the dashboard can still boot on the clearly labelled mocked stream; use
 `?source=live` or `?source=mock` to select explicitly.
@@ -39,6 +39,7 @@ error, kill the old one (`pkill -f "node.*vite"`) rather than opening 5174.
 npm test          # reducer unit tests (also run by `npm test` at the repo root)
 npm run test:render   # SSR smoke test: renders every panel against the full mock script
 npm run build     # production bundle
+npm run test:e2e  # full browser rehearsal; requires Chrome/Brave debugging on :9222
 ```
 
 ## Layout
@@ -50,7 +51,9 @@ npm run build     # production bundle
 | `src/lib/useEventStream.js` | Switches between the mock replay and `EventSource("/api/events")`. |
 | `src/pages/Intake.jsx` | One-question-at-a-time destination, origin, journey mode, dates/flexibility, party, budget and vibe intake. Provider codes and coordinates are deliberately absent from the user flow. |
 | `src/pages/Choose.jsx` | Affordable option selection with honest ranking and timeout labels. |
-| `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, final receipt. |
+| `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, truthful receipt, Milo guide and trip quest. |
+| `src/lib/journeyGame.js` | Pure itinerary-to-station mapping, schematic coordinates, distances and run-isolated progress keys. |
+| `e2e/browser-rehearsal.mjs` | Dependency-free Chrome DevTools rehearsal from intake through receipt, geolocation and the first virtual station. Set `HUMSAFAR_E2E_PAYMENT=true` only for a deliberate Prava proof run. |
 | `src/lib/icons.jsx` | Inline SVG glyphs. Presentation only. |
 | `src/styles.css` | The warm "paper" theme — canvas `#f3efe5`, forest `#1d3b2d`, coral `#e56b52`, mint `#c9f2dd`. |
 
@@ -94,6 +97,8 @@ Rules it enforces:
 - a failed sandbox line is **not** claimed as a decline that proves cap
   enforcement — without a structured cause it could be an ordinary booking
   failure;
+- a structured `credential_failed` line says Prava refused credential issuance
+  and that no checkout occurred; it never implies a merchant decline;
 - `environment: "test"` is always qualified as test inventory;
 - if only some categories exercise Prava, the run is labelled **mixed-mode** and
   the receipt states how many lines genuinely exercised a payment path, so one

@@ -17,7 +17,9 @@ import { AuditLog } from "../src/components/AuditLog.jsx";
 import { BudgetSplit } from "../src/components/BudgetSplit.jsx";
 import { DeliberationFeed } from "../src/components/DeliberationFeed.jsx";
 import { FinalReceipt } from "../src/components/FinalReceipt.jsx";
+import { MascotGuide } from "../src/components/MascotGuide.jsx";
 import { ProofPanel } from "../src/components/ProofPanel.jsx";
+import { TripQuest } from "../src/components/TripQuest.jsx";
 import Choose from "../src/pages/Choose.jsx";
 import Intake from "../src/pages/Intake.jsx";
 import { PurchaseCards } from "../src/components/PurchaseCards.jsx";
@@ -78,7 +80,7 @@ const expectations = [
   ["mocked stream", "mock labelling on purchases"],
   ["Audit log", "audit heading"],
   ["renegotiation_triggered", "renegotiation in the audit log"],
-  ["Every agent has settled", "final receipt"],
+  ["Your plan is ready", "truthful fixture receipt heading"],
   ["No payment was made", "mock receipt warning"],
   ["Fixture-only run — no payment was attempted", "run-level provenance banner"],
 ];
@@ -204,6 +206,24 @@ const intakeHtml = renderToStaticMarkup(<Intake onStarted={() => {}} navigate={(
 assert.ok(intakeHtml.includes("<form"), "the intake page renders a form");
 assert.ok(intakeHtml.includes('aria-label="Trip destination"'), "the current text answer has an accessible name");
 assert.ok(intakeHtml.includes('role="progressbar"'), "question progress is programmatic, not just visual");
+assert.ok(intakeHtml.includes("Milo:"), "the route cat gives a useful tip on every intake question");
+
+const mascotHtml = renderToStaticMarkup(<MascotGuide message="Pick the route." />);
+assert.ok(mascotHtml.includes("Humsafar&#x27;s cat travel concierge"), "the mascot image has useful alternative text");
+
+const questHtml = renderToStaticMarkup(<TripQuest plan={{
+  destination: { name: "Goa", placeId: "goa" },
+  base: { name: "Goa centre", latitude: 15.49, longitude: 73.82 },
+  baseAssumption: "Destination centre",
+  localTransportMode: "scooter",
+  days: [{ day: 1, date: "2026-08-10", returnToBase: { arriveAt: "18:00" }, timeline: [
+    { type: "place", id: "church", name: "Church", address: "Old Goa", startAt: "09:00", latitude: 15.5, longitude: 73.83 },
+  ] }],
+}} />);
+assert.ok(questHtml.includes("Your next station"), "the completed plan becomes a trip quest");
+assert.ok(questHtml.includes("Use my location"), "the quest offers browser-local geolocation");
+assert.ok(questHtml.includes("Virtual ride to stop 1"), "the quest offers a virtual vehicle progression");
+assert.ok(questHtml.includes("not turn-by-turn navigation"), "the game never claims to replace navigation");
 
 // Place suggestions. Only one question renders at a time, so the first render
 // carries the destination list; the origin list appears on its own step. The

@@ -32,6 +32,32 @@ export class MandateService {
     });
   }
 
+  async createCheckoutSession({ userId, userEmail, amountCap, currency = "INR", merchant, product }) {
+    return this.pravaClient.createMandateSession({
+      user_id: userId,
+      user_email: userEmail,
+      total_amount: money(amountCap),
+      currency,
+      purchase_context: [{
+        merchant_details: {
+          name: merchant.name,
+          url: merchant.url,
+          country_code_iso2: merchant.countryCode,
+        },
+        product_details: [{
+          description: product.description,
+          unit_price: money(product.unitPrice),
+          quantity: product.quantity ?? 1,
+        }],
+      }],
+      integration_type: "full_checkout",
+    });
+  }
+
+  async getCheckoutStatus(sessionId) {
+    return this.pravaClient.getSessionPaymentResult(sessionId);
+  }
+
   async syncCustomerMandates(customerId) {
     const result = await this.pravaClient.listMandates({ customerId, standingOnly: true });
     for (const mandate of result.data.mandates) {

@@ -34,16 +34,20 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
       },
     },
     pravaApprovalService: {
-      async create() {
+      async create({ runId }) {
         return {
+          runId,
           environment: "sandbox",
-          merchant: "Duffel",
-          amountCap: 100,
+          merchant: "Humsafar",
+          amountCap: 13800,
           currency: "INR",
           iframeUrl: "https://sandbox.collect.prava.space/session/test-only",
           expiresAt: "2026-08-03T00:15:00.000Z",
-          authorizeOnly: true,
+          stage: "waiting_for_cardholder",
         };
+      },
+      async status({ runId }) {
+        return { runId, environment: "sandbox", merchant: "Humsafar", amountCap: 13800, currency: "INR", stage: "checkout_ready", terminal: false, paid: false, checkedAt: "2026-08-03T00:05:00.000Z" };
       },
     },
   });
@@ -158,10 +162,16 @@ test("health, event ingestion, validation, auth, and scoped card routes work", a
 
   const phoneApproval = await fetch(`${baseUrl}/api/prava/phone-approval`, {
     method: "POST",
-    headers: { authorization: "Bearer internal-test-token" },
+    headers: { authorization: "Bearer internal-test-token", "content-type": "application/json" },
+    body: JSON.stringify({ runId: "run_1" }),
   });
   assert.equal(phoneApproval.status, 201);
-  assert.equal((await phoneApproval.json()).authorizeOnly, true);
+  assert.equal((await phoneApproval.json()).amountCap, 13800);
+  const phoneStatus = await fetch(`${baseUrl}/api/prava/phone-approval?runId=run_1`, {
+    headers: { authorization: "Bearer internal-test-token" },
+  });
+  assert.equal(phoneStatus.status, 200);
+  assert.equal((await phoneStatus.json()).stage, "checkout_ready");
 
   const choiceEvent = {
     type: "choice_requested",

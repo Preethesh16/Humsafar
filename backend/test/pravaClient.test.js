@@ -100,3 +100,23 @@ test("createMandateSession accepts the live nested session envelope without expo
   assert.equal(result.data.session_id, "sess_1");
   assert.equal(result.data.iframe_url, "https://sandbox.collect.prava.space/session/sess_1");
 });
+
+test("getSessionPaymentResult reads the exact session endpoint", async () => {
+  let requested;
+  const client = new PravaClient({
+    apiKey: "test-key",
+    fetchImpl: async (url, options) => {
+      requested = { url, options };
+      return new Response(JSON.stringify({
+        status: "awaiting_result",
+        transactions: [{ token: "server-only-credential" }],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    },
+  });
+
+  const result = await client.getSessionPaymentResult("sess_1");
+
+  assert.equal(requested.url, "https://sandbox.api.prava.space/v1/sessions/sess_1/payment-result");
+  assert.equal(requested.options.method, "GET");
+  assert.equal(result.data.status, "awaiting_result");
+});

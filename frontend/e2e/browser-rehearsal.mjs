@@ -115,7 +115,7 @@ assert.match(receipt.mascot, /cat travel concierge/i);
 assert.match(receipt.text, /fixture|sandbox|payment evidence/i, "receipt must state provenance");
 assert.match(
   receipt.text,
-  /Approve Prava on your phone[\s\S]*Set up on phone/i,
+  /Continue with Prava sandbox[\s\S]*Pay ₹[\d,]+ on phone/i,
   "receipt must offer the explicit phone handoff without starting it automatically",
 );
 if (paymentProof) {
@@ -143,15 +143,19 @@ await waitFor(() => evaluate("document.querySelector('.quest-xp')?.textContent.i
 // return fewer stations on a given day, so advance to five or the last station
 // available rather than making this visual regression depend on provider row
 // count. The board must remain a clean day-sized level either way.
-const questTotal = await evaluate("Number(document.querySelector('.quest-xp')?.textContent.match(/\\/(\\d+) stops/)?.[1] ?? 1)");
-const activeLevelStops = await evaluate("Number(document.querySelector('.quest-map--3d')?.dataset.levelStops ?? 1)");
-const targetProgress = Math.min(5, activeLevelStops);
-for (let progress = 2; progress <= targetProgress; progress += 1) {
+let targetProgress = 1;
+for (let progress = 2; progress <= 5; progress += 1) {
+  // The selected-stay rebase can finish while the quest is open and can
+  // legitimately reduce the active day's stop count. Read the live control
+  // each round instead of chasing a stale denominator captured pre-rebase.
+  const canAdvance = await evaluate("Boolean(document.querySelector('.quest-drive:not(:disabled)'))");
+  if (!canAdvance) break;
   const xp = progress * 120;
-  await waitFor(() => evaluate("Boolean(document.querySelector('.quest-drive:not(:disabled)'))"), 10_000, `ride button before ${xp} XP`);
   await evaluate("document.querySelector('.quest-drive')?.click(); true");
   await waitFor(() => evaluate(`document.querySelector('.quest-xp')?.textContent.includes('${xp} XP')`), 10_000, `${xp} XP route progress`);
+  targetProgress = progress;
 }
+const questTotal = await evaluate("Number(document.querySelector('.quest-xp')?.textContent.match(/\\/(\\d+) stops/)?.[1] ?? 1)");
 const midQuest = await evaluate(`(() => {
   const board = document.querySelector('.quest-map--3d');
   const positions = [...document.querySelectorAll('.quest-stop circle:not(.quest-stop-shadow)')]

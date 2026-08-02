@@ -299,7 +299,7 @@ export default function App() {
   } else if (pathname === "/approve") {
     page = <ApprovalPage state={state} source={source} />;
   } else if (pathname === "/receipt") {
-    page = <ReceiptPage state={state} source={source} itinerary={itinerary} onRestart={restart} navigate={navigate} />;
+    page = <ReceiptPage state={state} source={source} runId={runId} itinerary={itinerary} onRestart={restart} navigate={navigate} />;
   } else {
     page = <Intake onStarted={started} navigate={navigate} />;
   }
@@ -351,7 +351,7 @@ function ApprovalPage({ state, source }) {
   );
 }
 
-function ReceiptPage({ state, source, itinerary, onRestart, navigate }) {
+function ReceiptPage({ state, source, runId, itinerary, onRestart, navigate }) {
   const summary = useMemo(() => summarize(state), [state]);
   if (!state.receipt) return <div className="page-empty"><h2>Waiting for the agents to settle…</h2></div>;
   return (
@@ -368,6 +368,7 @@ function ReceiptPage({ state, source, itinerary, onRestart, navigate }) {
           blockedAttempts={state.blockedAttempts}
           renegotiations={state.renegotiations}
           isMock={source === SOURCE.MOCK}
+          runId={runId ?? state.runId}
           embedded
           onDismiss={() => navigate("/deliberate")}
         />

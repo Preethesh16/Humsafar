@@ -55,6 +55,23 @@ export class PravaClient {
     return { data: session, source: "live" };
   }
 
+  async getSessionPaymentResult(sessionId) {
+    if (typeof sessionId !== "string" || !sessionId.trim()) {
+      throw new TypeError("sessionId is required");
+    }
+    const payload = await this.request(
+      `/v1/sessions/${encodeURIComponent(sessionId)}/payment-result`,
+    );
+    const result = payload.data?.data?.status ? payload.data.data : payload.data;
+    if (typeof result?.status !== "string") {
+      throw new PravaApiError("Prava returned an invalid payment result", {
+        code: "PRAVA_INVALID_PAYMENT_RESULT",
+        responseId: payload.responseId,
+      });
+    }
+    return { data: result, source: "live" };
+  }
+
   async listMandates({ customerId, standingOnly = true }) {
     const query = new URLSearchParams({
       customer_id: customerId,

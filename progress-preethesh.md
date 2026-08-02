@@ -368,3 +368,11 @@
 - Decision: do not create another session, run a charge, or close the current hosted page. After the human approval, rerun only the read-only verifier; `mandateCount: 1` is the required activation evidence before continuing.
 - Blocked on: human-presence WebAuthn approval on the user's phone.
 - Commit: recorded by the commit containing this entry.
+
+### [2026-08-02 15:10 IST] — Clarified phone ownership and passkey ceremony
+- Prompt: asked for basic instructions because the hosted Prava flow was opened and card enrollment was performed on a friend's phone.
+- Files changed: `progress-preethesh.md` only.
+- Changed: clarified that the friend holding the already-open phone must tap **Create passkey now** and approve Android's system prompt using that phone's configured fingerprint, face, pattern, PIN, or password. No credential, OTP, biometric, or screen-lock value should be shared in chat.
+- Decision: continue on the same phone and existing hosted page. Treat the resulting passkey as stored on that phone/account; use Preethesh's own passkey-capable device for a new ceremony later if Preethesh needs independent control.
+- Blocked on: the phone holder completing the Android system confirmation and reporting the non-sensitive result screen.
+- Commit: recorded by the commit containing this entry.

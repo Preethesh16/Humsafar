@@ -289,3 +289,22 @@ status: failed | mandateStatus: active | visaConfirmation: SUCCESS
 - Validation: **215 Python** (2 new), 168 Node, 81 frontend. Live run verified against real Prava: mandate resolution succeeds for all four merchants; mints fail only while the Visa window is shut.
 - Blocked on: the window. `catch_window.py` probes every 4 minutes and launches the full four-agent live run on the first success.
 - Commit: pending
+
+### [2026-08-02 23:50 IST] — env updated, Duffel answered, submission pack written
+- Prompt: Preethesh's `.env` was pasted in chat with real keys; then continue.
+- Files changed: `.env` (untracked), `agents/.venv` (created, ignored), `SUBMISSION.md` (new).
+
+**`.env` updated from the pasted block**, with three corrections rather than a blind overwrite:
+* The paste dropped the whole agent-core section, including the three `OPENAI_AGENTS_*` flags that keep model and tool payloads out of OpenAI traces. Dropping those would have been a quiet credential leak, so they were carried over along with the tuned model choices.
+* `SESSION_SECRET` added (empty is fine locally; required on a deployed host or a restart logs judges out).
+* `HUMSAFAR_PYTHON=.venv/bin/python` **pointed at a venv that did not exist here** — Preethesh's local path. `runService` spawns with `cwd: agents/`, so every browser-started run would have died with `SPAWN_FAILED` and the site would have looked dead while the API returned 202. Created the venv and installed the pinned requirements; 215 tests pass under it.
+
+**The keys are now chat-exposed and must be rotated after the hackathon.** Preethesh's own log says the same.
+
+**Why inventory is fixture — answered definitively, and it is no longer "no Duffel token".** The token works: a direct BLR→GOI query returned **89 real offers**. They are priced in **USD** (Air India $37.50, British Airways $47.04) and our entire budget model plus every Prava mandate is INR. Preethesh's guard fails closed on non-INR rather than invalidating the rupee budget proof, which is the right call — converting at a rate we invented would be fabricating data. So the honest disclosure changes from "we had no token" to "the token works, the test account prices in USD, and we refuse to fake an exchange rate."
+
+**Wrote `SUBMISSION.md`** — the Devfolio fields, the Prava integration section with the completed five-step transaction and the over-cap decline, a full disclosure table, a timed demo-video script, and a say-this-not-that table for the narration. The video and the Devfolio publish are the two remaining critical-path items and both need a person.
+
+- Validation: 215 Python under the new venv, backend live against the updated env.
+- Blocked on: deployment needs an account; the four-agent live run needs a Visa window (watcher running, 7 attempts, still shut).
+- Commit: pending

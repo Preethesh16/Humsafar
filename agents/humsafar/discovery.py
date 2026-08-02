@@ -16,6 +16,7 @@ import urllib.error
 import urllib.request
 from typing import Optional, Protocol
 
+from .destinations import build_inventory, parse_destination
 from .models import Option
 from .money import to_paise
 
@@ -27,40 +28,6 @@ class DiscoveryProvider(Protocol):
         ...
 
 
-# Prices are realistic mid-2026 Bengaluru->Goa weekend numbers. They are shaped
-# so the categories genuinely contend for a Rs 30,000 pot: the cheapest viable
-# set fits easily, but every agent's *preferred* option does not, which is the
-# whole point of the negotiation.
-_FIXTURES: dict[str, list[tuple[str, str, str, str, float]]] = {
-    "flights": [
-        ("IndiGo", "6E-6423 BLR-GOI return, 1 checked bag", "IndiGo", "6500.00", 4.1),
-        ("SpiceJet", "SG-482 BLR-GOI return, late arrival", "SpiceJet", "7400.00", 3.8),
-        ("Akasa Air", "QP-1382 BLR-GOI return, morning out", "Akasa Air", "8200.00", 4.3),
-        ("Air India Express", "IX-1128 BLR-GOI return, direct", "Air India Express", "9800.00", 4.4),
-        ("Air India", "BLR-GOI return, flexible fare", "Air India", "11800.00", 4.6),
-    ],
-    "stay": [
-        ("Zostel Goa", "2 nights, private twin, Anjuna", "Zostel Goa", "5400.00", 4.0),
-        ("The Hosteller", "2 nights, deluxe double, Vagator", "The Hosteller", "8900.00", 4.2),
-        ("Anjuna Beach Resort", "2 nights, pool-view room", "Anjuna Beach Resort", "11200.00", 4.5),
-        ("Casa Vagator", "2 nights, sea-view room, breakfast", "Casa Vagator", "14500.00", 4.7),
-        ("Taj Holiday Village", "2 nights, garden villa", "Taj Holiday Village", "16000.00", 4.8),
-    ],
-    "food": [
-        ("Local shacks", "2 days, beach shack meals for two", "Local Shacks", "2400.00", 3.9),
-        ("Fisherman's Wharf", "lunch and dinner for two", "Fisherman's Wharf", "3200.00", 4.1),
-        ("Gunpowder Assagao", "dinner for two + one lunch", "Gunpowder Assagao", "4200.00", 4.5),
-        ("Thalassa Vagator", "sunset dinner for two, reserved", "Thalassa Vagator", "5200.00", 4.4),
-    ],
-    "guide": [
-        ("GoGoa Bikes", "2-day scooter rental + fuel", "GoGoa Bikes", "1800.00", 4.0),
-        ("Spice Plantation Tour", "half day, guided, lunch included", "Spice Plantation Tour", "2600.00", 4.2),
-        ("Dudhsagar Day Trip", "guided falls trip, shared jeep", "Dudhsagar Day Trip", "3600.00", 4.6),
-        ("Sunset Cruise + Old Goa", "private guide, half day", "Sunset Cruise Old Goa", "4500.00", 4.5),
-    ],
-}
-
-
 class FixtureDiscovery:
     """Realistic offline options, shaped like the real partner APIs.
 
@@ -68,8 +35,16 @@ class FixtureDiscovery:
     and it is what keeps the submission's disclosure section honest.
     """
 
+    def __init__(self, days: int = 3) -> None:
+        self.days = days
+
     def discover(self, category: str, goal: str) -> list[Option]:
-        rows = _FIXTURES.get(category, [])
+        # The goal is no longer ignored. It used to be: every request returned
+        # the same Bengaluru->Goa inventory, so a Jaipur trip came back with
+        # BLR-GOI flights and a hotel in Anjuna. Discovery now answers the
+        # question that was actually asked.
+        destination = parse_destination(goal)
+        rows = build_inventory(destination, self.days).get(category, [])
         return [
             Option(
                 category=category,

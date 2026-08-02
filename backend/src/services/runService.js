@@ -38,6 +38,8 @@ export class RunService {
       "--budget", String(amount),
       "--run-id", runId,
     ];
+    // Discovery goes through this backend, so a configured DUFFEL_ACCESS_TOKEN
+    // is actually used rather than sitting idle behind an opt-in flag.
     if (awaitApproval) args.push("--await-approval");
     if (awaitChoice) args.push("--await-choice");
 

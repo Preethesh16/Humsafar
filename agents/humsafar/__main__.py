@@ -41,10 +41,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--no-stream", action="store_true", help="Do not POST events to the backend")
     parser.add_argument("--live-cards", action="store_true", help="Mint through the real backend route")
+    # Live discovery is the DEFAULT. The backend route calls Duffel when a
+    # token is configured and degrades to labelled fixtures when it is not, so
+    # defaulting to local fixtures meant a configured Duffel token would simply
+    # never be used. Opting out is still possible for offline work.
     parser.add_argument(
-        "--live-discovery",
+        "--local-discovery",
         action="store_true",
-        help="Discover options via POST /api/discovery/:category instead of local fixtures",
+        help="Use the agent's own offline fixtures instead of the backend discovery route",
     )
     parser.add_argument(
         "--trust",
@@ -100,7 +104,9 @@ def main(argv: list[str] | None = None) -> int:
         else StubScopedCardClient()
     )
     narrator = Narrator(enabled=args.llm)
-    provider = BackendDiscovery(base_url=args.backend, token=token) if args.live_discovery else None
+    provider = (
+        None if args.local_discovery else BackendDiscovery(base_url=args.backend, token=token)
+    )
     trust = TrustClient(base_url=args.backend, token=token) if args.trust else None
     approval = (
         PolledApproval(base_url=args.backend, token=token, ttl_seconds=args.approval_ttl)
@@ -124,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
         f"\n  HUMSAFAR — {args.goal}\n"
         f"  budget      : Rs {args.budget}\n"
         f"  cards       : {'live backend route' if args.live_cards else 'STUB (simulated, not a real charge)'}\n"
-        f"  discovery   : {'backend route' if args.live_discovery else 'local FIXTURE data'}\n"
+        f"  discovery   : {'local FIXTURE data' if args.local_discovery else 'backend route (Duffel when configured)'}\n"
         f"  trust check : {'on' if args.trust else 'off'}\n"
         f"  approval    : {'HUMAN via approval API' if args.await_approval else 'auto (no human decision)'}\n"
         f"  checkout    : {'LIVE Prava credential + reconciliation' if args.live_checkout else 'SIMULATED (fixture)'}\n"

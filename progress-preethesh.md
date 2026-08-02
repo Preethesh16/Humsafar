@@ -338,3 +338,14 @@
 - Blocked on: the human completing the hosted browser flow.
 - Needs from Jeswin/Deepthi: none.
 - Commit: `24e5bff` (hosted-page clarification committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 13:41 IST] — Opened a fresh hosted approval page for the user
+- Prompt: said the dashboard instructions remained unclear and asked me to perform the setup directly.
+- Files changed: `progress-preethesh.md` only; no implementation or local credential file changed.
+- Changed: created exactly one fresh ₹100 INR, one-time, Duffel-listed sandbox mandate session using the already configured local credentials and opened its short-lived Prava-hosted page directly in the user's browser. The URL and session token were not printed, persisted, or committed.
+- Validation: the operator returned `mandate_session_created`, `authorizeOnly: true`, safe session metadata, and `hostedPageOpened: true`. This created authorization state only; no credential mint, checkout, report, or completed transaction occurred.
+- Decision: stop automation at Prava's secure collection page. The human cardholder must enter the issued sandbox card and approve WebAuthn/passkey; those security actions cannot and should not be automated by Humsafar.
+- Why: card entry and biometric/passkey approval are deliberately isolated human-presence controls on Prava's hosted origin.
+- Blocked on: completion of the newly opened browser page before its short expiry.
+- Needs from Jeswin/Deepthi: none until mandate activation is verified.
+- Commit: pending (fresh-session operational log on `preethesh/integrations-backend`)

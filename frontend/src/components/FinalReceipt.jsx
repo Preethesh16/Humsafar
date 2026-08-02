@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import { metaFor, money } from "../lib/agents.js";
 import { labelForPurchase, provenCount, runMode, runModeLabel } from "../lib/provenance.js";
 import { IconCheck } from "../lib/icons.jsx";
@@ -9,6 +11,21 @@ import { IconCheck } from "../lib/icons.jsx";
  * wired — it copies the summary rather than pretending a message was sent.
  */
 export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations, isMock, onDismiss }) {
+  const closeRef = useRef(null);
+
+  // A modal that can only be dismissed with the mouse is a keyboard trap. Escape
+  // closes it, and focus moves into the dialog when it appears so a screen
+  // reader announces it rather than leaving focus behind on the page.
+  useEffect(() => {
+    if (!receipt) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") onDismiss?.();
+    };
+    document.addEventListener("keydown", onKey);
+    closeRef.current?.focus();
+    return () => document.removeEventListener("keydown", onKey);
+  }, [receipt, onDismiss]);
+
   if (!receipt) return null;
 
   const lines = receipt.purchases ?? [];
@@ -49,7 +66,7 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
           <span className="outcome-check">
             <IconCheck />
           </span>
-          <button type="button" className="ghost" onClick={onDismiss} aria-label="Close receipt">
+          <button type="button" className="ghost" onClick={onDismiss} aria-label="Close receipt" ref={closeRef}>
             ✕
           </button>
         </div>

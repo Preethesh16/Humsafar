@@ -261,3 +261,91 @@
 - Blocked on: `.env` is absent, so the read-only Prava authentication check and all deliberate sandbox calls remain blocked on Preethesh placing the existing sandbox key locally. The taste-step backend remains intentionally deferred until genuine Prava evidence passes G4.
 - Needs from Jeswin/Deepthi: Jeswin must consume the new resolver/approval endpoints, pass the new correlated approval events, and redact `cardToken`, `dynamicCvv`, expiry, and transaction identifiers in `ScopedCard.safe()` before any live-card run. Deepthi must use the approval request ID/digest/run ID, keep `INTERNAL_API_TOKEN` out of browser bundles, and render payment provenance separately from outcome. Both must pull the contract commit before dependent work.
 - Commit: `9d9d5f5` (G0/G2 implementation committed on `preethesh/integrations-backend`)
+
+### [2026-08-01 23:58 IST] — Clarified the existing Prava sandbox credentials
+- Prompt: said the Prava sandbox secret/API keys already exist and asked what happened to the sandbox integration.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: clarified that the sandbox implementation remains active and no credential or transaction was removed; the repository deliberately does not contain the user's key.
+- Validation: confirmed the current branch is `preethesh/integrations-backend` and the gitignored local `.env` file is absent, so no authenticated Prava request could have run from this workspace.
+- Decision: the user will place the existing `sk_test_...` sandbox secret locally as `PRAVA_SECRET_KEY`; it must not be pasted into chat or committed. Then `npm run prava:verify` performs the read-only authentication check before transaction-bearing calls.
+- Why: possession of a dashboard key and availability of that key to the local process are different states. Keeping the key outside Git/chat preserves it while allowing the existing sandbox client to authenticate once configured.
+- Blocked on: local `.env` creation by the credential owner.
+- Needs from Jeswin/Deepthi: none for this credential placement step.
+- Commit: `9a45dd9` (credential clarification committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 00:04 IST] — Distinguished Prava's secret and publishable API keys
+- Prompt: clarified that Prava issued both one secret key and one API key.
+- Files changed: `.env.example`, `precaution.md`, and `progress-preethesh.md`; no runtime implementation changed.
+- Changed: documented the dual-key setup: `sk_test_...` maps to backend-only `PRAVA_SECRET_KEY`, while `pk_test_...` maps to `PRAVA_PUBLISHABLE_KEY` for future browser SDK initialization. Added both placeholders without values and a warning against exposing the secret through Vite/client code.
+- Validation: checked the current official Prava Authentication & Environments documentation, which specifies Bearer authentication for secret keys and browser SDK initialization for publishable keys; confirmed the existing backend correctly uses the secret Bearer form.
+- Decision: configure the secret key now for REST verification; retain the publishable key locally but do not wire it into the frontend until a real Prava browser SDK/passkey step is implemented.
+- Why: using the publishable key on server calls would fail authentication, while exposing the secret key in browser code would compromise the merchant account.
+- Blocked on: the user placing both values in the local gitignored `.env`; only the secret is required for the immediate read-only verification.
+- Needs from Jeswin/Deepthi: Jeswin needs neither raw key. Deepthi may use only the publishable key if the browser SDK phase is implemented and must never import or expose `PRAVA_SECRET_KEY`.
+- Commit: `ef4f615` (dual-key documentation committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 00:07 IST] — Mapped the dashboard key shown in the screenshot
+- Prompt: shared the Prava Sandbox API Keys dashboard and asked exactly what to fill and where.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: confirmed the masked dashboard key begins with `pk_test_` and therefore belongs in local `PRAVA_PUBLISHABLE_KEY`; the separately saved `sk_test_` value belongs in backend-only `PRAVA_SECRET_KEY`.
+- Validation: visually inspected the supplied Sandbox-tab screenshot and matched its visible key prefix against Prava's current official dual-key authentication table.
+- Decision: keep the existing active default key; do not rotate, revoke, or create another. Configure both values only in the gitignored root `.env`, then use the secret-key-backed read-only verifier.
+- Why: the shown publishable key is intended for browser SDK initialization and cannot authenticate the current REST backend; the secret key must remain server-only.
+- Blocked on: the user entering the two already-saved values locally and running `npm run prava:verify`.
+- Needs from Jeswin/Deepthi: none now; Deepthi may later consume only the publishable key through an approved browser SDK path.
+- Commit: `c4d4144` (dashboard mapping committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 00:10 IST] — Corrected and passed the live sandbox access verification
+- Prompt: ran `npm run prava:verify` with the locally configured keys and received `CUSTOMER_NOT_FOUND` for the placeholder Humsafar customer.
+- Files changed: `.env.example`, `backend/scripts/verifyPravaAccess.js`, `backend/test/verifyPravaAccess.test.js`, and `progress-preethesh.md`.
+- Changed: corrected the verifier to distinguish invalid authentication from an authenticated merchant account whose application customer has not been created yet. `CUSTOMER_NOT_FOUND` now returns `authentication: "ok"`, `customer: "not_created"`, and zero mandates instead of the false `authentication: "failed"` label. Clarified that `PRAVA_TEST_CUSTOMER_ID` is our stable external application identifier and becomes associated during the first session.
+- Validation: current official Prava Create Session documentation confirms `user_id` is the unique identifier from our system and that invalid keys return `AUTH_1001`/`AUTH_1002`, not `CUSTOMER_NOT_FOUND`. Root tests passed 60/60. The read-only command was rerun against the real local sandbox secret and returned authentication OK, customer not created, zero mandates, and a sanitized response ID; no session, mandate, credential, or transaction was created.
+- Decision: G1 Prava credential authentication is passed. Keep `humsafar-demo-user` stable and create its first merchant-specific mandate session only when the cardholder is ready to complete the hosted approval flow.
+- Why: listing mandates before any customer session legitimately has no customer to return; treating that as bad credentials blocked a valid new-account setup and misreported the evidence.
+- Blocked on: the next step requires a deliberate mandate-session ceremony with the user's email, selected first merchant, and the cardholder ready for the hosted passkey/card flow.
+- Needs from Jeswin/Deepthi: none for authentication. Continue treating mandate approval as authorization only, not a completed purchase.
+- Commit: `2d9a4d2` (verifier correction committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 11:38 IST] — Prepared the first hosted Prava mandate ceremony
+- Prompt: shared Prava's current documentation, the Sandbox dashboard at onboarding step 2/3, and asked what to do next.
+- Files changed: `.env.example`, `package.json`, `backend/scripts/createPravaMandateSession.js`, `backend/test/createPravaMandateSession.test.js`, and `progress-preethesh.md`.
+- Changed: added `npm run prava:create-mandate-session`, a sandbox-only operator command for one merchant-specific, one-time, authorize-only mandate. It validates the secret-key prefix, sandbox origin, customer email, positive cap, HTTPS merchant URL, and ISO country code before network access. It prints only safe session metadata and the hosted `iframeUrl`; it deliberately drops `session_token`, keys, and card data. Added local configuration for a ₹100 Duffel cap-enforcement proof mandate.
+- Validation: read the complete supplied 124-line Prava introduction and compared today's official integration-choice, quickstart, SDK, create-session, and sandbox-testing pages with Humsafar's REST client. Root tests passed 62/62 and `git diff --check` passed. Confirmed the real local `.env` has no customer email yet, so the command was not run and no session/transaction allowance was consumed.
+- Decision: keep Humsafar on the hosted full-API path for this first proof. Do not install the global dashboard skill, do not use MCP/CLI, and do not paste the dashboard's generic SDK snippet. The dashboard currently shows 20 sandbox transactions remaining, which becomes the live operational limit regardless of the older 30-per-day organizer note.
+- Why: hosted mode is Prava's documented fastest/lowest-maintenance path and matches the backend already implemented. The global skill/CLI is a different agent-owned-interface product, while embedded SDK work would add frontend risk before one genuine sandbox proof exists.
+- Blocked on: the user adding `PRAVA_TEST_CUSTOMER_EMAIL` locally and being physically ready to open the short-lived hosted page, enter the team test card, and complete real WebAuthn/passkey approval.
+- Needs from Jeswin/Deepthi: none until the mandate is active; they must continue to treat mandate approval as authorization, not a purchase.
+- Commit: `186a715` (safe hosted-session operator committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 13:02 IST] — Created and opened the first live Prava sandbox mandate session
+- Prompt: authorized me to use the supplied email locally and proceed with the next Prava sandbox steps.
+- Files changed: local gitignored `.env`; `backend/src/integrations/pravaClient.js`, `backend/test/pravaClient.test.js`, and `progress-preethesh.md`. The email and all credentials remain excluded from tracked files.
+- Changed: added the customer email only to local `.env`, invoked the safe hosted-session operator, and opened the returned Prava page locally without printing its URL or session token. The first authenticated response used a nested/current envelope without the documented `authorizeOnly` field, so the strict parser rejected it; updated the parser to accept either documented top-level or observed nested envelopes while still requiring both `session_id` and `iframe_url`, then retried once successfully.
+- Validation: root tests passed 78/78. The second real sandbox call returned a one-time, merchant-listed, ₹100 INR Duffel authorization session with safe metadata and opened the hosted page. No card details, key, session token, hosted URL, email, or raw response entered Git/log output; no charge or checkout result exists yet.
+- Decision: the user must now finish the short-lived hosted card/passkey ceremony in the browser. Do not mint a credential, run the over-cap proof, or claim a transaction until the mandate is confirmed active through the read-only sync/list flow.
+- Why: actual Prava response envelopes differ slightly from the current example, but the two security-critical identifiers are stable. Accepting only those required fields preserves fail-closed behavior without rejecting a valid sandbox session.
+- Blocked on: human completion of sandbox card entry, any test OTP, and WebAuthn/passkey approval before session expiry.
+- Needs from Jeswin/Deepthi: none until mandate activation is confirmed; do not represent this created session as a purchase.
+- Commit: `7ba86fa` (live response compatibility fix committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 13:07 IST] — Clarified where to complete the hosted approval
+- Prompt: asked where to enter the sandbox card, OTP, and passkey after the mandate session was created.
+- Files changed: `progress-preethesh.md` only; no implementation files changed.
+- Changed: clarified that these actions occur on Prava's separate hosted collection/approval page opened from the session's `iframeUrl`, not in the developer dashboard or terminal.
+- Validation: confirmed the preceding operator run reported `hostedPageOpened: true`; the URL was intentionally neither logged nor persisted and the session is short-lived.
+- Decision: first check the browser for a new Prava checkout/approval tab. If absent, blank, or expired, create exactly one fresh session while the cardholder is ready and open its returned `iframeUrl` locally.
+- Why: the dashboard manages keys/activity; sensitive card entry and WebAuthn approval are isolated on Prava's hosted surface.
+- Blocked on: the human completing the hosted browser flow.
+- Needs from Jeswin/Deepthi: none.
+- Commit: `24e5bff` (hosted-page clarification committed on `preethesh/integrations-backend`)
+
+### [2026-08-02 13:41 IST] — Opened a fresh hosted approval page for the user
+- Prompt: said the dashboard instructions remained unclear and asked me to perform the setup directly.
+- Files changed: `progress-preethesh.md` only; no implementation or local credential file changed.
+- Changed: created exactly one fresh ₹100 INR, one-time, Duffel-listed sandbox mandate session using the already configured local credentials and opened its short-lived Prava-hosted page directly in the user's browser. The URL and session token were not printed, persisted, or committed.
+- Validation: the operator returned `mandate_session_created`, `authorizeOnly: true`, safe session metadata, and `hostedPageOpened: true`. This created authorization state only; no credential mint, checkout, report, or completed transaction occurred.
+- Decision: stop automation at Prava's secure collection page. The human cardholder must enter the issued sandbox card and approve WebAuthn/passkey; those security actions cannot and should not be automated by Humsafar.
+- Why: card entry and biometric/passkey approval are deliberately isolated human-presence controls on Prava's hosted origin.
+- Blocked on: completion of the newly opened browser page before its short expiry.
+- Needs from Jeswin/Deepthi: none until mandate activation is verified.
+- Commit: `4c0f209` (fresh-session operational log committed on `preethesh/integrations-backend`)

@@ -79,3 +79,24 @@ test("chargeMandate preserves safe Prava error metadata", async () => {
       error.responseId === "resp_error",
   );
 });
+
+test("createMandateSession accepts the live nested session envelope without exposing it", async () => {
+  const client = new PravaClient({
+    apiKey: "test-key",
+    fetchImpl: async () => new Response(JSON.stringify({ data: {
+      session_id: "sess_1",
+      session_token: "sensitive-token",
+      iframe_url: "https://sandbox.collect.prava.space/session/sess_1",
+      expires_at: "2026-08-02T12:00:00.000Z",
+    } }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    }),
+  });
+
+  const result = await client.createMandateSession({ test: true });
+
+  assert.equal(result.source, "live");
+  assert.equal(result.data.session_id, "sess_1");
+  assert.equal(result.data.iframe_url, "https://sandbox.collect.prava.space/session/sess_1");
+});

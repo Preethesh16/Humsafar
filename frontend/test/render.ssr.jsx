@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import App from "../src/App.jsx";
+import { ApprovalPanel } from "../src/components/ApprovalPanel.jsx";
 import { AuditLog } from "../src/components/AuditLog.jsx";
 import { BudgetSplit } from "../src/components/BudgetSplit.jsx";
 import { DeliberationFeed } from "../src/components/DeliberationFeed.jsx";
@@ -134,6 +135,64 @@ assert.equal(
 );
 for (const banned of ["order placed", "real money", "production"]) {
   assert.ok(!liveReceipt.includes(banned), `receipt must never say "${banned}"`);
+}
+
+// The approval gate. A pending request must offer a decision; an expired or
+// uncorrelated one must explain itself and offer nothing.
+const pending = {
+  requested: true,
+  runId: "run_1",
+  approvalRequestId: "apr_1",
+  digest: "sha256:abc",
+  expiresAt: new Date(Date.now() + 120_000).toISOString(),
+  given: false,
+  requestedAllocations: { flights: 11800, stay: 9200, food: 5000, guide: 4000 },
+};
+
+const pendingHtml = renderToStaticMarkup(<ApprovalPanel approval={pending} isMock={false} />);
+assert.ok(pendingHtml.includes("Authorise this exact split"), "pending request asks for a decision");
+assert.ok(pendingHtml.includes("Approve this plan"), "approve action is offered");
+assert.ok(pendingHtml.includes("Decline"), "decline action is offered");
+assert.ok(pendingHtml.includes("apr_1"), "the request reference is shown");
+assert.ok(pendingHtml.includes("₹30,000"), "the exact total being authorised is shown");
+assert.ok(!pendingHtml.includes("sha256:abc"), "the digest is not surfaced as UI noise");
+
+const expiredHtml = renderToStaticMarkup(
+  <ApprovalPanel approval={{ ...pending, expiresAt: new Date(Date.now() - 1000).toISOString() }} isMock={false} />,
+);
+assert.ok(expiredHtml.includes("Approval expired"), "an expired request says so");
+assert.ok(!expiredHtml.includes("Approve this plan"), "an expired request offers no approve button");
+
+const uncorrelatedHtml = renderToStaticMarkup(
+  <ApprovalPanel approval={{ ...pending, digest: null }} isMock={false} />,
+);
+assert.ok(uncorrelatedHtml.includes("Cannot be answered here"), "an uncorrelated request says so");
+assert.ok(!uncorrelatedHtml.includes("Approve this plan"), "an uncorrelated request offers no approve button");
+
+assert.equal(
+  renderToStaticMarkup(<ApprovalPanel approval={{ requested: false }} isMock={false} />),
+  "",
+  "no panel before an approval is requested",
+);
+
+// Accessibility guards. These are cheap to assert and expensive to notice by
+// eye, and the plan's acceptance criteria list an accessibility check.
+const a11y = [
+  [liveReceipt, 'role="dialog"', "the receipt is announced as a dialog"],
+  [liveReceipt, 'aria-modal="true"', "the receipt traps assistive focus"],
+  [liveReceipt, 'aria-label="Close receipt"', "the icon-only close button is labelled"],
+  [pendingHtml, 'aria-live="polite"', "the approval countdown is announced as it changes"],
+];
+for (const [html, needle, description] of a11y) {
+  assert.ok(html.includes(needle), `a11y: ${description} — expected ${needle}`);
+}
+
+// Decorative SVGs must never be announced; every icon in the app is decorative
+// because its meaning is always carried by adjacent text.
+for (const [name, html] of [["receipt", liveReceipt], ["approval", pendingHtml]]) {
+  const svgs = (html.match(/<svg/g) ?? []).length;
+  const hidden = (html.match(/aria-hidden="true"/g) ?? []).length;
+  assert.ok(hidden >= svgs, `a11y: every ${name} icon must be aria-hidden (${svgs} svg, ${hidden} hidden)`);
 }
 
 // The app shell itself must render — it carries the hero, the journey stepper

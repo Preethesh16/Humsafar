@@ -7,9 +7,10 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node backend/src/server.js",
-    "start:sandbox": "node --env-file=.env backend/src/server.js",
-    "prava:verify": "node --env-file=.env backend/scripts/verifyPravaAccess.js",
+    "start": "node --network-family-autoselection-attempt-timeout=2000 backend/src/server.js",
+    "start:sandbox": "node --network-family-autoselection-attempt-timeout=2000 --env-file=.env backend/src/server.js",
+    "prava:verify": "node --network-family-autoselection-attempt-timeout=2000 --env-file=.env backend/scripts/verifyPravaAccess.js",
+    "prava:create-mandate-session": "node --network-family-autoselection-attempt-timeout=2000 --env-file=.env backend/scripts/createPravaMandateSession.js",
     "test": "node --test"
   },
   "dependencies": {

@@ -156,6 +156,24 @@ Two other teams reported the identical error on 30 Jul in Prava's Discord
 (toby, and Suman001 with a written bug report). Treating it as a known
 intermittent sandbox fault; raised in the support channel.
 
+**Confirmed on both flows (2026-08-02, ~20:30 IST).** The fault is not specific
+to mandates. A *standard checkout* session — `POST /v1/sessions` with no
+`mandate_setup`, the path Prava's own guidance points at — fails identically:
+
+```
+session ses_01KZ1FKQS40K5M3FT4MCZ84HE0   status: failed
+line_items[0]: token=null dynamic_cvv=null expiry_month=null expiry_year=null
+error: { code: "FETCH_AGENTIC_CREDS_ERROR",
+         message: "Visa 400 — Fetching cryptogram failed" }
+```
+
+The hosted page reported *"Your identity was verified, but we couldn't complete
+the payment."* So the passkey ceremony succeeds and Visa threshold checks
+succeed — an over-cap charge still declines correctly with a
+`visaCorrelationId` — while **only agentic-credential issuance fails**. Both
+`/v1/mandates/{id}/charge` and the session checkout path hit it. No client-side
+change can route around this.
+
 **Consequence:** no *further* live runs are possible until this clears. It does
 not affect the evidence above — the complete four-agent run at 15:30 and the cap
 decline both landed before the fault began, and are visible in the dashboard.

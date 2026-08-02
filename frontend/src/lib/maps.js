@@ -13,15 +13,30 @@
  * the restaurant the agent actually picked.
  */
 
-const BASE = "https://www.google.com/maps/search/?api=1&query=";
+const SEARCH = "https://www.google.com/maps/search/?api=1&query=";
+const PLACE = "https://www.google.com/maps/place/?api=1&query=";
 
 /**
- * @param {string} vendor  the merchant name the agent chose
- * @param {string} [place] destination or city, used to disambiguate
- * @returns {string|null}  null when there is nothing searchable, so callers can
- *                         omit the link rather than render a broken one
+ * Google resolves a `place_id` to exactly one location. Without one, the search
+ * endpoint can only guess, and a generic vendor name — "The Hosteller",
+ * "Local shacks" — legitimately matches many places, so it returns a list.
+ *
+ * Place ids come from the backend, where the API key lives. When one is absent
+ * this falls back to search, and `isExactPlace` lets the UI label the link
+ * honestly rather than promising a single result it cannot deliver.
  */
-export function mapsUrl(vendor, place) {
+export function isExactPlace(placeId) {
+  return typeof placeId === "string" && placeId.trim().length > 0;
+}
+
+/**
+ * @param {string} vendor    the merchant name the agent chose
+ * @param {string} [place]   destination or city, used to disambiguate
+ * @param {string} [placeId] Google place id; pins the link to one location
+ * @returns {string|null}    null when there is nothing searchable, so callers
+ *                           can omit the link rather than render a broken one
+ */
+export function mapsUrl(vendor, place, placeId) {
   const parts = [vendor, place]
     .map((part) => String(part ?? "").trim())
     .filter((part) => part.length > 0);
@@ -39,7 +54,13 @@ export function mapsUrl(vendor, place) {
     })
     .join(" ");
 
-  return `${BASE}${encodeURIComponent(query)}`;
+  if (isExactPlace(placeId)) {
+    // The place endpoint plus a place id opens that one location directly.
+    // `query` stays as the human-readable label Google shows while resolving.
+    return `${PLACE}${encodeURIComponent(query)}&query_place_id=${encodeURIComponent(placeId.trim())}`;
+  }
+
+  return `${SEARCH}${encodeURIComponent(query)}`;
 }
 
 /**

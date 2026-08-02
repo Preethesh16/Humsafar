@@ -186,6 +186,12 @@ def categories_for_goal(goal: str) -> list[str]:
 
     # Non-travel goals still run through the same engine; they just field a
     # smaller roster. The wire projection fills the unused categories with 0.
-    text = goal.lower()
+    #
+    # `text` was lost when is_travel_goal() was extracted from this function,
+    # which turned every non-travel goal into a NameError and killed the run.
+    # Every test used a travel goal, so nothing caught it. Preethesh fixed the
+    # same line independently; this keeps the None guard, which his `goal.lower()`
+    # would raise on.
+    text = (goal or "").lower()
     selected = [c for c in ("food", "guide") if c in text]
     return selected or ["flights", "stay", "food", "guide"]

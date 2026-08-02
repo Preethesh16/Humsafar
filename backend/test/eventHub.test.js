@@ -36,3 +36,24 @@ test("EventHub keeps only its bounded replay history", () => {
 
   assert.deepEqual(hub.snapshot().map(({ id }) => id), [2, 3]);
 });
+
+test("EventHub isolates replay and live delivery by runId", () => {
+  const hub = new EventHub();
+  hub.publish({ type: "agent_message", runId: "run_a" });
+  hub.publish({ type: "agent_message", runId: "run_b" });
+  const request = new EventEmitter();
+  request.query = { runId: "run_b" };
+  request.get = () => undefined;
+  const writes = [];
+  const response = {
+    status() { return this; }, set() { return this; }, flushHeaders() {},
+    write(value) { writes.push(value); },
+  };
+  hub.connect(request, response);
+  assert.equal(writes.some((value) => value.includes("run_a")), false);
+  assert.equal(writes.some((value) => value.includes("run_b")), true);
+  hub.publish({ type: "agent_message", runId: "run_a" });
+  hub.publish({ type: "agent_message", runId: "run_b" });
+  assert.equal(writes.filter((value) => value.includes("run_b")).length, 2);
+  assert.equal(writes.some((value) => value.includes('"runId":"run_a"')), false);
+});

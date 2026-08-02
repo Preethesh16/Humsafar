@@ -2,7 +2,7 @@
 
 **A team of AI agents that spends one shared budget together.** You give it a goal and a
 total budget. Specialist agents negotiate how to split the money across categories, a
-mediator settles the split, and each agent then buys its own part on its own
+mediator settles the split, and each agent then attempts its own part on its own
 merchant-locked Prava credential — so no agent can overspend, and none can reach another
 agent's slice or the rest of the money.
 
@@ -22,20 +22,22 @@ injection can drain everything.
 
 ## The mechanic
 
-1. The **orchestrator** takes the goal and budget and spins up four specialists —
-   Flights, Stay, Food, Guide.
-2. Specialists **discover real options** and argue for the share they need.
+1. The **Budget Strategy Agent** interprets the goal and preference weights; the
+   orchestrator spins up four specialists — Flights, Stay, Food, Guide.
+2. Specialists use provider discovery when configured and an explicitly labelled,
+   destination-aware fixture fallback otherwise, then argue for the share they need.
 3. They **negotiate over the same finite pot**. Round one deliberately overshoots: the
    preferred plan costs more than the budget, so concessions are genuine downgrades to
    cheaper options that were actually found, not scripted dialogue.
 4. A neutral **mediator** arbitrates until the split fits the budget without violating any
    agent's stated floor, or forces a compromise after five rounds.
-5. The user **approves the exact split once**, through an expiring, one-shot, run-scoped
-   approval.
-6. The orchestrator **mints one merchant-scoped Prava credential per agent**, capped at
+5. The user chooses among options that already fit each slice.
+6. The user **approves the exact split and option IDs once**, through an expiring,
+   one-shot, run-scoped approval.
+7. The orchestrator **mints one merchant-scoped Prava credential per agent**, capped at
    that agent's slice.
-7. Each agent **checks out on its own credential** — never touching a raw card number,
-   never able to reach another slice.
+8. Each agent executes through the configured checkout adapter. The default is a labelled
+   simulation; a credential is never described as a merchant order.
 
 Two things make the multi-agent design load-bearing rather than decorative:
 
@@ -55,13 +57,15 @@ disqualifier risk, and because the UI enforces the same distinctions in code.
 | Negotiation, mediation, convergence | **Working.** Deterministic, tested, terminates by construction. |
 | Scoped-card abstraction and cap enforcement | **Working**, against a stub credential issuer by default. |
 | Live dashboard over SSE | **Working**, including reconnect replay. |
+| Dynamic browser intake | **Working.** Free-form cities plus IATA codes, dates, travellers, rooms, budget and preferences start a real agent subprocess. |
+| Human option choice | **Working.** Only offered affordable options are accepted, once; selections are bound into approval. |
 | Run-scoped approval protocol | **Working** and verified end to end. |
 | Prava sandbox authentication | **Verified.** `npm run prava:verify` returns authentication OK. |
 | Prava mandates | **Created.** Five approved through the hosted passkey ceremony, `active`/`available`. |
 | Scoped credential issuance | **Verified on real rails.** Four credentials issued in a single run, one per agent, each capped at its own slice. |
 | Network cap enforcement | **Verified.** Visa declined ₹160 against a ₹100 mandate — *"Total amount 160.00 exceeds …"*. |
 | Merchant order | **Not performed.** No goods were bought; the charge is deliberately left unreconciled. |
-| Duffel flights/stays | **Not configured.** No `DUFFEL_ACCESS_TOKEN`, so discovery falls back to disclosed fixtures. |
+| Duffel flights/stays | **Wired for live test search.** With `GOOGLE_MAPS_API_KEY`, destinations are geocoded automatically for stays. Missing provider access falls back to disclosed destination-aware fixtures. |
 | Guide / Food inventory | **Fixtures by design**, shaped like Viator/OpenTable responses. Partner API access does not clear in a hackathon window. |
 
 ### What actually happened on Prava
@@ -157,7 +161,8 @@ event boundary, so allocation can never drift by a rounding error.
 
 Cross-team contracts are locked in [`INTERFACES.md`](INTERFACES.md). Payment safety rules
 are in [`precaution.md`](precaution.md). Delivery sequencing is in
-[`execution-plan.md`](execution-plan.md).
+[`execution-plan.md`](execution-plan.md). The exact keys, partner contracts, and
+remaining booking boundaries are in [`PRODUCTION-INTEGRATIONS.md`](PRODUCTION-INTEGRATIONS.md).
 
 ---
 
@@ -173,16 +178,17 @@ npm start
 # 2. dashboard  (http://localhost:5173)
 cd frontend && npm install && npm run dev
 
-# 3. a real agent run, streaming into the dashboard
+# 3. open the dashboard and submit any trip on `/`; it starts the agents.
+# CLI remains available for a deterministic proof-shot rehearsal:
 cd agents && python3 -m humsafar --goal "Plan my Goa trip" --budget 30000 --demo
 ```
 
 The dashboard opens on a clearly-labelled **simulated stream** so it demos with nothing
 else running. Toggle **live backend** (or open `?source=live`) to consume real events.
 
-Useful agent flags: `--demo` runs both proof shots, `--live-discovery` uses the backend's
-discovery routes, `--no-stream` skips the backend entirely, `--llm` uses OpenAI for
-dialogue when `OPENAI_API_KEY` is set.
+Useful agent flags: `--demo` runs both proof shots, backend provider discovery is
+the default, `--local-discovery` forces offline fixtures, `--no-stream` skips the
+event backend, and `--llm` uses OpenAI dialogue when `OPENAI_API_KEY` is set.
 
 ### Tests
 
@@ -192,7 +198,7 @@ cd frontend && npm run test:render # server-rendered UI smoke test
 cd agents && python3 -m unittest discover -s tests -t .
 ```
 
-Currently **79 JavaScript** and **156 Python** tests.
+Currently **87 JavaScript** and **178 Python** tests, plus frontend SSR and production-build checks.
 
 ### Environment
 

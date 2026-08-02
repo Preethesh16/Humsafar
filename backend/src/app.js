@@ -2,8 +2,9 @@ import express from "express";
 
 import { validateEvent } from "./events/eventSchema.js";
 import { ApprovalError } from "./services/approvalService.js";
+import { ChoiceError } from "./services/choiceService.js";
 
-export function createApp({ eventHub, scopedCardService, runService, choiceService, discoveryService, mandateService, approvalService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, discoveryService, mandateService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000" } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }
@@ -44,6 +45,7 @@ export function createApp({ eventHub, scopedCardService, runService, choiceServi
       return response.status(400).json({ error: { code: "INVALID_EVENT", message: error } });
     }
 
+    choiceService?.observe(request.body);
     const id = eventHub.publish(request.body);
     return response.status(202).json({ id });
   });
@@ -83,30 +85,6 @@ export function createApp({ eventHub, scopedCardService, runService, choiceServi
     }));
   });
 
-  app.post("/api/choices", authorize(internalApiToken), (request, response) => {
-    if (!choiceService) return response.status(503).json({ error: { code: "CHOICE_UNAVAILABLE" } });
-    try {
-      return response.status(202).json({ data: choiceService.record(request.body ?? {}) });
-    } catch (error) {
-      return response.status(error.status ?? 400).json({
-        error: { code: error.code ?? "INVALID_CHOICE", message: error.message },
-      });
-    }
-  });
-
-  app.get("/api/choices", authorize(internalApiToken), (request, response) => {
-    if (!choiceService) return response.status(503).json({ error: { code: "CHOICE_UNAVAILABLE" } });
-    try {
-      const found = choiceService.get({ runId: request.query.runId, agent: request.query.agent });
-      if (!found) return response.status(204).end();
-      return response.json({ data: found });
-    } catch (error) {
-      return response.status(error.status ?? 400).json({
-        error: { code: error.code ?? "INVALID_CHOICE", message: error.message },
-      });
-    }
-  });
-
   app.post("/api/runs", authorize(internalApiToken), (request, response) => {
     if (!runService) return response.status(503).json({ error: { code: "RUN_UNAVAILABLE" } });
     try {
@@ -116,6 +94,31 @@ export function createApp({ eventHub, scopedCardService, runService, choiceServi
         error: { code: error.code ?? "INVALID_RUN", message: error.message },
       });
     }
+  });
+
+  app.get("/api/runs/:runId", authorize(internalApiToken), (request, response) => {
+    if (!runService) return response.status(503).json({ error: { code: "RUN_UNAVAILABLE" } });
+    try {
+      return response.json(runService.get(request.params.runId));
+    } catch (error) {
+      return response.status(error.status ?? 400).json({
+        error: { code: error.code ?? "INVALID_RUN", message: error.message },
+      });
+    }
+  });
+
+  app.post("/api/choices", authorize(internalApiToken), (request, response) => {
+    if (!choiceService) return response.status(503).json({ error: { code: "CHOICE_UNAVAILABLE" } });
+    return choiceResponse(response, () => choiceService.select(request.body), 202);
+  });
+
+  app.get("/api/choices", authorize(internalApiToken), (request, response) => {
+    if (!choiceService) return response.status(503).json({ error: { code: "CHOICE_UNAVAILABLE" } });
+    return choiceResponse(response, () => {
+      const data = choiceService.get(request.query);
+      if (!data) return null;
+      return { data };
+    });
   });
 
   app.post("/api/discovery/:category", authorize(internalApiToken), async (request, response) => {
@@ -185,6 +188,18 @@ export function createApp({ eventHub, scopedCardService, runService, choiceServi
   });
 
   return app;
+}
+
+function choiceResponse(response, operation, successStatus = 200) {
+  try {
+    const result = operation();
+    return result === null ? response.status(204).end() : response.status(successStatus).json(result);
+  } catch (error) {
+    if (error instanceof ChoiceError) {
+      return response.status(error.status).json({ error: { code: error.code, message: error.message } });
+    }
+    throw error;
+  }
 }
 
 function approvalResponse(response, operation, successStatus = 200) {

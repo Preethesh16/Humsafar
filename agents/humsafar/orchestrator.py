@@ -15,7 +15,8 @@ recovery paths a real product needs anyway:
     orchestrator re-negotiates *only that slice* instead of restarting.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from inspect import signature
 from typing import Optional
 from uuid import uuid4
 
@@ -106,6 +107,9 @@ class Orchestrator:
         return self._run(config)
 
     def _run(self, config: RunConfig) -> RunReport:
+        # Every event is run-scoped. The backend uses this to keep a new
+        # browser session from replaying an earlier trip into the same UI.
+        self.emitter.run_id = config.run_id
         report = RunReport(goal=config.goal, budget_paise=config.budget_paise, negotiation=None)
 
         specialists = self._assemble(config)
@@ -119,7 +123,12 @@ class Orchestrator:
         report.negotiation = self._negotiate(specialists, config)
         allocations = report.negotiation.allocations_paise
 
-        if not self._approve(allocations, config):
+        # Taste is settled before approval. The backend digest binds both the
+        # monetary split and these exact option IDs, so an approval can never
+        # be reused after a room, flight or price changes.
+        choices = self._choose(specialists, allocations, config)
+
+        if not self._approve(allocations, choices, config):
             self._say("orchestrator", "Approval declined. No cards minted, no money moved.")
             return report
 
@@ -127,9 +136,15 @@ class Orchestrator:
         by_category = {s.category: s for s in specialists}
 
         for specialist in specialists:
-            self._execute(specialist, allocations[specialist.category], config, report)
+            self._execute(
+                specialist,
+                allocations[specialist.category],
+                choices.get(specialist.category),
+                config,
+                report,
+            )
 
-        self._recover(by_category, allocations, report)
+        self._recover(by_category, allocations, choices, config, report)
         self._close(report)
         return report
 
@@ -184,9 +199,71 @@ class Orchestrator:
         )
         return result
 
-    def _approve(self, allocations: dict[str, int], config: RunConfig) -> bool:
+    def _choose(
+        self,
+        specialists: list[Specialist],
+        allocations: dict[str, int],
+        config: RunConfig,
+    ) -> dict[str, object]:
+        """Settle every affordable option before the plan is approved."""
+        chosen = {}
+        for specialist in specialists:
+            slice_paise = allocations[specialist.category]
+            picked = self.choice.choose(
+                specialist.category, specialist.options, slice_paise
+            )
+            if picked is None:
+                continue
+
+            effective, trust_note = self._apply_trust(
+                specialist, picked.option, slice_paise
+            )
+            picked.trust_note = trust_note
+            if effective != picked.option:
+                # A safety-driven replacement is not the user's choice. Keep
+                # that distinction all the way to the receipt and audit log.
+                picked.option = effective
+                picked.chosen_by = "agent-timeout"
+                self._say(
+                    specialist.category,
+                    "Your selected merchant did not clear the trust check; "
+                    f"the agent selected {effective.vendor} before approval.{trust_note}",
+                )
+
+            chosen[specialist.category] = picked
+            self.emitter.choice_made(
+                config.run_id,
+                specialist.category,
+                option_id(specialist.category, picked.option),
+                picked.option.vendor,
+                picked.option.price_paise,
+                picked.chosen_by,
+            )
+            if picked.by_user:
+                self._say(
+                    specialist.category,
+                    f"You chose {picked.option.vendor} — {picked.option.description} at "
+                    f"{format_inr(picked.option.price_paise)}. Adding exactly that to approval.",
+                )
+        return chosen
+
+    def _approve(
+        self, allocations: dict[str, int], choices: dict[str, object], config: RunConfig
+    ) -> bool:
         """Run the §7 approval protocol. Nothing is minted without it."""
-        record = self.approval.request(config.run_id, allocations)
+        choice_ids = {
+            category: option_id(category, picked.option)
+            for category, picked in choices.items()
+        }
+        request_parameters = signature(self.approval.request).parameters
+        if len(request_parameters) >= 3:
+            record = self.approval.request(config.run_id, allocations, choice_ids)
+        else:
+            # Compatibility for small offline/test approval adapters written
+            # against the original two-argument protocol. The production
+            # PolledApproval always takes the choices and binds them in the
+            # backend digest.
+            record = self.approval.request(config.run_id, allocations)
         if record is None:
             self._say(
                 "orchestrator",
@@ -197,6 +274,7 @@ class Orchestrator:
 
         self.emitter.approval_requested(
             allocations,
+            choices=choice_ids,
             run_id=record.run_id,
             approval_request_id=record.approval_request_id,
             digest=record.digest,
@@ -204,8 +282,8 @@ class Orchestrator:
         )
         self._say(
             "orchestrator",
-            "Sending the split for approval. One passkey covers the whole plan — after this, "
-            "no agent can be prompted into spending outside its own slice."
+            "Sending the exact split and selected options for one plan approval. After this, "
+            "no agent can change the plan or spend outside its own slice."
             + (
                 f" Waiting for a decision (expires {record.expires_at})."
                 if self.approval.requires_human
@@ -246,29 +324,10 @@ class Orchestrator:
         self,
         specialist: Specialist,
         slice_paise: int,
+        picked,
         config: RunConfig,
         report: RunReport,
     ) -> None:
-        # §6: the agents decided the money, the user decides the taste. This
-        # sits before minting so a credential is never issued for an option
-        # that is about to change.
-        picked = self.choice.choose(specialist.category, specialist.options, slice_paise)
-        if picked is not None:
-            self.emitter.choice_made(
-                config.run_id,
-                specialist.category,
-                option_id(specialist.category, picked.option),
-                picked.option.vendor,
-                picked.option.price_paise,
-                picked.chosen_by,
-            )
-            if picked.by_user:
-                self._say(
-                    specialist.category,
-                    f"You chose {picked.option.vendor} — {picked.option.description} at "
-                    f"{format_inr(picked.option.price_paise)}. Buying exactly that.",
-                )
-
         option = picked.option if picked is not None else specialist.cheapest_within(slice_paise)
         if option is None:
             self._say(
@@ -286,6 +345,8 @@ class Orchestrator:
                     card_id="",
                     source="fixture",
                     detail=f"Slice {format_inr(slice_paise)} is below the category floor",
+                    option_id="",
+                    chosen_by="",
                 )
             )
             self.emitter.purchase_result(
@@ -297,7 +358,7 @@ class Orchestrator:
             )
             return
 
-        option, trust_note = self._apply_trust(specialist, option, slice_paise)
+        trust_note = getattr(picked, "trust_note", "") if picked is not None else ""
 
         guardian = Guardian({o.merchant for o in specialist.options})
         verdict = guardian.check(specialist.category, option, slice_paise, config.goal)
@@ -346,6 +407,8 @@ class Orchestrator:
                     card_id="",
                     source="fixture",
                     detail=str(card.get("error", "card issuance failed")),
+                    option_id=option_id(specialist.category, option),
+                    chosen_by=getattr(picked, "chosen_by", ""),
                 )
             )
             return
@@ -353,7 +416,8 @@ class Orchestrator:
         self.emitter.card_issued(specialist.category, card["cardId"], slice_paise)
         result = self.checkout.pay(option, card)
         status = "success" if result.ok else "failed"
-        amount = option.price_paise if result.ok else 0
+        outcome = result.get("outcome", "")
+        amount = option.price_paise if result.ok and outcome != "credential_issued" else 0
         # One string for both the audit record and the streamed event — the
         # receipt is built from these, and a receipt that disagrees with the
         # live feed is worse than either one alone.
@@ -369,14 +433,27 @@ class Orchestrator:
                 card_id=card["cardId"],
                 source=result.get("source", "fixture"),
                 detail=detail,
+                option_id=option_id(specialist.category, option),
+                chosen_by=getattr(picked, "chosen_by", ""),
+                outcome=outcome,
             )
         )
         self.emitter.purchase_result(
-            specialist.category, status, amount, option.merchant, detail
+            specialist.category,
+            status,
+            amount,
+            option.merchant,
+            detail,
+            result.get("source", "fixture"),
+            outcome,
+        )
+        action = "Authorized" if "NO merchant order" in detail else (
+            "Simulated" if result.get("source") == "fixture" and result.ok else
+            "Booked" if result.ok else "Failed"
         )
         self._say(
             specialist.category,
-            f"{'Booked' if result.ok else 'Failed'} {option.vendor} at "
+            f"{action} {option.vendor} at "
             f"{format_inr(option.price_paise)} on a card capped at {format_inr(slice_paise)}.",
         )
 
@@ -427,9 +504,11 @@ class Orchestrator:
         self,
         by_category: dict[str, Specialist],
         allocations: dict[str, int],
+        choices: dict[str, object],
+        config: RunConfig,
         report: RunReport,
     ) -> None:
-        """Re-negotiate only the slices that failed, never the whole plan."""
+        """Re-negotiate only a failed slice, then require a fresh approval."""
         failures = [p for p in report.purchases if p.status == "failed" and p.agent in by_category]
         if not failures:
             return
@@ -453,13 +532,41 @@ class Orchestrator:
             )
             report.renegotiated.append(failure.agent)
 
-            option = specialist.cheapest_within(available)
-            if option is None:
+            alternatives = [
+                option
+                for option in specialist.options
+                if option.merchant != failure.merchant and option.price_paise <= available
+            ]
+            if not alternatives:
                 self._say(
                     specialist.category,
-                    f"Nothing left in my category under {format_inr(available)}. Standing down.",
+                    f"No different option remains under {format_inr(available)}. Standing down.",
                 )
                 continue
+
+            retry_specialist = replace(specialist, options=alternatives)
+            retry_choices = self._choose(
+                [retry_specialist],
+                {specialist.category: available},
+                config,
+            )
+            picked = retry_choices.get(specialist.category)
+            if picked is None:
+                continue
+            option = picked.option
+
+            revised_choices = {**choices, specialist.category: picked}
+            if not self._approve(allocations, revised_choices, config):
+                self._say(
+                    specialist.category,
+                    "Replacement was not approved. The failed slice remains unspent.",
+                )
+                continue
+            choices[specialist.category] = picked
+
+            authorize = getattr(self.card_client, "authorize", None)
+            if authorize is not None:
+                authorize(option.merchant, available)
 
             card = self.card_client.mint(option.merchant, available)
             if not card.issued:
@@ -473,24 +580,36 @@ class Orchestrator:
             result = self.checkout.pay(option, card)
             if not result.ok:
                 self.emitter.purchase_result(
-                    specialist.category, "failed", 0, option.merchant, result.get("detail", "")
+                    specialist.category,
+                    "failed",
+                    0,
+                    option.merchant,
+                    result.get("detail", ""),
+                    result.get("source", "fixture"),
+                    result.get("outcome", ""),
                 )
                 continue
 
             failure.status = "success"
             failure.merchant = option.merchant
             failure.description = f"{option.vendor} — {option.description}"
-            failure.amount_paise = option.price_paise
+            recovery_outcome = result.get("outcome", "")
+            failure.amount_paise = 0 if recovery_outcome == "credential_issued" else option.price_paise
             failure.card_id = card["cardId"]
             failure.source = result.get("source", "fixture")
             failure.detail = f"Recovered after re-negotiation. {result.get('detail', '')}"
+            failure.option_id = option_id(specialist.category, option)
+            failure.chosen_by = picked.chosen_by
+            failure.outcome = recovery_outcome
 
             self.emitter.purchase_result(
                 specialist.category,
                 "success",
-                option.price_paise,
+                failure.amount_paise,
                 option.merchant,
                 failure.detail,
+                failure.source,
+                failure.outcome,
             )
             self._say(
                 specialist.category,
@@ -552,16 +671,19 @@ class Orchestrator:
                 "cardId": p.card_id,
                 "source": p.source,
                 "details": p.detail,
+                "optionId": p.option_id or None,
+                "chosenBy": p.chosen_by or None,
+                "outcome": p.outcome or None,
             }
             for p in report.purchases
         ]
         succeeded = sum(1 for p in report.purchases if p.status == "success")
         self._say(
             "orchestrator",
-            f"Done. {succeeded}/{len(report.purchases)} purchases completed, "
-            f"{format_inr(report.total_spent_paise)} spent of "
+            f"Done. {succeeded}/{len(report.purchases)} execution steps succeeded, "
+            f"{format_inr(report.total_spent_paise)} recorded against "
             f"{format_inr(report.budget_paise)}. "
-            f"{format_inr(report.budget_paise - report.total_spent_paise)} never left the account.",
+            f"{format_inr(report.budget_paise - report.total_spent_paise)} remains unspent.",
         )
         # Emitted last, deliberately: `final_receipt` is the dashboard's signal
         # that the run is over, so nothing may follow it.

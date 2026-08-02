@@ -39,6 +39,9 @@ deployment being complete. Linq is cut.
 - Logical separation comes from distinct OpenAI `Agent` definitions,
   instructions, tools, and structured output schemas—not from separate API
   keys.
+- The intent definition is presented as the **Budget Strategy Agent**: it may
+  choose categories and preference weights, but the deterministic engine alone
+  turns provider prices into integer-paise allocations.
 - Use the Python OpenAI Agents SDK, which uses the Responses API by default.
   Keep models configurable through environment variables. The current official
   resolver names `gpt-5.6-sol` as the latest reasoning target; perform one
@@ -69,7 +72,7 @@ Official references:
 
 | Logical agent | Model responsibility | Deterministic validation |
 |---|---|---|
-| Intent Agent | Parse an arbitrary goal into the subset of `flights`, `stay`, `food`, `guide`; extract user emphasis and constraints | Reject unknown categories, invalid weights, invented budget, or missing required fields; fall back to current keyword parser |
+| Budget Strategy Agent | Parse an arbitrary goal into the subset of `flights`, `stay`, `food`, `guide`; extract user emphasis and constraints | Reject unknown categories, invalid weights, invented budget, or missing required fields; the deterministic engine alone computes money |
 | Four Specialist Agents | Explain the trade-off around real discovered options and the engine-provided ask/floor | Cannot set allocations, prices, merchant IDs, mandate IDs, or payment state; every stated amount must match supplied data |
 | Mediator Explainer | Explain why the deterministic engine accepted concessions and the final split | Cannot edit the split or end condition; fallback text remains available |
 | Taste Assistant | Summarize differences among shortlisted options without inventing ratings/reviews | User chooses; timeout uses the deterministic ranking rule and is labeled `agent-timeout` |
@@ -292,3 +295,23 @@ approval, OpenAI's meaningful structured role, demo video, or disclosure.
 - Prava evidence is genuine sandbox evidence and described exactly as observed.
 - Every purchase line carries honest provenance; mixed-mode remains explicit.
 - The public deployment, README, video and submitted Devfolio project agree.
+
+## 2026-08-02 integration milestone
+
+Landed locally on Preethesh's branch and awaiting the one-shot merge:
+
+- Dynamic five-screen journey with structured trip intake and no hard-coded destination list.
+- Browser-started Python multi-agent run using backend provider discovery and trust checks.
+- OpenAI narration enabled only when configured; deterministic money remains authoritative.
+- Validated one-shot choice API; every selected option is affordable and bound into the approval digest.
+- Choice now occurs before approval, and execution uses the approved option rather than selecting afterward.
+- Run status, concurrency protection, child-process backpressure protection, and same-origin token proxy.
+- Destination-aware fallback for arbitrary origin/destination/duration; Duffel flights use entered IATA/date context, and Duffel Stays uses a server-side Google geocode or an explicit coordinate override.
+- No router advisory chain: the five linear screens use the native History API; production audit is clean.
+
+Still external/release work, not silently treated as complete: configure OpenAI,
+Duffel, and Google server credentials; add real merchant booking adapters and
+the passenger/contact fields they require; obtain transactional guide, rail,
+restaurant, and local-transport partner access; deploy HTTPS; record and
+publish the demo/submission. Prava sandbox delegation/cap evidence is already
+complete, but it is not a merchant booking. See `PRODUCTION-INTEGRATIONS.md`.

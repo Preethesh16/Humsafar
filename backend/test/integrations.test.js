@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { DuffelClient } from "../src/integrations/duffelClient.js";
+import { GoogleMapsClient } from "../src/integrations/googleMapsClient.js";
 import { withFixtureFallback } from "../src/integrations/withFixtureFallback.js";
 import { DiscoveryService } from "../src/services/discoveryService.js";
 import {
@@ -43,6 +44,47 @@ test("DiscoveryService degrades missing Duffel credentials to labeled fixtures",
   const result = await service.search("flights", { origin: "BLR", destination: "GOI", departureDate: "2026-08-02" });
   assert.equal(result.source, "fixture");
   assert.equal(result.data.every((item) => item.source === "fixture"), true);
+});
+
+test("Google geocoding keeps its key server-side and returns coordinates", async () => {
+  let requestUrl;
+  const client = new GoogleMapsClient({
+    apiKey: "server-only-key",
+    fetchImpl: async (url) => {
+      requestUrl = url;
+      return new Response(JSON.stringify({
+        status: "OK",
+        results: [{ geometry: { location: { lat: 15.2993, lng: 74.124 } } }],
+      }), { status: 200 });
+    },
+  });
+  assert.deepEqual(await client.geocode("Goa, India"), { latitude: 15.2993, longitude: 74.124 });
+  assert.equal(requestUrl.searchParams.get("address"), "Goa, India");
+  assert.equal(requestUrl.searchParams.get("key"), "server-only-key");
+});
+
+test("stay discovery geocodes the destination before calling Duffel", async () => {
+  let duffelInput;
+  const service = new DiscoveryService({
+    googleMapsClient: { geocode: async (place) => {
+      assert.equal(place, "Goa");
+      return { latitude: 15.2993, longitude: 74.124 };
+    } },
+    duffelClient: { searchStays: async (input) => {
+      duffelInput = input;
+      return { results: [{
+        id: "stay_1",
+        accommodation: { name: "Test Stay", description: "Two nights", rating: 4.4 },
+        cheapest_rate_total_amount: "8000.00",
+        cheapest_rate_currency: "INR",
+      }] };
+    } },
+    logger,
+  });
+  const result = await service.search("stay", { destination: "Goa", checkInDate: "2026-08-10", checkOutDate: "2026-08-12" });
+  assert.equal(result.source, "live");
+  assert.equal(duffelInput.latitude, 15.2993);
+  assert.equal(duffelInput.longitude, 74.124);
 });
 
 test("food and guide results always disclose fixture source", async () => {

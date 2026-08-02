@@ -35,8 +35,9 @@ class FixtureDiscovery:
     and it is what keeps the submission's disclosure section honest.
     """
 
-    def __init__(self, days: int = 3) -> None:
+    def __init__(self, days: int = 3, origin: str = "Bengaluru") -> None:
         self.days = days
+        self.origin = origin
 
     def discover(self, category: str, goal: str) -> list[Option]:
         # The goal is no longer ignored. It used to be: every request returned
@@ -44,7 +45,7 @@ class FixtureDiscovery:
         # BLR-GOI flights and a hotel in Anjuna. Discovery now answers the
         # question that was actually asked.
         destination = parse_destination(goal)
-        rows = build_inventory(destination, self.days).get(category, [])
+        rows = build_inventory(destination, self.days, self.origin).get(category, [])
         return [
             Option(
                 category=category,
@@ -85,12 +86,14 @@ class BackendDiscovery:
         token: Optional[str] = None,
         timeout: float = 15.0,
         fallback: Optional[DiscoveryProvider] = None,
+        query: Optional[dict] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
         self.fallback = fallback if fallback is not None else FixtureDiscovery()
         self.sources: dict[str, str] = {}
+        self.query = query or {}
 
     def discover(self, category: str, goal: str) -> list[Option]:
         headers = {"Content-Type": "application/json"}
@@ -99,7 +102,7 @@ class BackendDiscovery:
 
         request = urllib.request.Request(
             f"{self.base_url}/api/discovery/{category}",
-            data=json.dumps({"goal": goal}).encode("utf-8"),
+            data=json.dumps({"goal": goal, **self.query}).encode("utf-8"),
             headers=headers,
             method="POST",
         )
@@ -186,7 +189,9 @@ def categories_for_goal(goal: str) -> list[str]:
     #
     # `text` was lost when is_travel_goal() was extracted from this function,
     # which turned every non-travel goal into a NameError and killed the run.
-    # Every test used a travel goal, so nothing caught it.
+    # Every test used a travel goal, so nothing caught it. Preethesh fixed the
+    # same line independently; this keeps the None guard, which his `goal.lower()`
+    # would raise on.
     text = (goal or "").lower()
     selected = [c for c in ("food", "guide") if c in text]
     return selected or ["flights", "stay", "food", "guide"]

@@ -3,7 +3,7 @@ export class EventHub {
     this.historyLimit = historyLimit;
     this.nextId = 1;
     this.history = [];
-    this.clients = new Set();
+    this.clients = new Map();
   }
 
   publish(event) {
@@ -14,8 +14,8 @@ export class EventHub {
     }
 
     const frame = serialize(entry);
-    for (const client of this.clients) {
-      client.write(frame);
+    for (const [client, runId] of this.clients) {
+      if (!runId || event.runId === runId) client.write(frame);
     }
 
     return entry.id;
@@ -32,14 +32,17 @@ export class EventHub {
     response.flushHeaders();
     response.write("retry: 3000\n\n");
 
+    const runId = typeof request.query?.runId === "string" ? request.query.runId : null;
     const lastEventId = Number(request.get("last-event-id") ?? 0);
     if (Number.isInteger(lastEventId) && lastEventId >= 0) {
       for (const entry of this.history) {
-        if (entry.id > lastEventId) response.write(serialize(entry));
+        if (entry.id > lastEventId && (!runId || entry.event.runId === runId)) {
+          response.write(serialize(entry));
+        }
       }
     }
 
-    this.clients.add(response);
+    this.clients.set(response, runId);
     request.on("close", () => this.clients.delete(response));
   }
 

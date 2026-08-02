@@ -13,9 +13,10 @@ npm install && npm start          # http://127.0.0.1:3000
 cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-The dashboard boots on the **mocked stream** by default so it demos with no
-backend running. Flip the "Live backend" toggle in the header, or open
-`http://localhost:5173/?source=live`, to consume the real SSE stream.
+The root page is a dynamic trip intake. Starting a run switches to the live
+stream automatically and persists the run correlation for refreshes. With no
+run, the dashboard can still boot on the clearly labelled mocked stream; use
+`?source=live` or `?source=mock` to select explicitly.
 
 Point the dev proxy somewhere else with `HUMSAFAR_BACKEND_URL=http://host:port`.
 
@@ -47,6 +48,8 @@ npm run build     # production bundle
 | `src/state/sessionReducer.js` | Pure fold of the locked event contract into UI state. No React — unit-tested directly. |
 | `src/lib/mockStream.js` | **MOCKED** scripted replay of the `brainstorming.md` Section 7 demo beats. |
 | `src/lib/useEventStream.js` | Switches between the mock replay and `EventSource("/api/events")`. |
+| `src/pages/Intake.jsx` | Structured origin/destination, IATA, dates, travellers, rooms, budget and preference input; coordinates are only an advanced override because the backend can geocode automatically. |
+| `src/pages/Choose.jsx` | Affordable option selection with honest ranking and timeout labels. |
 | `src/components/` | Deliberation feed, budget split, credential cards, proof panel, audit log, final receipt. |
 | `src/lib/icons.jsx` | Inline SVG glyphs. Presentation only. |
 | `src/styles.css` | The warm "paper" theme — canvas `#f3efe5`, forest `#1d3b2d`, coral `#e56b52`, mint `#c9f2dd`. |
@@ -102,4 +105,6 @@ Rules it enforces:
 the stream has to be same-origin. Rather than ask Preethesh to widen the
 backend's origin policy for a dev-only concern, `vite.config.js` proxies `/api`
 and `/health` to the backend. A production build should be served from the same
-origin as the API for the same reason.
+origin as the API for the same reason. The dev proxy reads the repository-root
+`.env` server-side to attach `INTERNAL_API_TOKEN`; it never exposes that token to
+browser code.

@@ -2,8 +2,9 @@ import { flightFixtures, foodFixtures, guideFixtures, stayFixtures } from "../fi
 import { withFixtureFallback } from "../integrations/withFixtureFallback.js";
 
 export class DiscoveryService {
-  constructor({ duffelClient, logger = console }) {
+  constructor({ duffelClient, googleMapsClient, logger = console }) {
     this.duffelClient = duffelClient;
+    this.googleMapsClient = googleMapsClient;
     this.logger = logger;
   }
 
@@ -22,11 +23,26 @@ export class DiscoveryService {
       return withFixtureFallback({
         integration: "duffel-stays",
         logger: this.logger,
-        live: async () => normalizeStays(await this.duffelClient.searchStays(input)),
+        live: async () => {
+          const coordinates = await this.#stayCoordinates(input);
+          return normalizeStays(await this.duffelClient.searchStays({ ...input, ...coordinates }));
+        },
         fixture: async () => stayFixtures,
       });
     }
     throw new TypeError("category must be flights, stay, food, or guide");
+  }
+
+  async #stayCoordinates(input) {
+    if (Number.isFinite(input.latitude) && Number.isFinite(input.longitude)) {
+      return { latitude: input.latitude, longitude: input.longitude };
+    }
+    if (!this.googleMapsClient) {
+      const error = new Error("GOOGLE_MAPS_API_KEY or explicit coordinates are required for live stay search");
+      error.code = "STAY_COORDINATES_UNAVAILABLE";
+      throw error;
+    }
+    return this.googleMapsClient.geocode(input.destination);
   }
 }
 

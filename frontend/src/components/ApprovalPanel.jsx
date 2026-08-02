@@ -93,6 +93,12 @@ export function ApprovalPanel({ approval, isMock }) {
         </li>
       </ul>
 
+      {Object.keys(approval.requestedChoices ?? {}).length > 0 && (
+        <p className="approval__ref">
+          Options locked: {Object.entries(approval.requestedChoices).map(([agent, id]) => `${agent}=${id}`).join(" · ")}
+        </p>
+      )}
+
       {approval.approvalRequestId && (
         <p className="approval__ref">
           run <code>{approval.runId ?? "—"}</code> · request{" "}

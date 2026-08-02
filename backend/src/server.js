@@ -1,11 +1,12 @@
 import { createApp } from "./app.js";
 import { EventHub } from "./events/eventHub.js";
 import { DuffelClient } from "./integrations/duffelClient.js";
+import { GoogleMapsClient } from "./integrations/googleMapsClient.js";
 import { PravaClient } from "./integrations/pravaClient.js";
 import { DiscoveryService } from "./services/discoveryService.js";
 import { ApprovalService } from "./services/approvalService.js";
-import { MandateService } from "./services/mandateService.js";
 import { ChoiceService } from "./services/choiceService.js";
+import { MandateService } from "./services/mandateService.js";
 import { RunService } from "./services/runService.js";
 import { ScopedCardService } from "./services/scopedCardService.js";
 import { TrustService } from "./services/trustService.js";
@@ -29,12 +30,15 @@ const pravaClient = scopedCardService.pravaClient;
 const app = createApp({
   eventHub: new EventHub(),
   scopedCardService,
-  discoveryService: new DiscoveryService({ duffelClient: new DuffelClient() }),
+  discoveryService: new DiscoveryService({
+    duffelClient: new DuffelClient(),
+    googleMapsClient: new GoogleMapsClient(),
+  }),
   mandateService: new MandateService({ pravaClient, mandateMerchants }),
   approvalService: new ApprovalService(),
+  choiceService: new ChoiceService(),
   trustService: new TrustService(),
   runService: new RunService(),
-  choiceService: new ChoiceService(),
   internalApiToken,
   publicBaseUrl: process.env.PUBLIC_BASE_URL,
 });

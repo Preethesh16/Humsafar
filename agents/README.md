@@ -23,12 +23,13 @@ python3 -m humsafar --goal "Plan my Goa trip" --budget 30000 --demo
 | `--demo` | Shorthand for `--overspend stay --fail guide` — both proof shots |
 | `--no-stream` | Don't POST events to the backend |
 | `--live-cards` | Mint through `POST /api/scoped-cards` instead of the stub |
-| `--live-discovery` | Discover options via `POST /api/discovery/:category` |
+| `--local-discovery` | Opt out of the default backend provider route and use local fixtures only |
+| `--days`, `--origin`, `--destination`, airport/date/traveller flags | Structured context for destination-aware fallback and provider search |
 | `--trust` | Run the pre-purchase trust check via `POST /api/trust/check` |
 | `--llm` | Use OpenAI for agent dialogue (needs `OPENAI_API_KEY`) |
 | `--backend URL` | Backend base URL (default `http://127.0.0.1:3000`) |
 
-With `--live-discovery`, the run prints what each category *actually* resolved
+By default, the run uses backend discovery and prints what each category *actually* resolved
 to (`data sources: flights=fixture, stay=live, …`) rather than what was asked
 for — a live route that fell back to fixtures must never read as live.
 
@@ -115,12 +116,12 @@ disqualifier risk, so these are enforced in code rather than left to discipline:
   warning telling you not to present it as a blocked attempt.
 - Card tokens are never logged, printed, or placed in an event.
 
-## What's still stubbed
+## Provider and execution status
 
 | Piece | Status | Owner |
 |---|---|---|
 | Prava call under `mintScopedCard` | Live route exists, fails closed without `PRAVA_SECRET_KEY` | Preethesh |
-| Duffel flights/stay inventory | Fixture prices | Preethesh |
+| Duffel flights/stay inventory | Live test search when token/context exist; destination-aware fixture fallback otherwise | Preethesh |
 | Guide/food inventory | Fixture, Viator/OpenTable-shaped | Preethesh |
-| Merchant checkout | `SimulatedCheckout` | Preethesh |
+| Merchant checkout | `SimulatedCheckout` by default; no merchant order is claimed | Preethesh |
 | LLM dialogue | Wired, off by default (no key in the workspace) | Jeswin |

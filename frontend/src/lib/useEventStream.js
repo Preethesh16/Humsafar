@@ -14,18 +14,20 @@ export const SOURCE = { MOCK: "mock", LIVE: "live" };
  * reducer drops any frame whose id it has already folded in. That means a
  * mid-demo backend blip re-syncs the dashboard instead of duplicating the feed.
  */
-export function useEventStream(source) {
+export function useEventStream(source, runId = null) {
   const [state, dispatch] = useReducer(reduce, undefined, initialState);
   const [connection, setConnection] = useState("connecting");
 
   useEffect(() => {
+    dispatch({ reset: true });
     if (source === SOURCE.MOCK) {
       setConnection("mock");
       return startMockStream((frame) => dispatch(frame));
     }
 
     setConnection("connecting");
-    const es = new EventSource("/api/events");
+    const query = runId ? `?runId=${encodeURIComponent(runId)}` : "";
+    const es = new EventSource(`/api/events${query}`);
 
     es.onopen = () => setConnection("open");
     es.onmessage = (message) => {
@@ -44,7 +46,7 @@ export function useEventStream(source) {
     es.onerror = () => setConnection("reconnecting");
 
     return () => es.close();
-  }, [source]);
+  }, [source, runId]);
 
   return { state, connection };
 }
@@ -53,5 +55,7 @@ export function useEventStream(source) {
 export function initialSource() {
   if (typeof window === "undefined") return SOURCE.MOCK;
   const requested = new URLSearchParams(window.location.search).get("source");
-  return requested === SOURCE.LIVE ? SOURCE.LIVE : SOURCE.MOCK;
+  if (requested === SOURCE.LIVE) return SOURCE.LIVE;
+  if (requested === SOURCE.MOCK) return SOURCE.MOCK;
+  return window.sessionStorage?.getItem("humsafar.runId") ? SOURCE.LIVE : SOURCE.MOCK;
 }

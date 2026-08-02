@@ -61,7 +61,12 @@ class AutoApproval:
 
     requires_human = False
 
-    def request(self, run_id: str, allocations_paise: dict[str, int]) -> Optional[ApprovalRecord]:
+    def request(
+        self,
+        run_id: str,
+        allocations_paise: dict[str, int],
+        choices: Optional[dict[str, str]] = None,
+    ) -> Optional[ApprovalRecord]:
         return ApprovalRecord(
             approval_request_id="auto",
             run_id=run_id,
@@ -98,13 +103,19 @@ class PolledApproval:
 
     # -- protocol --------------------------------------------------------
 
-    def request(self, run_id: str, allocations_paise: dict[str, int]) -> Optional[ApprovalRecord]:
+    def request(
+        self,
+        run_id: str,
+        allocations_paise: dict[str, int],
+        choices: Optional[dict[str, str]] = None,
+    ) -> Optional[ApprovalRecord]:
         body = self._call(
             "POST",
             "/api/approvals/requests",
             {
                 "runId": run_id,
                 "allocations": {k: to_rupees(v) for k, v in allocations_paise.items()},
+                "choices": choices or {},
                 "ttlSeconds": self.ttl_seconds,
             },
         )

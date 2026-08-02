@@ -47,6 +47,7 @@ an unanswered Discord question into an implementation assumption.
 | No reliable public Prava sandbox merchant/store was identified. Staff also warned that creating a dummy Stripe store does not guarantee it will consume Prava sandbox cards. | Validate one merchant path early. Keep the merchant attempt separate from fixture purchases. Do not promise a successful merchant order unless one is observed end to end. |
 | The SDK/API integration does not include Prava's browser harness. The harness is associated with the production MCP/CLI path. | Use manual checkout or our own carefully scoped browser automation. Do not claim Prava bypasses bot checks for our REST integration. Keep a manual fallback and stop on CAPTCHA or merchant terms that prohibit automation. |
 | Builders got stuck at the passkey step. Sandbox uses a real WebAuthn prompt and sessions expire. | Use a supported current browser on a device with working WebAuthn. Have the hosted page open and the cardholder ready before creating the session. Complete issuer verification first on a new device, then register/verify the passkey. Recreate expired sessions instead of retrying stale URLs. |
+| Prava's hosted payment/passkey surface did not work reliably in this Linux browser, while the same short-lived URL completed on a passkey-capable Android phone. | Create the hosted session from the backend, then open/share only that short-lived `iframeUrl` to the cardholder's phone. Complete card entry, test OTP, and Android passkey on the phone. Never automate or relay OTP, biometric, PIN, or screen-lock data. The passkey belongs to that phone/account. |
 | A participant reported that the SDK-template session body was outdated. Another reported a broken guide link. | Treat current API reference pages and observed responses as authoritative. Compare every request field with the current Create Session reference; do not copy the template blindly. Capture sanitized `X-Response-ID` values for support. |
 | A participant did not copy a newly created API key and was unsure how to recover it. | Copy a new key once into a local secret manager and the gitignored `.env`; never into chat or Markdown. If lost, rotate/create a replacement rather than trying to recover or guess it. Run `npm run prava:verify` before any session creation. |
 | Session allowance/rate limits were unclear, and `TRIES_EXHAUSTED` was reported as a possible failure. | Do not use retry loops against session or charge endpoints. Use deliberate single calls, bounded retries only for transient transport errors, and preserve the response ID. The assigned team card also has a 30-transaction daily ceiling, so use fixtures for ordinary development. |
@@ -96,6 +97,9 @@ an unanswered Discord question into an implementation assumption.
 
 - [ ] Create the session only when the cardholder and supported browser are
   ready; the hosted session expires after 15 minutes.
+- [ ] For this workstation, treat Linux as the operator/backend surface and a
+  passkey-capable phone as the Prava hosted-approval surface. Do not burn
+  sessions repeatedly trying to force WebAuthn through the Linux browser.
 - [ ] Use the Prava-hosted secure page. Never collect the team card in our own
   React UI, CLI, logs, screenshots, or test fixtures.
 - [ ] Verify merchant name, merchant URL, currency, item description, approved

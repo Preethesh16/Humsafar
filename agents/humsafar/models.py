@@ -103,3 +103,6 @@ class Purchase:
     card_id: str
     source: Literal["live", "fixture"]
     detail: str
+    option_id: str = ""
+    chosen_by: str = ""
+    outcome: str = ""

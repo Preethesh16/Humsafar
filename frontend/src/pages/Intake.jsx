@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
 
 /**
  * Step 1 — the user states the goal.
@@ -14,20 +13,28 @@ import { useNavigate } from "react-router-dom";
  * event contract unchanged.
  */
 
-const SUGGESTIONS = ["Goa", "Jaipur", "Udaipur", "Leh", "Kochi"];
-
-export default function Intake({ onStarted }) {
-  const navigate = useNavigate();
-  const [destination, setDestination] = useState("Goa");
+export default function Intake({ onStarted, navigate }) {
+  const [origin, setOrigin] = useState("");
+  const [destination, setDestination] = useState("");
+  const [originCode, setOriginCode] = useState("");
+  const [destinationCode, setDestinationCode] = useState("");
   const [budget, setBudget] = useState(30000);
-  const [days, setDays] = useState(3);
+  const [departureDate, setDepartureDate] = useState(() => futureDate(7));
+  const [returnDate, setReturnDate] = useState(() => futureDate(10));
+  const [travelers, setTravelers] = useState(1);
+  const [rooms, setRooms] = useState(1);
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [emphasis, setEmphasis] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const goal =
-    `Plan my ${destination.trim() || "Goa"} trip for ${days} days` +
-    (emphasis.trim() ? `, ${emphasis.trim()}` : "");
+  const days = useMemo(
+    () => Math.max(1, Math.round((Date.parse(returnDate) - Date.parse(departureDate)) / 86_400_000)),
+    [departureDate, returnDate],
+  );
+  const goal = `Plan a ${days}-day trip from ${origin.trim()} to ${destination.trim()} for ${travelers} traveler${Number(travelers) === 1 ? "" : "s"}`
+    + (emphasis.trim() ? `, ${emphasis.trim()}` : "");
 
   async function start(event) {
     event.preventDefault();
@@ -37,11 +44,26 @@ export default function Intake({ onStarted }) {
       const response = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal, budget: Number(budget), days: Number(days) }),
+        body: JSON.stringify({
+          goal,
+          budget: Number(budget),
+          days,
+          origin: origin.trim(),
+          destination: destination.trim(),
+          originCode: originCode.trim().toUpperCase(),
+          destinationCode: destinationCode.trim().toUpperCase(),
+          departureDate,
+          returnDate,
+          travelers: Number(travelers),
+          rooms: Number(rooms),
+          latitude: latitude === "" ? undefined : Number(latitude),
+          longitude: longitude === "" ? undefined : Number(longitude),
+        }),
       });
-      if (!response.ok) throw new Error(`Backend returned ${response.status}`);
-      const { runId } = await response.json();
-      onStarted?.(runId);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error?.message ?? `Backend returned ${response.status}`);
+      const { runId } = payload;
+      onStarted?.({ runId, goal });
       navigate(`/deliberate?runId=${encodeURIComponent(runId)}`);
     } catch (cause) {
       // Never pretend a run started. The demo stream stays available and is
@@ -62,10 +84,15 @@ export default function Intake({ onStarted }) {
       </h1>
       <p className="intake-lede">
         Four specialist agents will negotiate this budget between themselves, then each
-        buys its own part on its own merchant-locked card. You approve once.
+        executes its own part through a merchant-locked credential. You approve the exact plan once.
       </p>
 
       <div className="intake-grid">
+        <label className="field">
+          <span className="field-label">Leaving from</span>
+          <input className="field-input" value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="Bengaluru" required />
+        </label>
+
         <label className="field">
           <span className="field-label">Destination</span>
           <input
@@ -75,18 +102,17 @@ export default function Intake({ onStarted }) {
             placeholder="Goa"
             required
           />
-          <div className="chips">
-            {SUGGESTIONS.map((city) => (
-              <button
-                type="button"
-                key={city}
-                className={`chip ${city === destination ? "on" : ""}`}
-                onClick={() => setDestination(city)}
-              >
-                {city}
-              </button>
-            ))}
-          </div>
+        </label>
+
+        <label className="field">
+          <span className="field-label">Origin airport code</span>
+          <input className="field-input" value={originCode} onChange={(e) => setOriginCode(e.target.value)} placeholder="BLR" minLength="3" maxLength="3" pattern="[A-Za-z]{3}" required />
+          <span className="field-hint">IATA code used for live flight search.</span>
+        </label>
+
+        <label className="field">
+          <span className="field-label">Destination airport code</span>
+          <input className="field-input" value={destinationCode} onChange={(e) => setDestinationCode(e.target.value)} placeholder="GOI" minLength="3" maxLength="3" pattern="[A-Za-z]{3}" required />
         </label>
 
         <label className="field">
@@ -104,16 +130,30 @@ export default function Intake({ onStarted }) {
         </label>
 
         <label className="field">
-          <span className="field-label">Days</span>
+          <span className="field-label">Departure</span>
           <input
             className="field-input"
-            type="number"
-            min="1"
-            max="14"
-            value={days}
-            onChange={(e) => setDays(e.target.value)}
+            type="date"
+            value={departureDate}
+            onChange={(e) => setDepartureDate(e.target.value)}
             required
           />
+        </label>
+
+        <label className="field">
+          <span className="field-label">Return</span>
+          <input className="field-input" type="date" min={departureDate} value={returnDate} onChange={(e) => setReturnDate(e.target.value)} required />
+          <span className="field-hint">{days} day trip</span>
+        </label>
+
+        <label className="field">
+          <span className="field-label">Travellers</span>
+          <input className="field-input" type="number" min="1" max="9" value={travelers} onChange={(e) => setTravelers(e.target.value)} required />
+        </label>
+
+        <label className="field">
+          <span className="field-label">Rooms</span>
+          <input className="field-input" type="number" min="1" max="9" value={rooms} onChange={(e) => setRooms(e.target.value)} required />
         </label>
 
         <label className="field wide">
@@ -128,6 +168,15 @@ export default function Intake({ onStarted }) {
             This shifts which agent concedes first — it never changes the budget.
           </span>
         </label>
+
+        <details className="field wide">
+          <summary className="field-label">Override hotel search coordinates (optional)</summary>
+          <p className="field-hint">When Google Maps and Duffel are configured, Humsafar resolves your destination automatically. Only enter coordinates to override that location.</p>
+          <div className="intake-grid">
+            <input className="field-input" type="number" step="any" min="-90" max="90" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="Latitude" />
+            <input className="field-input" type="number" step="any" min="-180" max="180" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="Longitude" />
+          </div>
+        </details>
       </div>
 
       <div className="intake-goal">
@@ -146,4 +195,10 @@ export default function Intake({ onStarted }) {
       </button>
     </form>
   );
+}
+
+function futureDate(offsetDays) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
 }

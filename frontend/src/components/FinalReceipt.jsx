@@ -103,9 +103,14 @@ export function FinalReceipt({ receipt, summary, blockedAttempts, renegotiations
                   <span className={`tag tag--${labelForPurchase(line).tone}`}>
                     {labelForPurchase(line).text}
                   </span>
+                  {line.chosenBy && (
+                    <span className="tag">
+                      {line.chosenBy === "user" ? "you chose this" : "auto-selected on timeout"}
+                    </span>
+                  )}
                 </span>
                 <span className="outcome-amount">
-                  {failed ? "not charged" : money(line.amount)}
+                  {failed ? "not charged" : line.outcome === "credential_issued" ? "authorised only" : money(line.amount)}
                 </span>
               </li>
             );

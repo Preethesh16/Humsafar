@@ -48,6 +48,7 @@ class EndToEndTest(unittest.TestCase):
             "a card was minted before approval was requested",
         )
         self.assertLess(sequence.index("approval_given"), sequence.index("card_issued"))
+        self.assertLess(sequence.index("choice_made"), sequence.index("approval_requested"))
         self.assertEqual(sequence[-1], "final_receipt")
 
     def test_nothing_is_minted_without_approval(self):
@@ -107,6 +108,12 @@ class RecoveryTest(unittest.TestCase):
 
         others = [p for p in report.purchases if p.agent != "guide"]
         self.assertTrue(all(p.status == "success" for p in others), "an unrelated slice was redone")
+        event_types = types(emitter)
+        self.assertEqual(event_types.count("approval_requested"), 2)
+        renegotiated_at = event_types.index("renegotiation_triggered")
+        second_approval_at = event_types.index("approval_requested", renegotiated_at)
+        last_card_at = len(event_types) - 1 - event_types[::-1].index("card_issued")
+        self.assertLess(second_approval_at, last_card_at)
 
     def test_recovery_stays_inside_the_budget(self):
         report, _ = run(fail_agent="stay")

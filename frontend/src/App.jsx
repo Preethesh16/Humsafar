@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import Choose from "./pages/Choose.jsx";
+import MandateSetup from "./components/MandateSetup.jsx";
 import Intake from "./pages/Intake.jsx";
 
 import { ApprovalPanel } from "./components/ApprovalPanel.jsx";
@@ -281,11 +282,66 @@ export default function App() {
     page = <ApprovalPage state={state} source={source} />;
   } else if (pathname === "/receipt") {
     page = <ReceiptPage state={state} source={source} navigate={navigate} />;
+  } else if (pathname === "/authorise") {
+    // The one-time step that lets the agents spend at all. Kept on its own
+    // route rather than in the run flow, because a mandate is authorised once
+    // per merchant and then reused across every future run — putting it inside
+    // the run would imply the user has to approve their card each time, which
+    // is the opposite of what the product does.
+    page = <AuthorisePage />;
   } else {
     page = <Intake onStarted={started} navigate={navigate} />;
   }
 
   return <><AutoAdvance state={state} pathname={pathname} navigate={navigate} />{page}</>;
+}
+
+/**
+ * The merchants the live Prava mandates cover, and the amounts they were
+ * approved at. Listed explicitly rather than derived from a run: a mandate is
+ * authorised per merchant ahead of time, which is how Prava's `listed` scope
+ * works, and pretending otherwise would misrepresent the model.
+ */
+const AUTHORISABLE = [
+  { name: "Air India Express", url: "https://airindiaexpress.com", countryCode: "IN", cap: 9800, what: "IX-1128 BLR-GOI return, direct" },
+  { name: "Anjuna Beach Resort", url: "https://anjunabeachresort.com", countryCode: "IN", cap: 11200, what: "2 nights, pool-view room" },
+  { name: "Gunpowder Assagao", url: "https://gunpowder.co.in", countryCode: "IN", cap: 4200, what: "dinner for two + one lunch" },
+  { name: "Dudhsagar Day Trip", url: "https://goatourism.gov.in", countryCode: "IN", cap: 3600, what: "guided full-day trip, shared jeep" },
+];
+
+function AuthorisePage() {
+  const [done, setDone] = useState(() => new Set());
+
+  return (
+    <div className="authorise">
+      <div className="eyebrow">Setup · one time per merchant</div>
+      <h2 className="page-title">
+        Authorise your agents. <span className="accent">Once.</span>
+      </h2>
+      <p className="page-lede">
+        Each agent gets its own spending authority, capped and locked to a single merchant.
+        You approve it here with your passkey — after that the agents transact on their own,
+        and no agent can spend past its cap or reach another&apos;s money.
+      </p>
+
+      {AUTHORISABLE.map((merchant) => (
+        <MandateSetup
+          key={merchant.name}
+          merchant={merchant}
+          amountCap={merchant.cap}
+          description={merchant.what}
+          onAuthorized={() => setDone((prev) => new Set(prev).add(merchant.name))}
+        />
+      ))}
+
+      {done.size > 0 && (
+        <p className="authorise__done">
+          {done.size} of {AUTHORISABLE.length} authorised. The agents can now spend at{" "}
+          {[...done].join(", ")}.
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**

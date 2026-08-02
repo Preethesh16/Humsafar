@@ -251,3 +251,19 @@ blocked.
 - This repository lives on a Windows drive accessed through WSL during development, where
   file watching does not fire. **Restart every long-running dev process after a pull**, or
   it will keep serving stale code.
+- **Prava calls fail intermittently without a Node connection flag.** The sandbox host
+  resolves to both IPv4 and NAT64 IPv6 addresses; the IPv6 ones are unroutable on some
+  networks, and Node's Happy Eyeballs auto-selection abandons the attempt after ~250ms and
+  reports `fetch failed` / `ETIMEDOUT`. Measured here: **9/12** requests succeeded with no
+  flag, **12/12** with `--network-family-autoselection-attempt-timeout=2000`. That flag is
+  set on every `npm` script that talks to Prava. `curl` is unaffected, which is what makes
+  this look like a credential or API problem when it is neither — if you are debugging
+  Prava by hand, use the npm scripts rather than a bare `node` invocation.
+
+### Environment file gotcha
+
+The scripts load `.env` via `node --env-file=.env`. A file saved as `.env.txt` (Windows
+"Save as" often appends `.txt`) is **silently ignored** — every value reads as undefined
+and the failure looks like bad credentials. Check `ls -a` for the exact filename, and
+confirm `.env` defines every key in `.env.example`; the mandate-session script validates
+five merchant/cap variables that are easy to miss.

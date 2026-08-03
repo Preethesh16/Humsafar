@@ -51,6 +51,12 @@ export class PravaApprovalService {
       currency: "INR",
       merchant: this.config.merchant,
       product: { ...this.config.product, unitPrice: amountCap, quantity: 1 },
+      // Returns the cardholder to us once Prava is done, instead of leaving
+      // them on Prava's domain. Documented as `callback_url`; `return_url` and
+      // `redirect_url` are accepted and silently ignored. Prava requires https,
+      // so mandateService drops it on an http origin rather than taking a 400 —
+      // meaning this is inert in local development and live once deployed.
+      callbackUrl: this.config.callbackUrl,
     });
     const iframeUrl = result?.data?.iframe_url ?? result?.data?.iframeUrl;
     const sessionId = result?.data?.session_id ?? result?.data?.sessionId;

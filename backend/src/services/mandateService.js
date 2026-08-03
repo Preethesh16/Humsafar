@@ -4,8 +4,21 @@ export class MandateService {
     this.mandateMerchants = mandateMerchants;
   }
 
-  async createSetupSession({ userId, userEmail, amountCap, currency = "INR", merchant, product }) {
+  async createSetupSession({ userId, userEmail, amountCap, currency = "INR", merchant, product, callbackUrl }) {
     return this.pravaClient.createMandateSession({
+      // Documented in Prava's REST checkout walkthrough: the hosted page
+      // redirects here once the cardholder is done, which is what returns them
+      // to our app instead of stranding them on Prava's domain. `return_url`
+      // and `redirect_url` are accepted and silently ignored — the field is
+      // `callback_url`.
+      //
+      // Prava rejects a non-https value outright ("callback_url must use https
+      // protocol"), so an http origin must omit it rather than send one and
+      // take a 400. PUBLIC_BASE_URL is http on every local dev server, so
+      // without this guard the phone-approval ceremony fails locally.
+      ...(typeof callbackUrl === "string" && callbackUrl.startsWith("https://")
+        ? { callback_url: callbackUrl }
+        : {}),
       user_id: userId,
       user_email: userEmail,
       total_amount: money(amountCap),

@@ -14,7 +14,7 @@ import {
   verifySessionToken,
 } from "./session.js";
 
-export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, pravaApprovalService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret } = {}) {
+export function createApp({ eventHub, scopedCardService, runService, discoveryService, itineraryService, mandateService, pravaApprovalService, approvalService, choiceService, trustService, internalApiToken, publicBaseUrl = "http://127.0.0.1:3000", frontendDist, sessionSecret, pravaCustomerId, pravaCustomerEmail } = {}) {
   if (!eventHub || typeof eventHub.publish !== "function") {
     throw new TypeError("An event hub is required");
   }

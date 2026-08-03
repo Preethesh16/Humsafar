@@ -63,6 +63,10 @@ const pravaApprovalService = new PravaApprovalService({
   config: {
     customerId: process.env.PRAVA_TEST_CUSTOMER_ID,
     customerEmail: process.env.PRAVA_TEST_CUSTOMER_EMAIL,
+    // Where Prava sends the cardholder afterwards. Dropped unless https, so
+    // this does nothing locally and takes effect once PUBLIC_BASE_URL is the
+    // deployed origin.
+    callbackUrl: process.env.PUBLIC_BASE_URL ? `${process.env.PUBLIC_BASE_URL}/receipt` : undefined,
     merchant: {
       name: process.env.PRAVA_PHONE_MERCHANT_NAME ?? "Humsafar",
       url: process.env.PRAVA_PHONE_MERCHANT_URL ?? "https://github.com/Preethesh16/Humsafar",
@@ -102,6 +106,10 @@ const app = createApp({
   publicBaseUrl: process.env.PUBLIC_BASE_URL,
   frontendDist,
   sessionSecret,
+  // Fixed server-side so a browser cannot open a checkout against somebody
+  // else's Prava customer.
+  pravaCustomerId: process.env.PRAVA_TEST_CUSTOMER_ID,
+  pravaCustomerEmail: process.env.PRAVA_TEST_CUSTOMER_EMAIL,
 });
 
 app.listen(port, host, () => {

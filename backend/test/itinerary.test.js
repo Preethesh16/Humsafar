@@ -49,18 +49,20 @@ test("weather is refused outside the real forecast window instead of invented", 
 });
 
 test("Open-Meteo normalises an exact-date daily forecast", async () => {
+  // Keep the mocked forecast within the real rolling window as the suite ages.
+  const forecastDate = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
   const client = new OpenMeteoClient({
     fetchImpl: async () => json({
       timezone: "Asia/Kolkata",
       daily: {
-        time: ["2026-08-04"], weather_code: [61],
+        time: [forecastDate], weather_code: [61],
         temperature_2m_max: [29], temperature_2m_min: [24],
         precipitation_probability_max: [70],
-        sunrise: ["2026-08-04T06:15"], sunset: ["2026-08-04T19:01"],
+        sunrise: [`${forecastDate}T06:15`], sunset: [`${forecastDate}T19:01`],
       },
     }),
   });
-  const result = await client.daily({ latitude: 15.49, longitude: 73.82, startDate: "2026-08-04", endDate: "2026-08-04" });
+  const result = await client.daily({ latitude: 15.49, longitude: 73.82, startDate: forecastDate, endDate: forecastDate });
   assert.equal(result.days[0].condition, "Rain");
   assert.equal(result.days[0].precipitationProbability, 70);
   assert.equal(result.days[0].sunrise, "06:15");

@@ -103,11 +103,22 @@ test("RunService uses the configured project Python without exposing it to the b
   assert.equal(calls[0].command, ".venv/bin/python");
 });
 
-test("RunService rejects a second run while the shared event stream is busy", () => {
+test("RunService allows concurrent runs up to its capacity", () => {
+  // The event hub filters by runId and each dashboard subscribes with its own,
+  // so two runs never bleed into each other's stream. The old limit of one
+  // meant the second judge to click Start got a 409 on a shared demo link.
   const { service } = harness();
+  service.start(trip);
+  assert.doesNotThrow(() => service.start(trip), "a second concurrent run was refused");
+});
+
+test("RunService still refuses runs past its capacity", () => {
+  // Bounded on purpose: every run spawns a Python process, so unbounded
+  // starts would exhaust memory on a small instance.
+  const { service } = harness({ HUMSAFAR_MAX_CONCURRENT_RUNS: "1" });
   service.start(trip);
   assert.throws(
     () => service.start(trip),
-    (error) => error.code === "RUN_ALREADY_ACTIVE" && error.status === 409,
+    (error) => error.code === "RUN_CAPACITY_REACHED" && error.status === 429,
   );
 });

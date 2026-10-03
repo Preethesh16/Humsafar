@@ -19,7 +19,8 @@ export class PravaApprovalService {
     // mandatory only when this external-state feature is explicitly enabled.
     this.config = enabled ? validateConfig(config) : config;
     this.now = now;
-    this.current = null;
+    this.approvals = new Map();
+    this.pending = new Map();
   }
 
   async create({ runId } = {}) {
@@ -33,17 +34,32 @@ export class PravaApprovalService {
     const plan = this.resolvePlan(runId);
     const amountCap = validatePlan(plan, runId);
 
-    // Double-clicks and page retries reuse the same live ceremony instead of
-    // consuming another scarce sandbox order/session.
+    const current = this.approvals.get(runId);
     if (
-      this.current
-      && this.current.runId === runId
-      && this.current.amountCap === amountCap
-      && Date.parse(this.current.expiresAt) > this.now() + 30_000
+      current
+      && current.amountCap === amountCap
+      && Date.parse(current.expiresAt) > this.now() + 30_000
     ) {
-      return publicApproval(this.current, { reused: true });
+      return publicApproval(current, { reused: true });
     }
 
+    // A same-run retry must not create another external session while the
+    // first request is still in flight. Different runs remain independent.
+    const pending = this.pending.get(runId);
+    if (pending) {
+      if (pending.amountCap !== amountCap) {
+        throw approvalError("PRAVA_APPROVAL_IN_PROGRESS", "An authorization for this trip is still being created");
+      }
+      return pending.promise;
+    }
+    const promise = this.#createApproval(runId, amountCap).finally(() => {
+      this.pending.delete(runId);
+    });
+    this.pending.set(runId, { amountCap, promise });
+    return promise;
+  }
+
+  async #createApproval(runId, amountCap) {
     const result = await this.mandateService.createSetupSession({
       userId: this.config.customerId,
       userEmail: this.config.customerEmail,
@@ -51,6 +67,12 @@ export class PravaApprovalService {
       currency: "INR",
       merchant: this.config.merchant,
       product: { ...this.config.product, unitPrice: amountCap, quantity: 1 },
+      // Returns the cardholder to us once Prava is done, instead of leaving
+      // them on Prava's domain. Documented as `callback_url`; `return_url` and
+      // `redirect_url` are accepted and silently ignored. Prava requires https,
+      // so mandateService drops it on an http origin rather than taking a 400 —
+      // meaning this is inert in local development and live once deployed.
+      callbackUrl: this.config.callbackUrl,
     });
     const iframeUrl = result?.data?.iframe_url ?? result?.data?.iframeUrl;
     const sessionId = result?.data?.session_id ?? result?.data?.sessionId;
@@ -63,7 +85,7 @@ export class PravaApprovalService {
       ? new Date(suppliedExpiry).toISOString()
       : new Date(this.now() + SESSION_FALLBACK_MS).toISOString();
 
-    this.current = {
+    const current = {
       runId,
       sessionId,
       environment: "sandbox",
@@ -75,30 +97,32 @@ export class PravaApprovalService {
       stage: "waiting_for_cardholder",
       authorizeOnly: true,
     };
-    return publicApproval(this.current, { reused: false });
+    this.approvals.set(runId, current);
+    return publicApproval(current, { reused: false });
   }
 
   async status({ runId } = {}) {
     if (!this.enabled) {
       throw approvalError("PRAVA_PHONE_APPROVAL_DISABLED", "Phone approval is disabled on this server");
     }
-    if (!this.current || this.current.runId !== runId) {
+    const current = this.approvals.get(runId);
+    if (!current) {
       throw approvalError("PRAVA_APPROVAL_NOT_FOUND", "No active Prava authorization exists for this trip");
     }
 
     const result = await this.mandateService.listCustomerMandates(this.config.customerId);
     const authorized = result?.data?.mandates?.some((mandate) =>
-      isMatchingAuthorization(mandate, this.current),
+      isMatchingAuthorization(mandate, current),
     );
-    const expired = Date.parse(this.current.expiresAt) <= this.now();
+    const expired = Date.parse(current.expiresAt) <= this.now();
     const stage = authorized ? "authorized" : expired ? "expired" : "waiting_for_cardholder";
-    this.current.stage = stage;
+    current.stage = stage;
     return {
-      runId: this.current.runId,
+      runId: current.runId,
       environment: "sandbox",
-      merchant: this.current.merchant,
-      amountCap: this.current.amountCap,
-      currency: this.current.currency,
+      merchant: current.merchant,
+      amountCap: current.amountCap,
+      currency: current.currency,
       stage,
       authorizeOnly: true,
       terminal: new Set(["authorized", "expired"]).has(stage),
